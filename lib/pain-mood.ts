@@ -103,7 +103,19 @@ export async function getMoodTags(): Promise<MoodTag[]> {
   return data as MoodTag[];
 }
 
+// Standalone logs serialize a mood entry's tags as a comma-joined
+// string (see createStandaloneLog/mapStandaloneLogToPoint), so a comma
+// inside a tag's own name would split it into two tags on the way back
+// out. Reject it here rather than at serialization time, since that's
+// the only point a tag name is ever actually chosen.
+function assertValidTagName(name: string): void {
+  if (name.includes(",")) {
+    throw new Error("Tag names can't contain commas.");
+  }
+}
+
 export async function createMoodTag(name: string, alwaysShow = true): Promise<MoodTag> {
+  assertValidTagName(name);
   const supabase = createClient();
   const userId = await getCurrentUserId();
   const { data, error } = await supabase
@@ -116,6 +128,7 @@ export async function createMoodTag(name: string, alwaysShow = true): Promise<Mo
 }
 
 export async function renameMoodTag(id: string, name: string): Promise<void> {
+  assertValidTagName(name);
   const supabase = createClient();
   const { error } = await supabase.from("mood_tags").update({ name }).eq("id", id);
   if (error) throw error;
@@ -152,6 +165,39 @@ function levelColumn(metric: WellbeingMetric): "pain_level" | "mood_level" {
   return metric === "pain" ? "pain_level" : "mood_level";
 }
 
+type DoseLogRow = Pick<
+  DoseLog,
+  "id" | "scheduled_for_date" | "scheduled_time" | "pain_level" | "mood_level" | "note"
+>;
+
+function mapDoseLogToPoint(row: DoseLogRow, metric: WellbeingMetric): TrendPoint {
+  return {
+    id: row.id,
+    date: row.scheduled_for_date,
+    time: row.scheduled_time.slice(0, 5),
+    level: (metric === "pain" ? row.pain_level : row.mood_level) as number,
+    source: "dose",
+    note: row.note,
+    tags: [],
+  };
+}
+
+function mapStandaloneLogToPoint(
+  log: StandalonePainMoodLog,
+  col: "pain_level" | "mood_level",
+): TrendPoint {
+  const [date, time] = log.logged_at.split("T");
+  return {
+    id: log.id,
+    date,
+    time: (time ?? "00:00").slice(0, 5),
+    level: log[col] as number,
+    source: "standalone",
+    note: log.note,
+    tags: log.tags ? log.tags.split(",").filter(Boolean) : [],
+  };
+}
+
 async function getDoseTrendPoints(
   metric: WellbeingMetric,
   medicationId: string,
@@ -168,17 +214,7 @@ async function getDoseTrendPoints(
     .gte("scheduled_for_date", startDate)
     .lte("scheduled_for_date", endDate);
   if (error) throw error;
-  return (data as Pick<DoseLog, "id" | "scheduled_for_date" | "scheduled_time" | "pain_level" | "mood_level" | "note">[]).map(
-    (row) => ({
-      id: row.id,
-      date: row.scheduled_for_date,
-      time: row.scheduled_time.slice(0, 5),
-      level: (metric === "pain" ? row.pain_level : row.mood_level) as number,
-      source: "dose" as const,
-      note: row.note,
-      tags: [],
-    }),
-  );
+  return (data as DoseLogRow[]).map((row) => mapDoseLogToPoint(row, metric));
 }
 
 async function getStandaloneTrendPoints(
@@ -189,20 +225,51 @@ async function getStandaloneTrendPoints(
 ): Promise<TrendPoint[]> {
   const logs = await getStandaloneLogs(medicationId, startDate, endDate);
   const col = levelColumn(metric);
-  return logs
-    .filter((log) => log[col] !== null)
-    .map((log) => {
-      const [date, time] = log.logged_at.split("T");
-      return {
-        id: log.id,
-        date,
-        time: (time ?? "00:00").slice(0, 5),
-        level: log[col] as number,
-        source: "standalone" as const,
-        note: log.note,
-        tags: log.tags ? log.tags.split(",").filter(Boolean) : [],
-      };
-    });
+  return logs.filter((log) => log[col] !== null).map((log) => mapStandaloneLogToPoint(log, col));
+}
+
+// Unbounded-by-date variants for getHistory(): fetch the most recent
+// `limit` entries directly via ORDER BY + LIMIT at the query level,
+// rather than a fixed lookback window that would silently go blank for
+// a user whose most recent entry is older than that window.
+async function getDoseHistoryPoints(
+  metric: WellbeingMetric,
+  medicationId: string,
+  limit: number,
+): Promise<TrendPoint[]> {
+  const supabase = createClient();
+  const col = levelColumn(metric);
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("id, scheduled_for_date, scheduled_time, pain_level, mood_level, note")
+    .eq("medication_id", medicationId)
+    .not(col, "is", null)
+    .order("scheduled_for_date", { ascending: false })
+    .order("scheduled_time", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as DoseLogRow[]).map((row) => mapDoseLogToPoint(row, metric));
+}
+
+async function getStandaloneHistoryPoints(
+  metric: WellbeingMetric,
+  medicationId: string | null,
+  limit: number,
+): Promise<TrendPoint[]> {
+  const supabase = createClient();
+  const col = levelColumn(metric);
+  let query = supabase
+    .from("standalone_pain_mood_logs")
+    .select("*")
+    .not(col, "is", null)
+    .order("logged_at", { ascending: false })
+    .limit(limit);
+  query = medicationId === null
+    ? query.is("medication_id", null)
+    : query.eq("medication_id", medicationId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data as StandalonePainMoodLog[]).map((log) => mapStandaloneLogToPoint(log, col));
 }
 
 function sortTrendPoints(points: TrendPoint[], order: "asc" | "desc"): TrendPoint[] {
@@ -241,14 +308,11 @@ export async function getHistory(
   medicationId: string | null,
   limit = 50,
 ): Promise<TrendPoint[]> {
-  const end = new Date();
-  const start = new Date(end);
-  start.setDate(start.getDate() - 365);
-  const points = await getTrend(
-    metric,
-    medicationId,
-    start.toISOString().slice(0, 10),
-    end.toISOString().slice(0, 10),
-  );
-  return sortTrendPoints(points, "desc").slice(0, limit);
+  const [dosePoints, standalonePoints] = await Promise.all([
+    medicationId !== null
+      ? getDoseHistoryPoints(metric, medicationId, limit)
+      : Promise.resolve([]),
+    getStandaloneHistoryPoints(metric, medicationId, limit),
+  ]);
+  return sortTrendPoints([...dosePoints, ...standalonePoints], "desc").slice(0, limit);
 }

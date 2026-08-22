@@ -2,8 +2,23 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Menu } from "lucide-react";
 import { useAuth } from "@/components/layout/AuthProvider";
 import { Button } from "@/components/ui/Button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
+
+const NAV_LINKS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/medications", label: "Medications" },
+  { href: "/pain-tracking", label: "Pain Tracking" },
+  { href: "/mood-wellbeing", label: "Mood & Wellbeing" },
+];
 
 export function TopNav() {
   const { user, signOut } = useAuth();
@@ -25,36 +40,37 @@ export function TopNav() {
         </Link>
         {user && (
           <div className="flex items-center gap-4">
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/calendar"
-              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
-            >
-              Calendar
-            </Link>
-            <Link
-              href="/medications"
-              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
-            >
-              Medications
-            </Link>
-            <Link
-              href="/pain-tracking"
-              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
-            >
-              Pain Tracking
-            </Link>
-            <Link
-              href="/mood-wellbeing"
-              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
-            >
-              Mood &amp; Wellbeing
-            </Link>
+            <nav className="hidden items-center gap-4 lg:flex">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Open navigation menu"
+                  className="rounded-control p-2 text-brand-text hover:bg-brand-bg lg:hidden"
+                >
+                  <Menu size={20} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {NAV_LINKS.map((link) => (
+                  <DropdownMenuItem key={link.href} asChild>
+                    <Link href={link.href}>{link.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <span className="hidden text-sm text-brand-text-muted sm:inline">
               {user.email}
             </span>
