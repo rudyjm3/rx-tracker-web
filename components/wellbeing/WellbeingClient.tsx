@@ -57,12 +57,12 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
 
   const { start, end } = rangeDates(rangeDays, today);
   const trendQuery = useQuery({
-    queryKey: ["wellbeing-trend", metric, selectedMedicationId, start, end],
-    queryFn: () => getTrend(metric, selectedMedicationId, start, end),
+    queryKey: ["wellbeing-trend", metric, selectedMedicationId, start, end, activeProfileId],
+    queryFn: () => getTrend(metric, selectedMedicationId, start, end, activeProfileId),
   });
   const historyQuery = useQuery({
-    queryKey: ["wellbeing-history", metric, selectedMedicationId],
-    queryFn: () => getHistory(metric, selectedMedicationId, 50),
+    queryKey: ["wellbeing-history", metric, selectedMedicationId, activeProfileId],
+    queryFn: () => getHistory(metric, selectedMedicationId, 50, activeProfileId),
   });
 
   const logMutation = useMutation({
@@ -75,6 +75,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
         note: input.note,
         tags: input.tags.join(","),
         loggedAt: input.loggedAt,
+        profileId: activeProfileId,
       }),
     onSuccess: () => {
       toast.success(`${metric === "pain" ? "Pain" : "Mood"} level logged`);

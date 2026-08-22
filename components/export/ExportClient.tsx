@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { computeAdherence } from "@/lib/adherence";
 import { getDoseLogHistory, getDoseLogStatusesInRange } from "@/lib/dose-logs";
-import { getActiveMedications } from "@/lib/medications";
+import { getActiveMedications, getInactiveMedications } from "@/lib/medications";
 import { getTrend, medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
 import { getSideEffectsInRange } from "@/lib/side-effects";
 import { localDateString, to12h } from "@/lib/utils";
@@ -47,15 +47,41 @@ export function ExportClient() {
   });
   const medications = useMemo(() => medicationsQuery.data ?? [], [medicationsQuery.data]);
 
+  // A medication discontinued partway through the selected range still
+  // has dose history/side effects worth including in the report, so the
+  // range queries below scope to active *and* inactive medications for
+  // this profile — only the "Active medications" list panel is
+  // active-only.
+  const inactiveMedicationsQuery = useQuery({
+    queryKey: ["medications", "inactive", activeProfileId],
+    queryFn: () => getInactiveMedications(activeProfileId),
+  });
+  const allMedicationIds = useMemo(
+    () => [
+      ...medications.map((m) => m.id),
+      ...(inactiveMedicationsQuery.data ?? []).map((m) => m.id),
+    ],
+    [medications, inactiveMedicationsQuery.data],
+  );
+
   const doseLogsQuery = useQuery({
-    queryKey: ["export-dose-logs", startDate, endDate],
-    queryFn: () => getDoseLogHistory({ startDate, endDate, limit: HISTORY_CAP, offset: 0 }),
+    queryKey: ["export-dose-logs", startDate, endDate, allMedicationIds],
+    queryFn: () =>
+      getDoseLogHistory({
+        startDate,
+        endDate,
+        medicationIds: allMedicationIds,
+        limit: HISTORY_CAP,
+        offset: 0,
+      }),
+    enabled: inactiveMedicationsQuery.data !== undefined,
   });
   const doseLogs = doseLogsQuery.data ?? [];
 
   const sideEffectsQuery = useQuery({
-    queryKey: ["export-side-effects", startDate, endDate],
-    queryFn: () => getSideEffectsInRange(startDate, endDate),
+    queryKey: ["export-side-effects", startDate, endDate, allMedicationIds],
+    queryFn: () => getSideEffectsInRange(startDate, endDate, allMedicationIds),
+    enabled: inactiveMedicationsQuery.data !== undefined,
   });
   const sideEffects = sideEffectsQuery.data ?? [];
 
@@ -64,8 +90,9 @@ export function ExportClient() {
   // full selected range, not just whichever rows happen to fit under
   // that cap.
   const adherenceStatusesQuery = useQuery({
-    queryKey: ["export-adherence-statuses", startDate, endDate],
-    queryFn: () => getDoseLogStatusesInRange(startDate, endDate),
+    queryKey: ["export-adherence-statuses", startDate, endDate, allMedicationIds],
+    queryFn: () => getDoseLogStatusesInRange(startDate, endDate, allMedicationIds),
+    enabled: inactiveMedicationsQuery.data !== undefined,
   });
   const adherenceStatuses = adherenceStatusesQuery.data ?? [];
 
@@ -103,6 +130,7 @@ export function ExportClient() {
 
   const isLoading =
     medicationsQuery.isLoading ||
+    inactiveMedicationsQuery.isLoading ||
     doseLogsQuery.isLoading ||
     sideEffectsQuery.isLoading ||
     adherenceStatusesQuery.isLoading ||

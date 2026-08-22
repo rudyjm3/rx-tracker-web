@@ -249,6 +249,10 @@ export async function getCalendarLogs(
 
 export interface DoseLogHistoryFilter {
   medicationId?: string; // omitted = every medication (active + inactive)
+  // Scopes the "every medication" case to a specific set (the active
+  // profile's own) — ignored when medicationId is set, since that's
+  // already a single, specific medication.
+  medicationIds?: string[];
   startDate?: string;
   endDate?: string;
   limit?: number;
@@ -265,6 +269,13 @@ export interface DoseLogHistoryFilter {
 export async function getDoseLogHistory(
   filter: DoseLogHistoryFilter = {},
 ): Promise<CalendarLogRow[]> {
+  if (
+    !filter.medicationId &&
+    filter.medicationIds &&
+    filter.medicationIds.length === 0
+  ) {
+    return [];
+  }
   const supabase = createClient();
   const limit = filter.limit ?? 50;
   const offset = filter.offset ?? 0;
@@ -274,7 +285,11 @@ export async function getDoseLogHistory(
     .order("scheduled_for_date", { ascending: false })
     .order("scheduled_time", { ascending: false })
     .range(offset, offset + limit - 1);
-  if (filter.medicationId) query = query.eq("medication_id", filter.medicationId);
+  if (filter.medicationId) {
+    query = query.eq("medication_id", filter.medicationId);
+  } else if (filter.medicationIds) {
+    query = query.in("medication_id", filter.medicationIds);
+  }
   if (filter.startDate) query = query.gte("scheduled_for_date", filter.startDate);
   if (filter.endDate) query = query.lte("scheduled_for_date", filter.endDate);
   const { data, error } = await query;
@@ -291,13 +306,17 @@ export async function getDoseLogHistory(
 export async function getDoseLogStatusesInRange(
   startDate: string,
   endDate: string,
+  medicationIds?: string[],
 ): Promise<{ medication_id: string; status: DoseLogStatus }[]> {
+  if (medicationIds && medicationIds.length === 0) return [];
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("dose_logs")
     .select("medication_id, status")
     .gte("scheduled_for_date", startDate)
     .lte("scheduled_for_date", endDate);
+  if (medicationIds) query = query.in("medication_id", medicationIds);
+  const { data, error } = await query;
   if (error) throw error;
   return data as { medication_id: string; status: DoseLogStatus }[];
 }
