@@ -316,3 +316,28 @@ export async function getHistory(
   ]);
   return sortTrendPoints([...dosePoints, ...standalonePoints], "desc").slice(0, limit);
 }
+
+export interface DailyAverage {
+  date: string;
+  level: number;
+}
+
+/**
+ * Groups trend points into one averaged level per date, sorted
+ * chronologically — the multi-day view's data shape for both
+ * TrendChart (interactive) and the export report's static
+ * ReportTrendChart, which both plot one point per day rather than
+ * every individual entry.
+ */
+export function groupDailyAverages(points: TrendPoint[]): DailyAverage[] {
+  const byDate = new Map<string, { sum: number; count: number }>();
+  for (const p of points) {
+    const acc = byDate.get(p.date) ?? { sum: 0, count: 0 };
+    acc.sum += p.level;
+    acc.count += 1;
+    byDate.set(p.date, acc);
+  }
+  return Array.from(byDate.entries())
+    .map(([date, { sum, count }]) => ({ date, level: sum / count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}

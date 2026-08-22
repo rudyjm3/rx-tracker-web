@@ -585,3 +585,113 @@ end;
 $$;
 
 grant execute on function record_dose(uuid, date, time, text, numeric, boolean, smallint, smallint, text) to authenticated;
+
+-- ─────────────────────────────────────────
+-- DOSE LOG EDIT/DELETE RPCs (step 7 — History)
+-- Same atomic, security-invoker, row-locked shape as record_dose, but
+-- keyed by an existing dose_logs row's id rather than the medication's
+-- natural (medication_id, date, time) key, since these operate on a
+-- log that's already been created (via record_dose or backfill) rather
+-- than creating/upserting one.
+-- ─────────────────────────────────────────
+create or replace function delete_dose_log(p_log_id uuid)
+returns void
+language plpgsql
+as $$
+declare
+  v_medication_id uuid;
+  v_status text;
+  v_deducted numeric;
+  v_inventory_enabled boolean;
+begin
+  select dl.medication_id, dl.status, dl.deducted_quantity, m.inventory_enabled
+    into v_medication_id, v_status, v_deducted, v_inventory_enabled
+    from dose_logs dl
+    join medications m on m.id = dl.medication_id
+   where dl.id = p_log_id
+   for update;
+
+  if v_medication_id is null then
+    raise exception 'Dose log not found';
+  end if;
+
+  perform 1 from medications where id = v_medication_id for update;
+
+  delete from dose_logs where id = p_log_id;
+
+  if v_status = 'taken' and v_deducted is not null and v_inventory_enabled then
+    update medications
+      set current_quantity = coalesce(current_quantity, 0) + v_deducted,
+          updated_at = now()
+      where id = v_medication_id;
+  end if;
+end;
+$$;
+
+grant execute on function delete_dose_log(uuid) to authenticated;
+
+-- p_taken_at/p_pain_level/p_mood_level/p_note/p_quantity_per_dose only
+-- apply when p_status = 'taken' (mirrors record_dose); always sets
+-- feedback_edited_at, since every call here is by definition an edit of
+-- an existing entry, unlike record_dose's initial Take-time capture.
+create or replace function edit_dose_log(
+  p_log_id uuid,
+  p_status text,
+  p_taken_at timestamptz,
+  p_pain_level smallint default null,
+  p_mood_level smallint default null,
+  p_note text default null,
+  p_quantity_per_dose numeric default null,
+  p_inventory_enabled boolean default false
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_medication_id uuid;
+  v_old_status text;
+  v_old_deducted numeric;
+begin
+  select medication_id, status, deducted_quantity
+    into v_medication_id, v_old_status, v_old_deducted
+    from dose_logs
+   where id = p_log_id
+   for update;
+
+  if v_medication_id is null then
+    raise exception 'Dose log not found';
+  end if;
+
+  perform 1 from medications where id = v_medication_id for update;
+
+  update dose_logs
+    set status = p_status,
+        taken_at = case when p_status = 'taken' then coalesce(p_taken_at, now()) else null end,
+        deducted_quantity = case when p_status = 'taken' then p_quantity_per_dose else null end,
+        pain_level = case when p_status = 'taken' then p_pain_level else null end,
+        mood_level = case when p_status = 'taken' then p_mood_level else null end,
+        note = case when p_status = 'taken' then coalesce(p_note, '') else '' end,
+        feedback_edited_at = now()
+   where id = p_log_id;
+
+  if not p_inventory_enabled then
+    return;
+  end if;
+
+  if v_old_status = 'taken' and v_old_deducted is not null then
+    update medications
+      set current_quantity = coalesce(current_quantity, 0) + v_old_deducted,
+          updated_at = now()
+      where id = v_medication_id;
+  end if;
+
+  if p_status = 'taken' then
+    update medications
+      set current_quantity = coalesce(current_quantity, 0) - p_quantity_per_dose,
+          updated_at = now()
+      where id = v_medication_id;
+  end if;
+end;
+$$;
+
+grant execute on function edit_dose_log(uuid, text, timestamptz, smallint, smallint, text, numeric, boolean) to authenticated;
