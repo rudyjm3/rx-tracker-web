@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { createClient } from "@/lib/supabase/server";
 import { AuthProvider } from "@/components/layout/AuthProvider";
+import { ActiveProfileProvider } from "@/components/layout/ActiveProfileProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { Toaster } from "sonner";
 
@@ -40,8 +41,10 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-brand-bg text-brand-text">
         <QueryProvider>
           <AuthProvider initialUser={user}>
-            {children}
-            <Toaster richColors position="top-center" />
+            <ActiveProfileProvider>
+              {children}
+              <Toaster richColors position="top-center" />
+            </ActiveProfileProvider>
           </AuthProvider>
         </QueryProvider>
       </body>
