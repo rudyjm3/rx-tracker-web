@@ -49,6 +49,12 @@ export function TopNav() {
             >
               Pain Tracking
             </Link>
+            <Link
+              href="/mood-wellbeing"
+              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
+            >
+              Mood &amp; Wellbeing
+            </Link>
             <span className="hidden text-sm text-brand-text-muted sm:inline">
               {user.email}
             </span>
