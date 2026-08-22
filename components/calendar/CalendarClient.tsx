@@ -54,14 +54,22 @@ export function CalendarClient() {
     queryFn: getMissedGraceMinutes,
   });
 
-  const inactiveIds = useMemo(
-    () => (inactiveMedicationsQuery.data ?? []).map((m) => m.id),
-    [inactiveMedicationsQuery.data],
+  // Covers active *and* inactive medications: a medication can be
+  // discontinued and later resumed, so its being active right now
+  // doesn't mean it was active for every past date — backfillMonth
+  // checks each active medication's own history too, not just inactive
+  // ones (see lib/calendar.ts).
+  const allMedicationIds = useMemo(
+    () => [
+      ...(activeMedicationsQuery.data ?? []).map((m) => m.id),
+      ...(inactiveMedicationsQuery.data ?? []).map((m) => m.id),
+    ],
+    [activeMedicationsQuery.data, inactiveMedicationsQuery.data],
   );
   const statusEventsQuery = useQuery({
-    queryKey: ["medication-status-events", inactiveIds],
-    queryFn: () => getStatusEvents(inactiveIds),
-    enabled: inactiveMedicationsQuery.data !== undefined,
+    queryKey: ["medication-status-events", allMedicationIds],
+    queryFn: () => getStatusEvents(allMedicationIds),
+    enabled: activeMedicationsQuery.data !== undefined && inactiveMedicationsQuery.data !== undefined,
   });
 
   const markersQuery = useQuery({

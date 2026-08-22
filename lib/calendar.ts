@@ -1,6 +1,6 @@
 import { finalizeMissedDoses, type CalendarLogRow } from "@/lib/dose-logs";
 import { generateDaySlots } from "@/lib/schedule";
-import { formatLate, minutesLate, to12h } from "@/lib/utils";
+import { formatLate, localDateString, minutesLate, to12h } from "@/lib/utils";
 import type {
   DoseLogStatus,
   Medication,
@@ -52,21 +52,49 @@ export function historicallyActiveMedications(
   );
 }
 
+/**
+ * Whether a medication's *current* schedule can be trusted to reflect
+ * what applied on a past `date`. Editing a medication deletes and
+ * re-inserts all of its medication_schedule_times, so every row's
+ * created_at moves forward together — if the earliest one is after
+ * `date`, the whole current schedule postdates that day and backfilling
+ * against it would synthesize a phantom missed dose at the *new* time
+ * alongside whatever was really logged at the old time. Interval-mode
+ * medications have no per-time timestamp to check against (matching the
+ * reference PHP app's own scope, which only checks fixed-time schedules)
+ * — fails open there, same as when there's no schedule data at all.
+ */
+function scheduleValidForDate(med: Medication, date: string): boolean {
+  if (med.schedule_mode !== "fixed_times") return true;
+  const times = med.medication_schedule_times ?? [];
+  if (times.length === 0) return true;
+  const dateEnd = `${date}T23:59:59`;
+  return times.every((t) => t.created_at <= dateEnd);
+}
+
 function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localDateString(d);
 }
 
 /**
- * Re-runs missed-dose finalization for every past date in [monthStart,
- * monthEnd] (today and future dates are skipped — there's nothing to
- * finalize yet), so calendar days aren't permanently blank just because
+ * Re-runs missed-dose finalization for every date in [monthStart,
+ * min(monthEnd, todayDate)] (future dates are skipped — there's nothing
+ * to finalize yet; today is included so doses already past their grace
+ * cutoff show up even if the user opens /calendar without ever visiting
+ * the dashboard), so calendar days aren't permanently blank just because
  * nobody had the app open that day. Idempotent per date via
  * finalizeMissedDoses' ignoreDuplicates guard, so safe to re-run on every
  * month load. Returns whether anything was actually finalized, so the
  * caller can invalidate its queries only when there's something new to
  * fetch (same pattern as the dashboard's own finalize effect).
+ *
+ * `statusEvents` must cover both active and inactive medications: a
+ * medication can be discontinued and later resumed, in which case it's
+ * active *now* but wasn't active for every date in between, so
+ * activeMedications can't be included unconditionally — each one is
+ * checked against its own history the same way inactive medications are.
  */
 export async function backfillMonth(
   monthStart: string,
@@ -79,7 +107,7 @@ export async function backfillMonth(
   statusEvents: MedicationStatusEvent[],
   graceMinutes: number,
 ): Promise<boolean> {
-  const lastBackfillDate = monthEnd < todayDate ? monthEnd : addDays(todayDate, -1);
+  const lastBackfillDate = monthEnd < todayDate ? monthEnd : todayDate;
   if (lastBackfillDate < monthStart) return false;
 
   let didFinalize = false;
@@ -89,9 +117,9 @@ export async function backfillMonth(
     date = addDays(date, 1)
   ) {
     const medsForDate = [
-      ...activeMedications,
+      ...activeMedications.filter((med) => wasActiveOnDate(med.id, date, statusEvents)),
       ...historicallyActiveMedications(date, inactiveMedications, statusEvents),
-    ];
+    ].filter((med) => scheduleValidForDate(med, date));
     const slots = generateDaySlots(date, medsForDate, groups, groupMembers, [], []);
     const finalized = await finalizeMissedDoses(date, slots, graceMinutes);
     didFinalize ||= finalized;
