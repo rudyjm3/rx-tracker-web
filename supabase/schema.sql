@@ -494,3 +494,37 @@ create index if not exists idx_standalone_pain_mood_logs_profile_id on standalon
 create index if not exists idx_standalone_pain_mood_logs_user_id on standalone_pain_mood_logs(user_id);
 create index if not exists idx_user_notifications_medication_id on user_notifications(medication_id);
 create index if not exists idx_user_notifications_user_id on user_notifications(user_id);
+
+-- ─────────────────────────────────────────
+-- INVENTORY RPCs
+-- Atomic relative adjustments to current_quantity — Supabase-js can't
+-- express `current_quantity = current_quantity - x` as a single atomic
+-- update, so Take/Undo dose recording calls these instead of a
+-- read-then-write from the client. security invoker (the default)
+-- means they run with the calling user's own privileges, so the "own
+-- medications" RLS policy still applies inside the function.
+-- ─────────────────────────────────────────
+create or replace function deduct_medication_quantity(p_medication_id uuid, p_amount numeric)
+returns numeric
+language sql
+as $$
+  update medications
+  set current_quantity = coalesce(current_quantity, 0) - p_amount,
+      updated_at = now()
+  where id = p_medication_id
+  returning current_quantity;
+$$;
+
+create or replace function restore_medication_quantity(p_medication_id uuid, p_amount numeric)
+returns numeric
+language sql
+as $$
+  update medications
+  set current_quantity = coalesce(current_quantity, 0) + p_amount,
+      updated_at = now()
+  where id = p_medication_id
+  returning current_quantity;
+$$;
+
+grant execute on function deduct_medication_quantity(uuid, numeric) to authenticated;
+grant execute on function restore_medication_quantity(uuid, numeric) to authenticated;

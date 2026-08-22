@@ -133,3 +133,30 @@ export interface MedicationDraft {
   created_at: string;
   updated_at: string;
 }
+
+export type DoseLogStatus = "taken" | "skipped" | "missed";
+
+export interface DoseLog {
+  id: string;
+  medication_id: string;
+  scheduled_for_date: string;
+  scheduled_time: string;
+  status: DoseLogStatus;
+  note: string;
+  pain_level: number | null;
+  mood_level: number | null;
+  deducted_quantity: number | null;
+  taken_at: string | null;
+  feedback_edited_at: string | null;
+  created_at: string;
+}
+
+export interface DosePostpone {
+  id: string;
+  medication_id: string;
+  scheduled_for_date: string;
+  scheduled_time: string;
+  postponed_until: string;
+  resolved_at: string | null;
+  created_at: string;
+}
