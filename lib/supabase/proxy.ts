@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   "/signup",
   "/forgot-password",
   "/reset-password",
+  "/auth/callback",
 ];
 
 function isPublicPath(pathname: string) {

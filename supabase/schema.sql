@@ -279,6 +279,14 @@ create table if not exists allergy_catalog (
   unique (name, owner_user_id)
 );
 
+-- `unique (name, owner_user_id)` doesn't stop duplicate global rows on
+-- re-run: Postgres treats every NULL owner_user_id as distinct, so the
+-- composite constraint never fires for them. A partial unique index on
+-- just the global rows closes that gap and gives `on conflict` something
+-- to target below.
+create unique index if not exists allergy_catalog_global_name_uidx
+  on allergy_catalog (name) where owner_user_id is null;
+
 -- Seed common system allergies (owner_user_id NULL = global)
 insert into allergy_catalog (owner_user_id, name) values
   (null, 'Penicillin'), (null, 'Sulfa Drugs'), (null, 'Aspirin/NSAIDs'),
@@ -286,7 +294,7 @@ insert into allergy_catalog (owner_user_id, name) values
   (null, 'Peanuts'), (null, 'Tree Nuts'), (null, 'Shellfish'),
   (null, 'Eggs'), (null, 'Milk/Dairy'), (null, 'Soy'), (null, 'Wheat/Gluten'),
   (null, 'Pollen'), (null, 'Pet Dander (Cat/Dog)'), (null, 'Bee/Insect Stings')
-on conflict (name, owner_user_id) do nothing;
+on conflict (name) where owner_user_id is null do nothing;
 
 create table if not exists profile_allergies (
   id                  uuid primary key default uuid_generate_v4(),
