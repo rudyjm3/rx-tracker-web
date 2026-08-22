@@ -68,3 +68,21 @@ body {
     #14cfe0 100%
   );
 }
+
+/* Export report (step 7): elements marked data-no-print (nav, filter
+   controls, the print button itself) are hidden when actually printing
+   or saving as PDF, and report sections avoid splitting mid-block
+   across a page break where reasonably possible. */
+@media print {
+  [data-no-print] {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  [data-report-section] {
+    break-inside: avoid;
+  }
+}
