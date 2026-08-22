@@ -25,6 +25,24 @@ create table if not exists family_profiles (
 );
 
 -- ─────────────────────────────────────────
+-- USER PROFILES (owner's own extended profile info)
+-- One row per auth user, created lazily on first save. family_profiles
+-- already covers family members' equivalent fields; this is the owner's
+-- own counterpart, since auth.users can't be extended with app columns.
+-- ─────────────────────────────────────────
+create table if not exists user_profiles (
+  user_id          uuid primary key references auth.users(id) on delete cascade,
+  display_name     text,
+  first_name       text,
+  last_name        text,
+  birth_date       date,
+  height_value     numeric(5,2),
+  height_unit      text,
+  profile_picture  text,
+  updated_at       timestamptz default now()
+);
+
+-- ─────────────────────────────────────────
 -- MEDICATIONS
 -- ─────────────────────────────────────────
 create table if not exists medications (
@@ -364,8 +382,20 @@ create table if not exists profile_onboarding (
 );
 
 -- ─────────────────────────────────────────
+-- AVATARS STORAGE BUCKET (step 8 — Profile & Family)
+-- Public bucket so getPublicUrl() works directly for <img> tags. Both the
+-- owner's own picture and every family member's picture upload under the
+-- owner's own uid folder ({userId}/{randomId}.{ext}), since family
+-- profiles have no independent storage identity of their own.
+-- ─────────────────────────────────────────
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+-- ─────────────────────────────────────────
 -- ROW LEVEL SECURITY
 -- ─────────────────────────────────────────
+alter table user_profiles              enable row level security;
 alter table medications               enable row level security;
 alter table medication_schedule_times  enable row level security;
 alter table dose_logs                  enable row level security;
@@ -461,6 +491,32 @@ create policy "own family profiles"
   on family_profiles for all using ((select auth.uid()) = user_id);
 create policy "own onboarding"
   on profile_onboarding for all using ((select auth.uid()) = user_id);
+create policy "own user profile"
+  on user_profiles for all using ((select auth.uid()) = user_id);
+
+-- Avatars storage bucket policies (step 8) — public read, writes scoped
+-- to the caller's own uid folder within the bucket.
+create policy "public read avatars"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+create policy "manage own avatar files insert"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+create policy "manage own avatar files update"
+  on storage.objects for update
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+create policy "manage own avatar files delete"
+  on storage.objects for delete
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 -- ─────────────────────────────────────────
 -- INDEXES
