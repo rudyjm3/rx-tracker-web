@@ -29,6 +29,21 @@ export function medicationTracksMetric(
   return metric === "pain" ? medicationTracksPain(medication) : medicationTracksMood(medication);
 }
 
+// 3 severity bands (the reference PHP app's charts use 4 — this brand's
+// tokens only have success/warning/danger). Mood is inverted from pain:
+// a low mood score is the bad end, a low pain score is the good end.
+export function levelColor(metric: WellbeingMetric, level: number): string {
+  const rounded = Math.round(level);
+  if (metric === "pain") {
+    if (rounded <= 3) return "var(--color-status-success)";
+    if (rounded <= 6) return "var(--color-status-warning)";
+    return "var(--color-status-danger)";
+  }
+  if (rounded <= 3) return "var(--color-status-danger)";
+  if (rounded <= 6) return "var(--color-status-warning)";
+  return "var(--color-status-success)";
+}
+
 // ── Standalone pain/mood logs ───────────────────────────────────────
 
 export async function getStandaloneLogs(

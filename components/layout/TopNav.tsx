@@ -43,6 +43,12 @@ export function TopNav() {
             >
               Medications
             </Link>
+            <Link
+              href="/pain-tracking"
+              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
+            >
+              Pain Tracking
+            </Link>
             <span className="hidden text-sm text-brand-text-muted sm:inline">
               {user.email}
             </span>
