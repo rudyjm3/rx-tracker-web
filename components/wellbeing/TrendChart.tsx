@@ -13,7 +13,12 @@ import {
 } from "recharts";
 import { cn } from "@/lib/cn";
 import { minutesToTime, timeToMinutes, to12h } from "@/lib/utils";
-import { levelColor, type TrendPoint, type WellbeingMetric } from "@/lib/pain-mood";
+import {
+  groupDailyAverages,
+  levelColor,
+  type TrendPoint,
+  type WellbeingMetric,
+} from "@/lib/pain-mood";
 
 export const RANGE_OPTIONS = [
   { label: "Today", days: 0 as const },
@@ -65,16 +70,7 @@ export function TrendChart({ metric, points, rangeDays, onRangeChange }: TrendCh
 
   const dailyAverages = useMemo(() => {
     if (showingDay) return [];
-    const byDate = new Map<string, { sum: number; count: number }>();
-    for (const p of points) {
-      const acc = byDate.get(p.date) ?? { sum: 0, count: 0 };
-      acc.sum += p.level;
-      acc.count += 1;
-      byDate.set(p.date, acc);
-    }
-    return Array.from(byDate.entries())
-      .map(([date, { sum, count }]) => ({ date, level: sum / count }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    return groupDailyAverages(points);
   }, [points, showingDay]);
 
   const hasData = showingDay ? dayPoints.length > 0 : dailyAverages.length > 0;

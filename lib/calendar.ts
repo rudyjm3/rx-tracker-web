@@ -195,6 +195,11 @@ export interface CalendarDaySlot {
   status: DoseLogStatus;
   isLate: boolean;
   lateLabel: string | null;
+  takenAt: string | null;
+  painLevel: number | null;
+  moodLevel: number | null;
+  note: string;
+  deductedQuantity: number | null;
 }
 
 export interface CalendarDayMedicationSummary {
@@ -281,6 +286,11 @@ export function buildDayDetails(
       status: log.status,
       isLate: lateMin !== null,
       lateLabel: lateMin !== null ? formatLate(lateMin) : null,
+      takenAt: log.taken_at,
+      painLevel: log.pain_level,
+      moodLevel: log.mood_level,
+      note: log.note,
+      deductedQuantity: log.deducted_quantity,
     });
   }
 

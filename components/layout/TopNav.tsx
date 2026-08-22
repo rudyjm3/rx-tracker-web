@@ -18,13 +18,15 @@ const NAV_LINKS = [
   { href: "/medications", label: "Medications" },
   { href: "/pain-tracking", label: "Pain Tracking" },
   { href: "/mood-wellbeing", label: "Mood & Wellbeing" },
+  { href: "/history", label: "History" },
+  { href: "/export", label: "Export" },
 ];
 
 export function TopNav() {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="border-b border-brand-border bg-brand-card">
+    <header data-no-print className="border-b border-brand-border bg-brand-card">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image

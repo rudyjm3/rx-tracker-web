@@ -1,6 +1,28 @@
 import { createClient } from "@/lib/supabase/client";
 import type { SideEffect, SideEffectSeverity } from "@/lib/types/medications";
 
+export type SideEffectRow = SideEffect & { medications: { name: string } };
+
+/**
+ * All of the user's side effects (across every medication, RLS-scoped
+ * through medication_id) within a date range — for the export report.
+ * Unlike getSideEffects, not limited to a single medication.
+ */
+export async function getSideEffectsInRange(
+  startDate: string,
+  endDate: string,
+): Promise<SideEffectRow[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("side_effects")
+    .select("*, medications(name)")
+    .gte("occurred_date", startDate)
+    .lte("occurred_date", endDate)
+    .order("occurred_date", { ascending: false });
+  if (error) throw error;
+  return data as SideEffectRow[];
+}
+
 export async function getSideEffects(
   medicationId: string,
 ): Promise<SideEffect[]> {

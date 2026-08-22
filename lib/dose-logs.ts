@@ -138,18 +138,47 @@ export async function getTodayPostpones(date: string): Promise<DosePostpone[]> {
   return data as DosePostpone[];
 }
 
-export async function getRecentLogs(
-  limit = 50,
-): Promise<(DoseLog & { medications: { name: string } })[]> {
+/**
+ * Edits an existing dose_logs row via the edit_dose_log RPC — same
+ * atomic inventory-adjustment shape as recordDose, but keyed by the
+ * log's own id (the row already exists) and always marks
+ * feedback_edited_at. See supabase/schema.sql for the function
+ * definition.
+ */
+export interface DoseLogEditInput {
+  status: DoseLogStatus;
+  takenAt?: string | null; // ISO; only applied when status === "taken"
+  painLevel?: number | null;
+  moodLevel?: number | null;
+  note?: string;
+  quantityPerDose?: number;
+  inventoryEnabled?: boolean;
+}
+
+export async function editDoseLog(logId: string, input: DoseLogEditInput): Promise<void> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("dose_logs")
-    .select("*, medications(name)")
-    .order("scheduled_for_date", { ascending: false })
-    .order("scheduled_time", { ascending: false })
-    .limit(limit);
+  const { error } = await supabase.rpc("edit_dose_log", {
+    p_log_id: logId,
+    p_status: input.status,
+    p_taken_at: input.takenAt ?? null,
+    p_pain_level: input.painLevel ?? null,
+    p_mood_level: input.moodLevel ?? null,
+    p_note: input.note ?? null,
+    p_quantity_per_dose: input.quantityPerDose ?? null,
+    p_inventory_enabled: input.inventoryEnabled ?? false,
+  });
   if (error) throw error;
-  return data as (DoseLog & { medications: { name: string } })[];
+}
+
+/**
+ * Deletes a dose_logs row via the delete_dose_log RPC, restoring
+ * deducted inventory if it was a 'taken' entry on an inventory-tracked
+ * medication.
+ */
+export async function deleteDoseLog(logId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("delete_dose_log", { p_log_id: logId });
+  if (error) throw error;
 }
 
 export interface CalendarDayMarker {
@@ -208,4 +237,59 @@ export async function getCalendarLogs(
     .order("scheduled_time", { ascending: true });
   if (error) throw error;
   return data as CalendarLogRow[];
+}
+
+export interface DoseLogHistoryFilter {
+  medicationId?: string; // omitted = every medication (active + inactive)
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Newest-first, offset-paginated dose_logs for the History page and the
+ * export report — joined with medication name/dose like
+ * getCalendarLogs, but filterable by an arbitrary date range and a
+ * single medication (including an inactive one, unlike the dashboard/
+ * calendar queries, which only ever see active medications' logs).
+ */
+export async function getDoseLogHistory(
+  filter: DoseLogHistoryFilter = {},
+): Promise<CalendarLogRow[]> {
+  const supabase = createClient();
+  const limit = filter.limit ?? 50;
+  const offset = filter.offset ?? 0;
+  let query = supabase
+    .from("dose_logs")
+    .select("*, medications(name, dose)")
+    .order("scheduled_for_date", { ascending: false })
+    .order("scheduled_time", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (filter.medicationId) query = query.eq("medication_id", filter.medicationId);
+  if (filter.startDate) query = query.gte("scheduled_for_date", filter.startDate);
+  if (filter.endDate) query = query.lte("scheduled_for_date", filter.endDate);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as CalendarLogRow[];
+}
+
+/**
+ * Every (medication_id, status) pair for dose_logs in a date range,
+ * with no row cap — for adherence aggregation in the export report,
+ * which must reflect the full selected range independently of
+ * getDoseLogHistory's display-table pagination cap.
+ */
+export async function getDoseLogStatusesInRange(
+  startDate: string,
+  endDate: string,
+): Promise<{ medication_id: string; status: DoseLogStatus }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("medication_id, status")
+    .gte("scheduled_for_date", startDate)
+    .lte("scheduled_for_date", endDate);
+  if (error) throw error;
+  return data as { medication_id: string; status: DoseLogStatus }[];
 }
