@@ -10,6 +10,7 @@ import {
   getTodayPostpones,
   postponeDose,
   recordDose,
+  type DoseFeedback,
 } from "@/lib/dose-logs";
 import {
   getActiveMedications,
@@ -23,6 +24,7 @@ import type { DoseLogStatus } from "@/lib/types/medications";
 import { HeroPanel } from "./HeroPanel";
 import { ScheduleList } from "./ScheduleList";
 import { LowSupplyBanner } from "./LowSupplyBanner";
+import { FeedbackDialog } from "./FeedbackDialog";
 
 const REFRESH_INTERVAL_MS = 60_000;
 const todayString = localDateString;
@@ -31,6 +33,7 @@ export function DashboardClient() {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(todayString);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [feedbackSlot, setFeedbackSlot] = useState<DaySlot | null>(null);
 
   // A dashboard left open across local midnight would otherwise keep
   // refetching/recording against the frozen initial date forever.
@@ -114,8 +117,8 @@ export function DashboardClient() {
   }, [date, graceQuery.data, logsQuery.dataUpdatedAt]);
 
   const takeMutation = useMutation({
-    mutationFn: (slot: DaySlot) =>
-      recordDose(slot.medication, date, slot.scheduledTime, "taken", slot.quantityPerDose),
+    mutationFn: ({ slot, feedback }: { slot: DaySlot; feedback?: DoseFeedback }) =>
+      recordDose(slot.medication, date, slot.scheduledTime, "taken", slot.quantityPerDose, feedback),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dose-logs", date] });
       queryClient.invalidateQueries({ queryKey: ["medications"] });
@@ -153,8 +156,19 @@ export function DashboardClient() {
   });
 
   function handleTake(slot: DaySlot) {
+    if (slot.medication.feedback_type !== "none") {
+      setFeedbackSlot(slot);
+      return;
+    }
     setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
-    takeMutation.mutate(slot);
+    takeMutation.mutate({ slot });
+  }
+  function handleFeedbackSubmit(feedback?: DoseFeedback) {
+    if (!feedbackSlot) return;
+    const slot = feedbackSlot;
+    setFeedbackSlot(null);
+    setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
+    takeMutation.mutate({ slot, feedback });
   }
   function handleSkip(slot: DaySlot) {
     setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
@@ -219,6 +233,12 @@ export function DashboardClient() {
           pendingKey={pendingKey}
         />
       </div>
+
+      <FeedbackDialog
+        slot={feedbackSlot}
+        onSubmit={handleFeedbackSubmit}
+        onClose={() => setFeedbackSlot(null)}
+      />
     </div>
   );
 }

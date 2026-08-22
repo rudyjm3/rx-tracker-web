@@ -7,6 +7,12 @@ import type {
   Medication,
 } from "@/lib/types/medications";
 
+export interface DoseFeedback {
+  painLevel?: number;
+  moodLevel?: number;
+  note?: string;
+}
+
 /**
  * Take/Skip. Runs as a single atomic Postgres RPC (record_dose) rather
  * than a client-side read-then-write, so two concurrent calls for the
@@ -14,6 +20,10 @@ import type {
  * existing log" and both deduct inventory for what should be a single
  * dose — the RPC serializes on a row lock instead. See
  * supabase/schema.sql for the function definition.
+ *
+ * `feedback` (pain/mood level, note) is only meaningful for status
+ * "taken" — the RPC itself enforces that, resetting these columns to
+ * null/'' for any other status.
  */
 export async function recordDose(
   medication: Pick<Medication, "id" | "inventory_enabled">,
@@ -21,6 +31,7 @@ export async function recordDose(
   scheduledTime: string,
   status: "taken" | "skipped",
   quantityPerDose: number,
+  feedback?: DoseFeedback,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.rpc("record_dose", {
@@ -30,6 +41,9 @@ export async function recordDose(
     p_status: status,
     p_quantity_per_dose: quantityPerDose,
     p_inventory_enabled: medication.inventory_enabled,
+    p_pain_level: feedback?.painLevel ?? null,
+    p_mood_level: feedback?.moodLevel ?? null,
+    p_note: feedback?.note ?? null,
   });
   if (error) throw error;
 }
