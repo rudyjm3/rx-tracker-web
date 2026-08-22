@@ -144,6 +144,10 @@ export interface CalendarDayMarker {
   missed: number;
 }
 
+export type CalendarLogRow = DoseLog & {
+  medications: { name: string; dose: string };
+};
+
 /**
  * Per-day taken/skipped/missed counts for a month, keyed by date — drives
  * the calendar grid's day-cell coloring. Aggregated client-side (a handful
@@ -179,7 +183,7 @@ export async function getCalendarMarkers(
 export async function getCalendarLogs(
   monthStart: string,
   monthEnd: string,
-): Promise<(DoseLog & { medications: { name: string; dose: string } })[]> {
+): Promise<CalendarLogRow[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("dose_logs")
@@ -189,5 +193,5 @@ export async function getCalendarLogs(
     .order("scheduled_for_date", { ascending: true })
     .order("scheduled_time", { ascending: true });
   if (error) throw error;
-  return data as (DoseLog & { medications: { name: string; dose: string } })[];
+  return data as CalendarLogRow[];
 }

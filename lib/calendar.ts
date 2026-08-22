@@ -1,6 +1,8 @@
-import { finalizeMissedDoses } from "@/lib/dose-logs";
+import { finalizeMissedDoses, type CalendarLogRow } from "@/lib/dose-logs";
 import { generateDaySlots } from "@/lib/schedule";
+import { formatLate, minutesLate, to12h } from "@/lib/utils";
 import type {
+  DoseLogStatus,
   Medication,
   MedicationGroup,
   MedicationGroupMember,
@@ -114,4 +116,145 @@ export function calendarDayColor(
   if (marker.skipped > 0 && marker.taken === 0) return "skipped";
   if (marker.taken > 0) return "taken";
   return "empty";
+}
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export interface MonthBounds {
+  monthStart: string; // YYYY-MM-01
+  monthEnd: string; // YYYY-MM-DD, the month's last day
+  daysInMonth: number;
+  firstDow: number; // 0 (Sun) .. 6 (Sat), weekday of the 1st
+  prevMonth: string; // YYYY-MM
+  nextMonth: string; // YYYY-MM
+  label: string; // e.g. "August 2026"
+}
+
+/**
+ * Local-time month arithmetic for the calendar grid — built from
+ * Date's local-time constructor (never toISOString()) so it can't drift
+ * a day near month boundaries the way UTC-based math would.
+ */
+export function monthBounds(month: string): MonthBounds {
+  const [yearStr, monthStr] = month.split("-");
+  const year = Number(yearStr);
+  const monthIndex = Number(monthStr) - 1;
+
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const firstDow = new Date(year, monthIndex, 1).getDay();
+  const prevDate = new Date(year, monthIndex - 1, 1);
+  const nextDate = new Date(year, monthIndex + 1, 1);
+
+  return {
+    monthStart: `${month}-01`,
+    monthEnd: `${month}-${String(daysInMonth).padStart(2, "0")}`,
+    daysInMonth,
+    firstDow,
+    prevMonth: `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`,
+    nextMonth: `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`,
+    label: `${MONTH_NAMES[monthIndex]} ${year}`,
+  };
+}
+
+export interface CalendarDaySlot {
+  logId: string;
+  medicationId: string;
+  time: string; // "HH:MM"
+  displayTime: string; // 12h
+  status: DoseLogStatus;
+  isLate: boolean;
+  lateLabel: string | null;
+}
+
+export interface CalendarDayMedicationSummary {
+  medicationId: string;
+  name: string;
+  dose: string;
+  total: number;
+  taken: number;
+  late: number;
+  skipped: number;
+  missed: number;
+  slots: CalendarDaySlot[];
+}
+
+export interface CalendarDayDetail {
+  date: string;
+  dayName: string; // e.g. "Friday"
+  displayDate: string; // e.g. "August 22, 2026"
+  medications: CalendarDayMedicationSummary[];
+}
+
+/**
+ * Groups a month's raw dose_logs into per-day, per-medication summaries
+ * for the day-detail view — port of the reference PHP app's
+ * $calendarDayData building loop in routes/calendar.php.
+ */
+export function buildDayDetails(
+  logs: CalendarLogRow[],
+  graceMinutes: number,
+): Record<string, CalendarDayDetail> {
+  const result: Record<string, CalendarDayDetail> = {};
+
+  for (const log of logs) {
+    const date = log.scheduled_for_date;
+    let day = result[date];
+    if (!day) {
+      const d = new Date(`${date}T00:00:00`);
+      day = {
+        date,
+        dayName: d.toLocaleDateString(undefined, { weekday: "long" }),
+        displayDate: d.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        medications: [],
+      };
+      result[date] = day;
+    }
+
+    let med = day.medications.find((m) => m.medicationId === log.medication_id);
+    if (!med) {
+      med = {
+        medicationId: log.medication_id,
+        name: log.medications.name,
+        dose: log.medications.dose,
+        total: 0,
+        taken: 0,
+        late: 0,
+        skipped: 0,
+        missed: 0,
+        slots: [],
+      };
+      day.medications.push(med);
+    }
+
+    const lateMin = minutesLate(log, graceMinutes);
+    med.total++;
+    if (log.status === "taken") {
+      med.taken++;
+      if (lateMin !== null) med.late++;
+    } else if (log.status === "skipped") {
+      med.skipped++;
+    } else if (log.status === "missed") {
+      med.missed++;
+    }
+
+    const time = log.scheduled_time.slice(0, 5);
+    med.slots.push({
+      logId: log.id,
+      medicationId: log.medication_id,
+      time,
+      displayTime: to12h(time),
+      status: log.status,
+      isLate: lateMin !== null,
+      lateLabel: lateMin !== null ? formatLate(lateMin) : null,
+    });
+  }
+
+  return result;
 }
