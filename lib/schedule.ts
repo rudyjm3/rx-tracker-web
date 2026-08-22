@@ -68,17 +68,16 @@ export function generateDaySlots(
   doseLogs: DoseLog[],
   postpones: DosePostpone[],
 ): DaySlot[] {
-  const groupByMedication = new Map<
+  const groupsByMedication = new Map<
     string,
-    { group: MedicationGroup; override: number | null }
+    { group: MedicationGroup; override: number | null }[]
   >();
   for (const member of groupMembers) {
     const group = groups.find((g) => g.id === member.group_id);
     if (group) {
-      groupByMedication.set(member.medication_id, {
-        group,
-        override: member.quantity_per_dose,
-      });
+      const existing = groupsByMedication.get(member.medication_id) ?? [];
+      existing.push({ group, override: member.quantity_per_dose });
+      groupsByMedication.set(member.medication_id, existing);
     }
   }
 
@@ -96,10 +95,11 @@ export function generateDaySlots(
 
   for (const med of medications) {
     if (med.as_needed) continue;
+    if (!med.dashboard_enabled) continue;
     if (med.start_date && date < med.start_date) continue;
     if (med.end_date && date > med.end_date) continue;
 
-    const groupInfo = groupByMedication.get(med.id);
+    const medGroups = groupsByMedication.get(med.id) ?? [];
     const times: { time: string; scheduleTimeOverride: number | null }[] = [];
 
     if (med.schedule_mode === "fixed_times") {
@@ -121,12 +121,13 @@ export function generateDaySlots(
     }
 
     for (const { time, scheduleTimeOverride } of times) {
-      const isGroupedNow =
-        groupInfo && groupInfo.group.scheduled_time.slice(0, 5) === time;
+      const matchedGroup = medGroups.find(
+        (g) => g.group.scheduled_time.slice(0, 5) === time,
+      );
       const quantityPerDose = resolveQuantityPerDose({
         medication: med,
         scheduleTimeQuantityOverride: scheduleTimeOverride,
-        groupMemberQuantityOverride: isGroupedNow ? groupInfo.override : null,
+        groupMemberQuantityOverride: matchedGroup ? matchedGroup.override : null,
       });
 
       const log = logsByKey.get(`${med.id}|${time}`);
@@ -137,8 +138,8 @@ export function generateDaySlots(
         medicationName: med.name,
         dose: med.dose,
         scheduledTime: time,
-        groupId: isGroupedNow ? groupInfo.group.id : null,
-        groupName: isGroupedNow ? groupInfo.group.name : null,
+        groupId: matchedGroup ? matchedGroup.group.id : null,
+        groupName: matchedGroup ? matchedGroup.group.name : null,
         quantityPerDose,
         status: log?.status ?? "pending",
         takenAt: log?.taken_at ?? null,

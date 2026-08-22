@@ -57,33 +57,3 @@ export async function adjustQuantity(
     .eq("id", medicationId);
   if (updateError) throw updateError;
 }
-
-// Relative adjustments for Take/Undo dose recording go through
-// Postgres RPCs (deduct_medication_quantity / restore_medication_quantity)
-// rather than a client-side read-then-write, since Supabase-js can't
-// express `current_quantity = current_quantity - x` as a single atomic
-// update. See supabase/schema.sql for the function definitions.
-
-export async function deductForDose(
-  medicationId: string,
-  amount: number,
-): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("deduct_medication_quantity", {
-    p_medication_id: medicationId,
-    p_amount: amount,
-  });
-  if (error) throw error;
-}
-
-export async function restoreForDose(
-  medicationId: string,
-  amount: number,
-): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase.rpc("restore_medication_quantity", {
-    p_medication_id: medicationId,
-    p_amount: amount,
-  });
-  if (error) throw error;
-}

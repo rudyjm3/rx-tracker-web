@@ -1,20 +1,14 @@
 import { createClient } from "@/lib/supabase/client";
-import { deductForDose, restoreForDose } from "@/lib/inventory";
 import type { DaySlot } from "@/lib/schedule";
 import type { DoseLog, DosePostpone, Medication } from "@/lib/types/medications";
 
 /**
- * Take/Skip. Handles switching away from a previously-taken dose
- * (restores the historically-recorded deducted_quantity, never
- * recomputes from today's medication config, since that may have
- * changed since the dose was logged) and switching into taken
- * (deducts quantityPerDose, the caller-resolved amount for this exact
- * slot — see lib/schedule.ts's resolveQuantityPerDose).
- *
- * The dose_logs write always happens first, then inventory follows:
- * if the log write fails, inventory is never touched; if a later
- * inventory RPC fails, only the balance is left stale (recoverable via
- * Adjust Quantity), which is the smaller failure mode of the two.
+ * Take/Skip. Runs as a single atomic Postgres RPC (record_dose) rather
+ * than a client-side read-then-write, so two concurrent calls for the
+ * same slot (double-click, two tabs/devices) can't both read "no
+ * existing log" and both deduct inventory for what should be a single
+ * dose — the RPC serializes on a row lock instead. See
+ * supabase/schema.sql for the function definition.
  */
 export async function recordDose(
   medication: Pick<Medication, "id" | "inventory_enabled">,
@@ -24,41 +18,15 @@ export async function recordDose(
   quantityPerDose: number,
 ): Promise<void> {
   const supabase = createClient();
-
-  const { data: existing, error: fetchError } = await supabase
-    .from("dose_logs")
-    .select("status, deducted_quantity")
-    .eq("medication_id", medication.id)
-    .eq("scheduled_for_date", scheduledForDate)
-    .eq("scheduled_time", scheduledTime)
-    .maybeSingle();
-  if (fetchError) throw fetchError;
-
-  if (existing?.status === status) return; // already in this state
-
-  const wasTaken = existing?.status === "taken";
-  const willBeTaken = status === "taken";
-
-  const { error } = await supabase.from("dose_logs").upsert(
-    {
-      medication_id: medication.id,
-      scheduled_for_date: scheduledForDate,
-      scheduled_time: scheduledTime,
-      status,
-      deducted_quantity: willBeTaken ? quantityPerDose : null,
-      taken_at: willBeTaken ? new Date().toISOString() : null,
-    },
-    { onConflict: "medication_id,scheduled_for_date,scheduled_time" },
-  );
+  const { error } = await supabase.rpc("record_dose", {
+    p_medication_id: medication.id,
+    p_scheduled_for_date: scheduledForDate,
+    p_scheduled_time: scheduledTime,
+    p_status: status,
+    p_quantity_per_dose: quantityPerDose,
+    p_inventory_enabled: medication.inventory_enabled,
+  });
   if (error) throw error;
-
-  if (!medication.inventory_enabled) return;
-
-  if (wasTaken && !willBeTaken && existing?.deducted_quantity != null) {
-    await restoreForDose(medication.id, existing.deducted_quantity);
-  } else if (!wasTaken && willBeTaken) {
-    await deductForDose(medication.id, quantityPerDose);
-  }
 }
 
 export async function postponeDose(
@@ -90,13 +58,15 @@ export async function postponeDose(
  * as_needed and adherence_enabled=false medications are never
  * finalized. ignoreDuplicates guards the race where the dose was taken
  * between reading `slots` and this call — it skips rather than
- * clobbering a row that now exists.
+ * clobbering a row that now exists. Returns whether any row was
+ * actually finalized, so callers can skip invalidating queries (and
+ * thus avoid re-triggering themselves) when there was nothing to do.
  */
 export async function finalizeMissedDoses(
   date: string,
   slots: DaySlot[],
   graceMinutes: number,
-): Promise<void> {
+): Promise<boolean> {
   const now = new Date();
   const toFinalize = slots.filter((slot) => {
     if (slot.status !== "pending") return false;
@@ -108,7 +78,7 @@ export async function finalizeMissedDoses(
     const cutoff = new Date(due.getTime() + graceMinutes * 60000);
     return now > cutoff;
   });
-  if (toFinalize.length === 0) return;
+  if (toFinalize.length === 0) return false;
 
   const supabase = createClient();
   const { error } = await supabase.from("dose_logs").upsert(
@@ -125,6 +95,7 @@ export async function finalizeMissedDoses(
     },
   );
   if (error) throw error;
+  return true;
 }
 
 export async function getTodayLogs(date: string): Promise<DoseLog[]> {

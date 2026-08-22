@@ -25,14 +25,33 @@ import { LowSupplyBanner } from "./LowSupplyBanner";
 
 const REFRESH_INTERVAL_MS = 60_000;
 
+// Local calendar date, not UTC — toISOString() would shift the date
+// for any user not on UTC, especially for several hours around local
+// midnight (e.g. a UTC-7 user sees tomorrow's date after 5pm local).
 function todayString(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function DashboardClient() {
   const queryClient = useQueryClient();
-  const [date] = useState(todayString);
+  const [date, setDate] = useState(todayString);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+
+  // A dashboard left open across local midnight would otherwise keep
+  // refetching/recording against the frozen initial date forever.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDate((current) => {
+        const now = todayString();
+        return now === current ? current : now;
+      });
+    }, REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
 
   const medicationsQuery = useQuery({
     queryKey: ["medications", "active"],
@@ -88,8 +107,8 @@ export function DashboardClient() {
     if (slots.length === 0 || graceQuery.data == null) return;
     let cancelled = false;
     finalizeMissedDoses(date, slots, graceMinutes)
-      .then(() => {
-        if (!cancelled) {
+      .then((didFinalize) => {
+        if (!cancelled && didFinalize) {
           queryClient.invalidateQueries({ queryKey: ["dose-logs", date] });
         }
       })
@@ -155,16 +174,28 @@ export function DashboardClient() {
     snoozeMutation.mutate({ slot, minutes });
   }
 
-  const nextDose = slots.find((s) => s.status === "pending") ?? null;
+  const effectiveTime = (slot: DaySlot) =>
+    slot.postponedUntil
+      ? new Date(slot.postponedUntil).getTime()
+      : new Date(`${date}T${slot.scheduledTime}`).getTime();
+
+  const nextDose =
+    slots
+      .filter((s) => s.status === "pending")
+      .sort((a, b) => effectiveTime(a) - effectiveTime(b))[0] ?? null;
 
   const adherencePercent = computeAdherence(
     slots
-      .filter((s) => s.status !== "pending")
+      .filter((s) => s.status !== "pending" && s.medication.adherence_enabled)
       .map((s) => ({ status: s.status as DoseLogStatus })),
   );
 
   const isLoading =
-    medicationsQuery.isLoading || logsQuery.isLoading || postponesQuery.isLoading;
+    medicationsQuery.isLoading ||
+    groupsQuery.isLoading ||
+    groupMembersQuery.isLoading ||
+    logsQuery.isLoading ||
+    postponesQuery.isLoading;
 
   if (isLoading) {
     return <p className="text-brand-text-muted">Loading dashboard…</p>;

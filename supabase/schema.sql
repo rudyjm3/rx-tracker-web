@@ -496,35 +496,78 @@ create index if not exists idx_user_notifications_medication_id on user_notifica
 create index if not exists idx_user_notifications_user_id on user_notifications(user_id);
 
 -- ─────────────────────────────────────────
--- INVENTORY RPCs
--- Atomic relative adjustments to current_quantity — Supabase-js can't
--- express `current_quantity = current_quantity - x` as a single atomic
--- update, so Take/Undo dose recording calls these instead of a
--- read-then-write from the client. security invoker (the default)
--- means they run with the calling user's own privileges, so the "own
--- medications" RLS policy still applies inside the function.
+-- DOSE RECORDING RPC
+-- Take/Skip run through this single RPC rather than a client-side
+-- read-then-write, so two concurrent calls for the same slot
+-- (double-click, two tabs/devices) can't both observe "no existing
+-- log" and both deduct inventory for what should be a single dose.
+-- The `for update` lock on the medication row serializes concurrent
+-- calls for that medication; security invoker (the default) means it
+-- runs with the calling user's own privileges, so the "own
+-- medications"/"own dose logs" RLS policies still apply inside it.
 -- ─────────────────────────────────────────
-create or replace function deduct_medication_quantity(p_medication_id uuid, p_amount numeric)
-returns numeric
-language sql
+create or replace function record_dose(
+  p_medication_id uuid,
+  p_scheduled_for_date date,
+  p_scheduled_time time,
+  p_status text,
+  p_quantity_per_dose numeric,
+  p_inventory_enabled boolean
+)
+returns void
+language plpgsql
 as $$
-  update medications
-  set current_quantity = coalesce(current_quantity, 0) - p_amount,
-      updated_at = now()
-  where id = p_medication_id
-  returning current_quantity;
+declare
+  v_existing_status text;
+  v_existing_deducted numeric;
+begin
+  perform 1 from medications where id = p_medication_id for update;
+
+  select status, deducted_quantity
+    into v_existing_status, v_existing_deducted
+    from dose_logs
+   where medication_id = p_medication_id
+     and scheduled_for_date = p_scheduled_for_date
+     and scheduled_time = p_scheduled_time
+   for update;
+
+  if v_existing_status = p_status then
+    return; -- already in this state
+  end if;
+
+  insert into dose_logs (
+    medication_id, scheduled_for_date, scheduled_time, status,
+    deducted_quantity, taken_at
+  )
+  values (
+    p_medication_id, p_scheduled_for_date, p_scheduled_time, p_status,
+    case when p_status = 'taken' then p_quantity_per_dose else null end,
+    case when p_status = 'taken' then now() else null end
+  )
+  on conflict (medication_id, scheduled_for_date, scheduled_time)
+  do update set
+    status = excluded.status,
+    deducted_quantity = excluded.deducted_quantity,
+    taken_at = excluded.taken_at;
+
+  if not p_inventory_enabled then
+    return;
+  end if;
+
+  if v_existing_status = 'taken' and v_existing_deducted is not null then
+    update medications
+      set current_quantity = coalesce(current_quantity, 0) + v_existing_deducted,
+          updated_at = now()
+      where id = p_medication_id;
+  end if;
+
+  if p_status = 'taken' then
+    update medications
+      set current_quantity = coalesce(current_quantity, 0) - p_quantity_per_dose,
+          updated_at = now()
+      where id = p_medication_id;
+  end if;
+end;
 $$;
 
-create or replace function restore_medication_quantity(p_medication_id uuid, p_amount numeric)
-returns numeric
-language sql
-as $$
-  update medications
-  set current_quantity = coalesce(current_quantity, 0) + p_amount,
-      updated_at = now()
-  where id = p_medication_id
-  returning current_quantity;
-$$;
-
-grant execute on function deduct_medication_quantity(uuid, numeric) to authenticated;
-grant execute on function restore_medication_quantity(uuid, numeric) to authenticated;
+grant execute on function record_dose(uuid, date, time, text, numeric, boolean) to authenticated;
