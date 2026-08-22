@@ -390,59 +390,107 @@ alter table family_profiles            enable row level security;
 alter table profile_onboarding         enable row level security;
 
 -- RLS Policies
+-- auth.uid() is wrapped in (select ...) throughout: unwrapped, Postgres
+-- re-evaluates it once per row instead of once per query, which is a
+-- documented RLS performance pitfall at any real row count.
 create policy "own medications"
-  on medications for all using (auth.uid() = user_id);
+  on medications for all using ((select auth.uid()) = user_id);
 create policy "own schedule times"
   on medication_schedule_times for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own dose logs"
   on dose_logs for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own postpones"
   on dose_postpones for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own refills"
   on medication_refills for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own inventory transactions"
   on inventory_transactions for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own side effects"
   on side_effects for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own dose changes"
   on medication_dose_changes for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own status events"
   on medication_status_events for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own groups"
-  on medication_groups for all using (auth.uid() = user_id);
+  on medication_groups for all using ((select auth.uid()) = user_id);
 create policy "own group members"
   on medication_group_members for all
-  using (group_id in (select id from medication_groups where user_id = auth.uid()));
+  using (group_id in (select id from medication_groups where user_id = (select auth.uid())));
 create policy "own notes"
   on medication_notes for all
-  using (medication_id in (select id from medications where user_id = auth.uid()));
+  using (medication_id in (select id from medications where user_id = (select auth.uid())));
 create policy "own drafts"
-  on medication_drafts for all using (auth.uid() = user_id);
+  on medication_drafts for all using ((select auth.uid()) = user_id);
 create policy "own pain mood logs"
-  on standalone_pain_mood_logs for all using (auth.uid() = user_id);
+  on standalone_pain_mood_logs for all using ((select auth.uid()) = user_id);
 create policy "own mood tags"
-  on mood_tags for all using (auth.uid() = user_id);
+  on mood_tags for all using ((select auth.uid()) = user_id);
 create policy "read allergy catalog"
-  on allergy_catalog for select using (owner_user_id is null or owner_user_id = auth.uid());
-create policy "manage own allergy catalog entries"
-  on allergy_catalog for all using (owner_user_id = auth.uid());
+  on allergy_catalog for select using (owner_user_id is null or owner_user_id = (select auth.uid()));
+-- Split into the three write actions (not "for all", which would
+-- duplicate "read allergy catalog"'s SELECT coverage and force both
+-- permissive policies to run on every read) — Postgres policies can't
+-- list multiple commands in one FOR clause, so this is three policies.
+create policy "manage own allergy catalog entries insert"
+  on allergy_catalog for insert
+  with check (owner_user_id = (select auth.uid()));
+create policy "manage own allergy catalog entries update"
+  on allergy_catalog for update
+  using (owner_user_id = (select auth.uid()))
+  with check (owner_user_id = (select auth.uid()));
+create policy "manage own allergy catalog entries delete"
+  on allergy_catalog for delete
+  using (owner_user_id = (select auth.uid()));
 create policy "own profile allergies"
-  on profile_allergies for all using (auth.uid() = owner_user_id);
+  on profile_allergies for all using ((select auth.uid()) = owner_user_id);
 create policy "own settings"
-  on app_settings for all using (auth.uid() = user_id);
+  on app_settings for all using ((select auth.uid()) = user_id);
 create policy "own push subscriptions"
-  on push_subscriptions for all using (auth.uid() = user_id);
+  on push_subscriptions for all using ((select auth.uid()) = user_id);
 create policy "own notifications"
-  on user_notifications for all using (auth.uid() = user_id);
+  on user_notifications for all using ((select auth.uid()) = user_id);
 create policy "own family profiles"
-  on family_profiles for all using (auth.uid() = user_id);
+  on family_profiles for all using ((select auth.uid()) = user_id);
 create policy "own onboarding"
-  on profile_onboarding for all using (auth.uid() = user_id);
+  on profile_onboarding for all using ((select auth.uid()) = user_id);
+
+-- ─────────────────────────────────────────
+-- INDEXES
+-- Covering indexes for every foreign key — without these, RLS policies
+-- and joins that filter through them (which is most of this app's
+-- query patterns) fall back to sequential scans as tables grow.
+-- ─────────────────────────────────────────
+create index if not exists idx_allergy_catalog_owner_user_id on allergy_catalog(owner_user_id);
+create index if not exists idx_family_profiles_user_id on family_profiles(user_id);
+create index if not exists idx_inventory_transactions_dose_log_id on inventory_transactions(dose_log_id);
+create index if not exists idx_inventory_transactions_medication_id on inventory_transactions(medication_id);
+create index if not exists idx_inventory_transactions_refill_id on inventory_transactions(refill_id);
+create index if not exists idx_medication_dose_changes_medication_id on medication_dose_changes(medication_id);
+create index if not exists idx_medication_drafts_profile_id on medication_drafts(profile_id);
+create index if not exists idx_medication_drafts_user_id on medication_drafts(user_id);
+create index if not exists idx_medication_group_members_medication_id on medication_group_members(medication_id);
+create index if not exists idx_medication_groups_profile_id on medication_groups(profile_id);
+create index if not exists idx_medication_groups_user_id on medication_groups(user_id);
+create index if not exists idx_medication_notes_medication_id on medication_notes(medication_id);
+create index if not exists idx_medication_refills_medication_id on medication_refills(medication_id);
+create index if not exists idx_medication_status_events_medication_id on medication_status_events(medication_id);
+create index if not exists idx_medications_profile_id on medications(profile_id);
+create index if not exists idx_medications_user_id on medications(user_id);
+create index if not exists idx_profile_allergies_allergy_catalog_id on profile_allergies(allergy_catalog_id);
+create index if not exists idx_profile_allergies_profile_id on profile_allergies(profile_id);
+create index if not exists idx_profile_onboarding_profile_id on profile_onboarding(profile_id);
+create index if not exists idx_push_subscriptions_user_id on push_subscriptions(user_id);
+create index if not exists idx_side_effects_medication_id on side_effects(medication_id);
+create index if not exists idx_standalone_pain_mood_logs_medication_id on standalone_pain_mood_logs(medication_id);
+create index if not exists idx_standalone_pain_mood_logs_profile_id on standalone_pain_mood_logs(profile_id);
+create index if not exists idx_standalone_pain_mood_logs_user_id on standalone_pain_mood_logs(user_id);
+create index if not exists idx_user_notifications_medication_id on user_notifications(medication_id);
+create index if not exists idx_user_notifications_user_id on user_notifications(user_id);

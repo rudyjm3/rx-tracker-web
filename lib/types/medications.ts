@@ -1,0 +1,135 @@
+export type ScheduleMode = "fixed_times" | "interval";
+export type MedicationType = "prescription" | "otc" | "supplement";
+export type FeedbackType = "none" | "pain" | "mood" | "both";
+export type SetupStatus = "draft" | "ready" | "active";
+export type StatusEventType = "discontinued" | "resumed";
+export type RefillEntryType = "refill" | "adjustment";
+export type SideEffectSeverity = "mild" | "moderate" | "severe";
+
+export interface MedicationScheduleTime {
+  id: string;
+  medication_id: string;
+  reminder_time: string;
+  quantity_per_dose: number | null;
+  created_at: string;
+}
+
+export interface Medication {
+  id: string;
+  user_id: string;
+  profile_id: string | null;
+  name: string;
+  dose: string;
+  dose_amount: number | null;
+  dose_unit: string | null;
+  dose_form: string | null;
+  instructions: string;
+  schedule_mode: ScheduleMode;
+  interval_hours: number | null;
+  first_dose_time: string | null;
+  as_needed: boolean;
+  medication_type: MedicationType;
+  inventory_type: string;
+  inventory_unit: string;
+  starting_quantity: number | null;
+  current_quantity: number | null;
+  quantity_per_dose: number;
+  low_supply_threshold: number;
+  track_dose_feedback: boolean;
+  feedback_type: FeedbackType;
+  start_date: string | null;
+  end_date: string | null;
+  active: boolean;
+  setup_status: SetupStatus;
+  dashboard_enabled: boolean;
+  reminders_enabled: boolean;
+  adherence_enabled: boolean;
+  inventory_enabled: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  medication_schedule_times?: MedicationScheduleTime[];
+}
+
+export interface MedicationGroup {
+  id: string;
+  user_id: string;
+  profile_id: string | null;
+  name: string;
+  scheduled_time: string;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MedicationGroupMember {
+  group_id: string;
+  medication_id: string;
+  sort_order: number;
+  quantity_per_dose: number | null;
+}
+
+export interface MedicationNote {
+  id: string;
+  medication_id: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SideEffect {
+  id: string;
+  medication_id: string;
+  occurred_date: string;
+  description: string;
+  severity: SideEffectSeverity;
+  note: string;
+  created_at: string;
+}
+
+export interface MedicationRefill {
+  id: string;
+  medication_id: string;
+  refill_date: string;
+  amount: number;
+  pills_on_hand: number;
+  note: string;
+  entry_type: RefillEntryType;
+  started_using_at: string | null;
+  carryover_quantity: number;
+  created_at: string;
+}
+
+export interface MedicationDoseChange {
+  id: string;
+  medication_id: string;
+  changed_at: string;
+  old_dose_amount: number | null;
+  old_dose_unit: string;
+  new_dose_amount: number | null;
+  new_dose_unit: string;
+  comment: string;
+  created_at: string;
+}
+
+export interface MedicationStatusEvent {
+  id: string;
+  medication_id: string;
+  event: StatusEventType;
+  event_at: string;
+  reason: string;
+  comment: string;
+  created_at: string;
+}
+
+export interface MedicationDraft {
+  id: string;
+  user_id: string;
+  profile_id: string | null;
+  form_data: string;
+  current_step: number;
+  furthest_step: number;
+  created_at: string;
+  updated_at: string;
+}
