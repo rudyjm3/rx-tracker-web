@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getMissedGraceMinutes } from "@/lib/app-settings";
 import {
   backfillMonth,
@@ -31,6 +32,7 @@ function currentMonth(): string {
 
 export function CalendarClient() {
   const queryClient = useQueryClient();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
   const month = searchParams.get("m") ?? currentMonth();
@@ -46,14 +48,20 @@ export function CalendarClient() {
   }
 
   const activeMedicationsQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const inactiveMedicationsQuery = useQuery({
-    queryKey: ["medications", "inactive"],
-    queryFn: getInactiveMedications,
+    queryKey: ["medications", "inactive", activeProfileId],
+    queryFn: () => getInactiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
-  const groupsQuery = useQuery({ queryKey: ["groups"], queryFn: getGroups });
+  const groupsQuery = useQuery({
+    queryKey: ["groups", activeProfileId],
+    queryFn: () => getGroups(activeProfileId),
+    enabled: !isResolving,
+  });
   const groupMembersQuery = useQuery({
     queryKey: ["group-members"],
     queryFn: getGroupMembers,
@@ -75,19 +83,23 @@ export function CalendarClient() {
     ],
     [activeMedicationsQuery.data, inactiveMedicationsQuery.data],
   );
+  const medicationListsLoaded =
+    activeMedicationsQuery.data !== undefined && inactiveMedicationsQuery.data !== undefined;
   const statusEventsQuery = useQuery({
     queryKey: ["medication-status-events", allMedicationIds],
     queryFn: () => getStatusEvents(allMedicationIds),
-    enabled: activeMedicationsQuery.data !== undefined && inactiveMedicationsQuery.data !== undefined,
+    enabled: medicationListsLoaded,
   });
 
   const markersQuery = useQuery({
-    queryKey: ["calendar-markers", bounds.monthStart, bounds.monthEnd],
-    queryFn: () => getCalendarMarkers(bounds.monthStart, bounds.monthEnd),
+    queryKey: ["calendar-markers", bounds.monthStart, bounds.monthEnd, allMedicationIds],
+    queryFn: () => getCalendarMarkers(bounds.monthStart, bounds.monthEnd, allMedicationIds),
+    enabled: medicationListsLoaded,
   });
   const logsQuery = useQuery({
-    queryKey: ["calendar-logs", bounds.monthStart, bounds.monthEnd],
-    queryFn: () => getCalendarLogs(bounds.monthStart, bounds.monthEnd),
+    queryKey: ["calendar-logs", bounds.monthStart, bounds.monthEnd, allMedicationIds],
+    queryFn: () => getCalendarLogs(bounds.monthStart, bounds.monthEnd, allMedicationIds),
+    enabled: medicationListsLoaded,
   });
 
   const graceMinutes = graceQuery.data ?? 60;
@@ -182,6 +194,7 @@ export function CalendarClient() {
   }
 
   const isLoading =
+    isResolving ||
     activeMedicationsQuery.isLoading ||
     inactiveMedicationsQuery.isLoading ||
     groupsQuery.isLoading ||

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getMissedGraceMinutes } from "@/lib/app-settings";
 import {
   finalizeMissedDoses,
@@ -31,6 +32,7 @@ const todayString = localDateString;
 
 export function DashboardClient() {
   const queryClient = useQueryClient();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const [date, setDate] = useState(todayString);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [feedbackSlot, setFeedbackSlot] = useState<DaySlot | null>(null);
@@ -48,11 +50,16 @@ export function DashboardClient() {
   }, []);
 
   const medicationsQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
     refetchInterval: REFRESH_INTERVAL_MS,
+    enabled: !isResolving,
   });
-  const groupsQuery = useQuery({ queryKey: ["groups"], queryFn: getGroups });
+  const groupsQuery = useQuery({
+    queryKey: ["groups", activeProfileId],
+    queryFn: () => getGroups(activeProfileId),
+    enabled: !isResolving,
+  });
   const groupMembersQuery = useQuery({
     queryKey: ["group-members"],
     queryFn: getGroupMembers,
@@ -196,6 +203,7 @@ export function DashboardClient() {
   );
 
   const isLoading =
+    isResolving ||
     medicationsQuery.isLoading ||
     groupsQuery.isLoading ||
     groupMembersQuery.isLoading ||

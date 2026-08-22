@@ -11,14 +11,17 @@ export type SideEffectRow = SideEffect & { medications: { name: string } };
 export async function getSideEffectsInRange(
   startDate: string,
   endDate: string,
+  medicationIds?: string[],
 ): Promise<SideEffectRow[]> {
+  if (medicationIds && medicationIds.length === 0) return [];
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("side_effects")
     .select("*, medications(name)")
     .gte("occurred_date", startDate)
-    .lte("occurred_date", endDate)
-    .order("occurred_date", { ascending: false });
+    .lte("occurred_date", endDate);
+  if (medicationIds) query = query.in("medication_id", medicationIds);
+  const { data, error } = await query.order("occurred_date", { ascending: false });
   if (error) throw error;
   return data as SideEffectRow[];
 }

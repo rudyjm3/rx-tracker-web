@@ -50,6 +50,7 @@ export async function getStandaloneLogs(
   medicationId: string | null,
   startDate: string,
   endDate: string,
+  profileId?: string | null,
 ): Promise<StandalonePainMoodLog[]> {
   const supabase = createClient();
   let query = supabase
@@ -60,6 +61,12 @@ export async function getStandaloneLogs(
   query = medicationId === null
     ? query.is("medication_id", null)
     : query.eq("medication_id", medicationId);
+  // Only meaningful for the "Independent" (medicationId null) case — a
+  // medication-linked entry is already scoped via medication_id, which
+  // itself belongs to exactly one profile.
+  if (medicationId === null && profileId !== undefined) {
+    query = profileId === null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
+  }
   const { data, error } = await query;
   if (error) throw error;
   return data as StandalonePainMoodLog[];
@@ -73,6 +80,7 @@ export interface CreateStandaloneLogInput {
   note?: string;
   tags?: string;
   loggedAt?: string;
+  profileId?: string | null;
 }
 
 export async function createStandaloneLog(input: CreateStandaloneLogInput): Promise<void> {
@@ -81,6 +89,7 @@ export async function createStandaloneLog(input: CreateStandaloneLogInput): Prom
   const { error } = await supabase.from("standalone_pain_mood_logs").insert({
     user_id: userId,
     medication_id: input.medicationId,
+    profile_id: input.profileId ?? null,
     log_type: input.logType,
     pain_level: input.painLevel ?? null,
     mood_level: input.moodLevel ?? null,
@@ -222,8 +231,9 @@ async function getStandaloneTrendPoints(
   medicationId: string | null,
   startDate: string,
   endDate: string,
+  profileId?: string | null,
 ): Promise<TrendPoint[]> {
-  const logs = await getStandaloneLogs(medicationId, startDate, endDate);
+  const logs = await getStandaloneLogs(medicationId, startDate, endDate, profileId);
   const col = levelColumn(metric);
   return logs.filter((log) => log[col] !== null).map((log) => mapStandaloneLogToPoint(log, col));
 }
@@ -255,6 +265,7 @@ async function getStandaloneHistoryPoints(
   metric: WellbeingMetric,
   medicationId: string | null,
   limit: number,
+  profileId?: string | null,
 ): Promise<TrendPoint[]> {
   const supabase = createClient();
   const col = levelColumn(metric);
@@ -267,6 +278,9 @@ async function getStandaloneHistoryPoints(
   query = medicationId === null
     ? query.is("medication_id", null)
     : query.eq("medication_id", medicationId);
+  if (medicationId === null && profileId !== undefined) {
+    query = profileId === null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
+  }
   const { data, error } = await query;
   if (error) throw error;
   return (data as StandalonePainMoodLog[]).map((log) => mapStandaloneLogToPoint(log, col));
@@ -293,12 +307,13 @@ export async function getTrend(
   medicationId: string | null,
   startDate: string,
   endDate: string,
+  profileId?: string | null,
 ): Promise<TrendPoint[]> {
   const [dosePoints, standalonePoints] = await Promise.all([
     medicationId !== null
       ? getDoseTrendPoints(metric, medicationId, startDate, endDate)
       : Promise.resolve([]),
-    getStandaloneTrendPoints(metric, medicationId, startDate, endDate),
+    getStandaloneTrendPoints(metric, medicationId, startDate, endDate, profileId),
   ]);
   return sortTrendPoints([...dosePoints, ...standalonePoints], "asc");
 }
@@ -307,12 +322,13 @@ export async function getHistory(
   metric: WellbeingMetric,
   medicationId: string | null,
   limit = 50,
+  profileId?: string | null,
 ): Promise<TrendPoint[]> {
   const [dosePoints, standalonePoints] = await Promise.all([
     medicationId !== null
       ? getDoseHistoryPoints(metric, medicationId, limit)
       : Promise.resolve([]),
-    getStandaloneHistoryPoints(metric, medicationId, limit),
+    getStandaloneHistoryPoints(metric, medicationId, limit, profileId),
   ]);
   return sortTrendPoints([...dosePoints, ...standalonePoints], "desc").slice(0, limit);
 }

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
@@ -30,17 +31,32 @@ function badgeVariantFor(row: CalendarLogRow, graceMinutes: number): BadgeVarian
 }
 
 export function HistoryClient() {
+  const { activeProfileId, isResolving } = useActiveProfile();
   const [selectedMedicationId, setSelectedMedicationId] = useState<string>(ALL_MEDICATIONS);
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(localDateString);
 
+  // A medication selected under a different profile no longer belongs
+  // to what's visible now — reset to "All medications" rather than keep
+  // querying that specific (now-hidden) medication's history. Adjusted
+  // during render (React's documented pattern for "reset state when a
+  // prop changes"), matching GroupModal's own use of the same pattern,
+  // rather than a useEffect+setState.
+  const [lastProfileId, setLastProfileId] = useState(activeProfileId);
+  if (activeProfileId !== lastProfileId) {
+    setLastProfileId(activeProfileId);
+    setSelectedMedicationId(ALL_MEDICATIONS);
+  }
+
   const activeMedicationsQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const inactiveMedicationsQuery = useQuery({
-    queryKey: ["medications", "inactive"],
-    queryFn: getInactiveMedications,
+    queryKey: ["medications", "inactive", activeProfileId],
+    queryFn: () => getInactiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const allMedications = useMemo(
     () => [...(activeMedicationsQuery.data ?? []), ...(inactiveMedicationsQuery.data ?? [])],
@@ -86,8 +102,9 @@ export function HistoryClient() {
       </div>
 
       <HistoryList
-        key={`${selectedMedicationId}|${startDate}|${endDate}`}
+        key={`${selectedMedicationId}|${startDate}|${endDate}|${activeProfileId ?? ""}`}
         medicationId={selectedMedicationId === ALL_MEDICATIONS ? undefined : selectedMedicationId}
+        medicationIds={allMedications.map((m) => m.id)}
         startDate={startDate}
         endDate={endDate}
         medications={allMedications}
@@ -98,12 +115,19 @@ export function HistoryClient() {
 
 interface HistoryListProps {
   medicationId: string | undefined;
+  medicationIds: string[];
   startDate: string;
   endDate: string;
   medications: Medication[];
 }
 
-function HistoryList({ medicationId, startDate, endDate, medications }: HistoryListProps) {
+function HistoryList({
+  medicationId,
+  medicationIds,
+  startDate,
+  endDate,
+  medications,
+}: HistoryListProps) {
   const queryClient = useQueryClient();
   // "Load more" grows this and re-fetches from offset 0 up to the new
   // limit, rather than accumulating separately-fetched pages client
@@ -123,9 +147,23 @@ function HistoryList({ medicationId, startDate, endDate, medications }: HistoryL
   const graceMinutes = graceQuery.data ?? 60;
 
   const pageQuery = useQuery({
-    queryKey: ["dose-log-history", medicationId ?? ALL_MEDICATIONS, startDate, endDate, visibleCount],
+    queryKey: [
+      "dose-log-history",
+      medicationId ?? ALL_MEDICATIONS,
+      medicationIds,
+      startDate,
+      endDate,
+      visibleCount,
+    ],
     queryFn: () =>
-      getDoseLogHistory({ medicationId, startDate, endDate, limit: visibleCount, offset: 0 }),
+      getDoseLogHistory({
+        medicationId,
+        medicationIds,
+        startDate,
+        endDate,
+        limit: visibleCount,
+        offset: 0,
+      }),
   });
 
   const entries = pageQuery.data ?? [];

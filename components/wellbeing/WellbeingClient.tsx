@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getActiveMedications } from "@/lib/medications";
 import {
   createStandaloneLog,
@@ -39,13 +40,27 @@ interface WellbeingClientProps {
 // MoodWellbeingClient as thin per-page wrappers.
 export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingClientProps) {
   const queryClient = useQueryClient();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const today = localDateString();
   const [selectedMedicationId, setSelectedMedicationId] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState<RangeDays>(0);
 
+  // A medication selected under a different profile no longer belongs
+  // to what's visible now — reset to "Independent" rather than keep
+  // querying that specific (now-hidden) medication's trend/history.
+  // Adjusted during render (React's documented pattern for "reset state
+  // when a prop changes"), matching GroupModal's own use of the same
+  // pattern, rather than a useEffect+setState.
+  const [lastProfileId, setLastProfileId] = useState(activeProfileId);
+  if (activeProfileId !== lastProfileId) {
+    setLastProfileId(activeProfileId);
+    setSelectedMedicationId(null);
+  }
+
   const medicationsQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
 
   const trackedMedications = useMemo(
@@ -55,12 +70,14 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
 
   const { start, end } = rangeDates(rangeDays, today);
   const trendQuery = useQuery({
-    queryKey: ["wellbeing-trend", metric, selectedMedicationId, start, end],
-    queryFn: () => getTrend(metric, selectedMedicationId, start, end),
+    queryKey: ["wellbeing-trend", metric, selectedMedicationId, start, end, activeProfileId],
+    queryFn: () => getTrend(metric, selectedMedicationId, start, end, activeProfileId),
+    enabled: !isResolving,
   });
   const historyQuery = useQuery({
-    queryKey: ["wellbeing-history", metric, selectedMedicationId],
-    queryFn: () => getHistory(metric, selectedMedicationId, 50),
+    queryKey: ["wellbeing-history", metric, selectedMedicationId, activeProfileId],
+    queryFn: () => getHistory(metric, selectedMedicationId, 50, activeProfileId),
+    enabled: !isResolving,
   });
 
   const logMutation = useMutation({
@@ -73,6 +90,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
         note: input.note,
         tags: input.tags.join(","),
         loggedAt: input.loggedAt,
+        profileId: activeProfileId,
       }),
     onSuccess: () => {
       toast.success(`${metric === "pain" ? "Pain" : "Mood"} level logged`);

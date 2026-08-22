@@ -40,3 +40,27 @@ export function DropdownMenuItem({
     />
   );
 }
+
+export function DropdownMenuSeparator({
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
+  return (
+    <DropdownMenuPrimitive.Separator
+      className={cn("my-1 h-px bg-brand-border", className)}
+      {...props}
+    />
+  );
+}
+
+export function DropdownMenuLabel({
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Label>) {
+  return (
+    <DropdownMenuPrimitive.Label
+      className={cn("px-3 pb-1 pt-2 text-xs font-semibold text-brand-text-muted", className)}
+      {...props}
+    />
+  );
+}

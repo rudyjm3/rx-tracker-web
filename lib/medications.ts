@@ -55,24 +55,30 @@ export async function getCurrentUserId() {
   return user.id;
 }
 
-export async function getActiveMedications(): Promise<Medication[]> {
+export async function getActiveMedications(
+  profileId?: string | null,
+): Promise<Medication[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("medications")
     .select("*, medication_schedule_times(*)")
-    .eq("active", true)
-    .order("sort_order");
+    .eq("active", true);
+  query = profileId == null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
+  const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return data as Medication[];
 }
 
-export async function getInactiveMedications(): Promise<Medication[]> {
+export async function getInactiveMedications(
+  profileId?: string | null,
+): Promise<Medication[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("medications")
     .select("*, medication_schedule_times(*)")
-    .eq("active", false)
-    .order("name");
+    .eq("active", false);
+  query = profileId == null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
+  const { data, error } = await query.order("name");
   if (error) throw error;
   return data as Medication[];
 }
@@ -295,13 +301,11 @@ export interface GroupMemberInput {
   sort_order?: number;
 }
 
-export async function getGroups(): Promise<MedicationGroup[]> {
+export async function getGroups(profileId?: string | null): Promise<MedicationGroup[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("medication_groups")
-    .select("*")
-    .eq("active", true)
-    .order("sort_order");
+  let query = supabase.from("medication_groups").select("*").eq("active", true);
+  query = profileId == null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
+  const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return data as MedicationGroup[];
 }

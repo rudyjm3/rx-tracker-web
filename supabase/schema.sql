@@ -25,12 +25,34 @@ create table if not exists family_profiles (
 );
 
 -- ─────────────────────────────────────────
+-- USER PROFILES (owner's own extended profile info)
+-- One row per auth user, created lazily on first save. family_profiles
+-- already covers family members' equivalent fields; this is the owner's
+-- own counterpart, since auth.users can't be extended with app columns.
+-- ─────────────────────────────────────────
+create table if not exists user_profiles (
+  user_id          uuid primary key references auth.users(id) on delete cascade,
+  display_name     text,
+  first_name       text,
+  last_name        text,
+  birth_date       date,
+  height_value     numeric(5,2),
+  height_unit      text,
+  profile_picture  text,
+  updated_at       timestamptz default now()
+);
+
+-- ─────────────────────────────────────────
 -- MEDICATIONS
 -- ─────────────────────────────────────────
 create table if not exists medications (
   id                      uuid primary key default uuid_generate_v4(),
   user_id                 uuid not null references auth.users(id) on delete cascade,
-  profile_id              uuid references family_profiles(id) on delete set null,
+  -- cascade, not set null: profile_id null means "the account owner" in
+  -- the app, so removing a family member must remove their medications
+  -- (and everything that cascades from a medication row) rather than
+  -- silently reassigning them to the owner.
+  profile_id              uuid references family_profiles(id) on delete cascade,
   name                    text not null,
   dose                    text not null default '',
   dose_amount             numeric(10,3),
@@ -194,7 +216,7 @@ create table if not exists medication_status_events (
 create table if not exists medication_groups (
   id             uuid primary key default uuid_generate_v4(),
   user_id        uuid not null references auth.users(id) on delete cascade,
-  profile_id     uuid references family_profiles(id) on delete set null,
+  profile_id     uuid references family_profiles(id) on delete cascade,
   name           text not null,
   scheduled_time time not null,
   active         boolean not null default true,
@@ -228,7 +250,7 @@ create table if not exists medication_notes (
 create table if not exists medication_drafts (
   id             uuid primary key default uuid_generate_v4(),
   user_id        uuid not null references auth.users(id) on delete cascade,
-  profile_id     uuid references family_profiles(id) on delete set null,
+  profile_id     uuid references family_profiles(id) on delete cascade,
   form_data      text not null,
   current_step   smallint not null default 1,
   furthest_step  smallint not null default 1,
@@ -244,7 +266,7 @@ create table if not exists standalone_pain_mood_logs (
   id            uuid primary key default uuid_generate_v4(),
   user_id       uuid not null references auth.users(id) on delete cascade,
   medication_id uuid references medications(id) on delete cascade,
-  profile_id    uuid references family_profiles(id) on delete set null,
+  profile_id    uuid references family_profiles(id) on delete cascade,
   log_type      text not null check (log_type in ('pain','mood','both')),
   pain_level    smallint check (pain_level between 1 and 10),
   mood_level    smallint check (mood_level between 1 and 10),
@@ -311,6 +333,15 @@ create table if not exists profile_allergies (
   unique (owner_user_id, profile_id, allergy_catalog_id)
 );
 
+-- `unique (owner_user_id, profile_id, allergy_catalog_id)` above has the
+-- same gap as allergy_catalog_global_name_uidx above it: Postgres treats
+-- every NULL profile_id as distinct, so the composite constraint never
+-- fires for the owner's own allergies (profile_id IS NULL) — only for
+-- family members'. A partial unique index on just the owner-level rows
+-- closes that gap the same way.
+create unique index if not exists profile_allergies_owner_catalog_uidx
+  on profile_allergies (owner_user_id, allergy_catalog_id) where profile_id is null;
+
 -- ─────────────────────────────────────────
 -- APP SETTINGS (per-user key-value store)
 -- ─────────────────────────────────────────
@@ -364,8 +395,20 @@ create table if not exists profile_onboarding (
 );
 
 -- ─────────────────────────────────────────
+-- AVATARS STORAGE BUCKET (step 8 — Profile & Family)
+-- Public bucket so getPublicUrl() works directly for <img> tags. Both the
+-- owner's own picture and every family member's picture upload under the
+-- owner's own uid folder ({userId}/{randomId}.{ext}), since family
+-- profiles have no independent storage identity of their own.
+-- ─────────────────────────────────────────
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+-- ─────────────────────────────────────────
 -- ROW LEVEL SECURITY
 -- ─────────────────────────────────────────
+alter table user_profiles              enable row level security;
 alter table medications               enable row level security;
 alter table medication_schedule_times  enable row level security;
 alter table dose_logs                  enable row level security;
@@ -461,6 +504,32 @@ create policy "own family profiles"
   on family_profiles for all using ((select auth.uid()) = user_id);
 create policy "own onboarding"
   on profile_onboarding for all using ((select auth.uid()) = user_id);
+create policy "own user profile"
+  on user_profiles for all using ((select auth.uid()) = user_id);
+
+-- Avatars storage bucket policies (step 8) — public read, writes scoped
+-- to the caller's own uid folder within the bucket.
+create policy "public read avatars"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+create policy "manage own avatar files insert"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+create policy "manage own avatar files update"
+  on storage.objects for update
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+create policy "manage own avatar files delete"
+  on storage.objects for delete
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 -- ─────────────────────────────────────────
 -- INDEXES

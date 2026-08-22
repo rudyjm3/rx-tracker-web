@@ -19,12 +19,13 @@ function parseDraft<T>(row: MedicationDraft): ParsedDraft<T> {
   };
 }
 
-export async function getDrafts<T = unknown>(): Promise<ParsedDraft<T>[]> {
+export async function getDrafts<T = unknown>(
+  profileId?: string | null,
+): Promise<ParsedDraft<T>[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("medication_drafts")
-    .select("*")
-    .order("updated_at", { ascending: false });
+  let query = supabase.from("medication_drafts").select("*");
+  query = profileId == null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
+  const { data, error } = await query.order("updated_at", { ascending: false });
   if (error) throw error;
   return (data as MedicationDraft[]).map((row) => parseDraft<T>(row));
 }
@@ -47,6 +48,7 @@ export async function saveDraft<T>(args: {
   formData: T;
   currentStep: number;
   furthestStep: number;
+  profileId?: string | null;
 }): Promise<string> {
   const supabase = createClient();
   const payload = {
@@ -72,7 +74,7 @@ export async function saveDraft<T>(args: {
 
   const { data, error } = await supabase
     .from("medication_drafts")
-    .insert({ user_id: user.id, ...payload })
+    .insert({ user_id: user.id, profile_id: args.profileId ?? null, ...payload })
     .select("id")
     .single();
   if (error) throw error;

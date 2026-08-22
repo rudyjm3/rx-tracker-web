@@ -74,3 +74,58 @@ export function daysUntilRunout(medication: Medication): number | null {
   if (dosesPerDay <= 0) return null;
   return Math.floor(qty / dosesPerDay);
 }
+
+// Whole years between a birth date and today — falls back to a birth
+// year alone (family_profiles carries both, for members whose exact date
+// isn't known) when there's no birth date. Port of the reference PHP
+// app's calculate_age().
+export function calculateAge(
+  birthDate: string | null,
+  birthYear?: number | null,
+): number | null {
+  if (birthDate) {
+    const birth = new Date(`${birthDate}T00:00:00`);
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const beforeBirthdayThisYear =
+      now.getMonth() < birth.getMonth() ||
+      (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate());
+    if (beforeBirthdayThisYear) age--;
+    return age;
+  }
+  if (birthYear) return new Date().getFullYear() - birthYear;
+  return null;
+}
+
+export function heightToInches(value: number, unit: string): number {
+  return unit === "cm" ? value / 2.54 : value;
+}
+
+export function formatFeetInches(totalInches: number): string {
+  const clamped = Math.max(0, totalInches);
+  let feet = Math.floor(clamped / 12);
+  let inches = Math.round(clamped - feet * 12);
+  if (inches === 12) {
+    feet++;
+    inches = 0;
+  }
+  return `${feet}' ${inches}"`;
+}
+
+// First name + last initial ("Sarah J."), or whichever name part is
+// present, or the email's local part as a last resort — matches the
+// reference app's fallback_display_name(), extended with an email
+// fallback since this app always has one (unlike a family member, who
+// might have neither name part set).
+export function fallbackDisplayName(
+  firstName: string | null | undefined,
+  lastName: string | null | undefined,
+  email?: string | null,
+): string {
+  const first = (firstName ?? "").trim();
+  const last = (lastName ?? "").trim();
+  if (first && last) return `${first} ${last.charAt(0).toUpperCase()}.`;
+  if (first) return first;
+  if (last) return last;
+  return email ? email.split("@")[0] : "";
+}
