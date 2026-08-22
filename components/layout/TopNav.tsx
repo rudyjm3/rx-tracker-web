@@ -24,7 +24,13 @@ export function TopNav() {
           </span>
         </Link>
         {user && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/medications"
+              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
+            >
+              Medications
+            </Link>
             <span className="hidden text-sm text-brand-text-muted sm:inline">
               {user.email}
             </span>

@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/client";
 import type {
   FeedbackType,
   Medication,
+  MedicationDoseChange,
   MedicationGroup,
+  MedicationStatusEvent,
   MedicationType,
   ScheduleMode,
 } from "@/lib/types/medications";
@@ -359,4 +361,44 @@ export async function deleteGroup(id: string): Promise<void> {
     .update({ active: false, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+}
+
+// ── Dose history (dose changes + status events, merged) ────────────
+
+export type DoseHistoryEntry =
+  | { type: "dose_change"; at: string; data: MedicationDoseChange }
+  | { type: "status_event"; at: string; data: MedicationStatusEvent };
+
+export async function getDoseHistory(
+  medicationId: string,
+): Promise<DoseHistoryEntry[]> {
+  const supabase = createClient();
+  const [changesResult, eventsResult] = await Promise.all([
+    supabase
+      .from("medication_dose_changes")
+      .select("*")
+      .eq("medication_id", medicationId),
+    supabase
+      .from("medication_status_events")
+      .select("*")
+      .eq("medication_id", medicationId),
+  ]);
+  if (changesResult.error) throw changesResult.error;
+  if (eventsResult.error) throw eventsResult.error;
+
+  const entries: DoseHistoryEntry[] = [
+    ...(changesResult.data as MedicationDoseChange[]).map((c) => ({
+      type: "dose_change" as const,
+      at: c.changed_at,
+      data: c,
+    })),
+    ...(eventsResult.data as MedicationStatusEvent[]).map((e) => ({
+      type: "status_event" as const,
+      at: e.event_at,
+      data: e,
+    })),
+  ];
+
+  entries.sort((a, b) => b.at.localeCompare(a.at));
+  return entries;
 }
