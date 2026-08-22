@@ -199,6 +199,7 @@ export interface CalendarDaySlot {
   painLevel: number | null;
   moodLevel: number | null;
   note: string;
+  deductedQuantity: number | null;
 }
 
 export interface CalendarDayMedicationSummary {
@@ -289,6 +290,7 @@ export function buildDayDetails(
       painLevel: log.pain_level,
       moodLevel: log.mood_level,
       note: log.note,
+      deductedQuantity: log.deducted_quantity,
     });
   }
 

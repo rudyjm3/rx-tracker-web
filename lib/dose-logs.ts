@@ -273,3 +273,23 @@ export async function getDoseLogHistory(
   if (error) throw error;
   return data as CalendarLogRow[];
 }
+
+/**
+ * Every (medication_id, status) pair for dose_logs in a date range,
+ * with no row cap — for adherence aggregation in the export report,
+ * which must reflect the full selected range independently of
+ * getDoseLogHistory's display-table pagination cap.
+ */
+export async function getDoseLogStatusesInRange(
+  startDate: string,
+  endDate: string,
+): Promise<{ medication_id: string; status: DoseLogStatus }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("medication_id, status")
+    .gte("scheduled_for_date", startDate)
+    .lte("scheduled_for_date", endDate);
+  if (error) throw error;
+  return data as { medication_id: string; status: DoseLogStatus }[];
+}

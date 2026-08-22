@@ -148,6 +148,7 @@ function HistoryList({ medicationId, startDate, endDate, medications }: HistoryL
         painLevel: row.pain_level,
         moodLevel: row.mood_level,
         note: row.note,
+        deductedQuantity: row.deducted_quantity,
       },
     });
   }

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { computeAdherence } from "@/lib/adherence";
-import { getDoseLogHistory } from "@/lib/dose-logs";
+import { getDoseLogHistory, getDoseLogStatusesInRange } from "@/lib/dose-logs";
 import { getActiveMedications } from "@/lib/medications";
 import { getTrend, medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
 import { getSideEffectsInRange } from "@/lib/side-effects";
@@ -57,6 +57,16 @@ export function ExportClient() {
   });
   const sideEffects = sideEffectsQuery.data ?? [];
 
+  // A separate, uncapped query — doseLogs above is capped at
+  // HISTORY_CAP for the display table, but adherence must reflect the
+  // full selected range, not just whichever rows happen to fit under
+  // that cap.
+  const adherenceStatusesQuery = useQuery({
+    queryKey: ["export-adherence-statuses", startDate, endDate],
+    queryFn: () => getDoseLogStatusesInRange(startDate, endDate),
+  });
+  const adherenceStatuses = adherenceStatusesQuery.data ?? [];
+
   const adherenceEligibleMeds = useMemo(
     () => medications.filter((m) => !m.as_needed && m.adherence_enabled),
     [medications],
@@ -65,10 +75,12 @@ export function ExportClient() {
     () => new Set(adherenceEligibleMeds.map((m) => m.id)),
     [adherenceEligibleMeds],
   );
-  const overallAdherence = computeAdherence(doseLogs.filter((l) => eligibleIds.has(l.medication_id)));
+  const overallAdherence = computeAdherence(
+    adherenceStatuses.filter((l) => eligibleIds.has(l.medication_id)),
+  );
   const perMedicationAdherence = adherenceEligibleMeds.map((med) => ({
     medication: med,
-    percent: computeAdherence(doseLogs.filter((l) => l.medication_id === med.id)),
+    percent: computeAdherence(adherenceStatuses.filter((l) => l.medication_id === med.id)),
   }));
 
   const painTrackedMeds = useMemo(() => medications.filter(medicationTracksPain), [medications]);
@@ -88,7 +100,12 @@ export function ExportClient() {
   });
 
   const isLoading =
-    medicationsQuery.isLoading || doseLogsQuery.isLoading || sideEffectsQuery.isLoading;
+    medicationsQuery.isLoading ||
+    doseLogsQuery.isLoading ||
+    sideEffectsQuery.isLoading ||
+    adherenceStatusesQuery.isLoading ||
+    painTrendQueries.some((q) => q.isLoading) ||
+    moodTrendQueries.some((q) => q.isLoading);
 
   return (
     <div className="flex flex-col gap-6">

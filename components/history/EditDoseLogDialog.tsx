@@ -13,6 +13,7 @@ import { Field, inputClass } from "@/components/ui/Field";
 import { LevelGrid } from "@/components/ui/LevelGrid";
 import { deleteDoseLog, editDoseLog } from "@/lib/dose-logs";
 import { medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
+import { localDateString } from "@/lib/utils";
 import type { DoseLogStatus, Medication } from "@/lib/types/medications";
 
 export interface EditableDoseLog {
@@ -23,6 +24,12 @@ export interface EditableDoseLog {
   painLevel: number | null;
   moodLevel: number | null;
   note: string;
+  // The exact amount actually deducted for this entry (from
+  // dose_logs.deducted_quantity) — may differ from the medication's
+  // default quantity_per_dose when the slot had a group or per-
+  // schedule-time override. Needed so re-saving a "taken" entry
+  // without changing its amount doesn't silently shift inventory.
+  deductedQuantity: number | null;
 }
 
 interface EditDoseLogDialogProps {
@@ -101,14 +108,34 @@ function EditDoseLogForm({ log, medication, onSaved, onDeleted, onCancel }: Edit
     setSaving(true);
     setError(null);
     try {
-      const baseDate = log.takenAt ? log.takenAt.slice(0, 10) : log.scheduledForDate;
+      // Local calendar date, not the UTC slice takenAt's ISO string
+      // would give — timeFromIso already displays the local time, so
+      // the date it's combined with here has to match in the same
+      // local frame or the reconstructed timestamp silently drifts a
+      // day for anyone not on UTC.
+      const baseDate = log.takenAt
+        ? localDateString(new Date(log.takenAt))
+        : log.scheduledForDate;
+      // Was already 'taken' and staying 'taken' (editing the note/
+      // time/levels only): reuse the exact amount originally deducted
+      // for this slot, which may differ from the medication's default
+      // quantity_per_dose (a group or per-schedule-time override) —
+      // otherwise the RPC's restore-then-deduct cycle would silently
+      // shift inventory by the difference even though nothing about
+      // the dose amount changed. A transition INTO 'taken' from
+      // skipped/missed has no original amount to preserve, so it
+      // falls back to the medication default.
+      const quantityPerDose =
+        status === "taken" && log.status === "taken" && log.deductedQuantity !== null
+          ? log.deductedQuantity
+          : medication.quantity_per_dose;
       await editDoseLog(log.id, {
         status,
         takenAt: status === "taken" ? new Date(`${baseDate}T${time}:00`).toISOString() : null,
         painLevel: status === "taken" && trackPain ? (painLevel ?? undefined) : undefined,
         moodLevel: status === "taken" && trackMood ? (moodLevel ?? undefined) : undefined,
         note: status === "taken" ? note.trim() : "",
-        quantityPerDose: medication.quantity_per_dose,
+        quantityPerDose,
         inventoryEnabled: medication.inventory_enabled,
       });
       onSaved();

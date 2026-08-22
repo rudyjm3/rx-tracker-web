@@ -168,6 +168,7 @@ export function CalendarClient() {
           painLevel: editingSlot.painLevel,
           moodLevel: editingSlot.moodLevel,
           note: editingSlot.note,
+          deductedQuantity: editingSlot.deductedQuantity,
         }
       : null;
 
