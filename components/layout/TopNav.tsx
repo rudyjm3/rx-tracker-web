@@ -32,6 +32,12 @@ export function TopNav() {
               Dashboard
             </Link>
             <Link
+              href="/calendar"
+              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
+            >
+              Calendar
+            </Link>
+            <Link
               href="/medications"
               className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
             >

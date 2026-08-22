@@ -441,3 +441,22 @@ export async function getDoseHistory(
   entries.sort((a, b) => b.at.localeCompare(a.at));
   return entries;
 }
+
+/**
+ * Bulk status-event fetch for a set of medications — used by the
+ * calendar's historical backfill to reconstruct whether a now-inactive
+ * medication was active on a given past date, without a per-medication
+ * round trip (see lib/calendar.ts).
+ */
+export async function getStatusEvents(
+  medicationIds: string[],
+): Promise<MedicationStatusEvent[]> {
+  if (medicationIds.length === 0) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("medication_status_events")
+    .select("*")
+    .in("medication_id", medicationIds);
+  if (error) throw error;
+  return data as MedicationStatusEvent[];
+}

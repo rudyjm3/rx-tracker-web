@@ -18,23 +18,14 @@ import {
 } from "@/lib/medications";
 import { computeAdherence } from "@/lib/adherence";
 import { generateDaySlots, type DaySlot } from "@/lib/schedule";
+import { localDateString } from "@/lib/utils";
 import type { DoseLogStatus } from "@/lib/types/medications";
 import { HeroPanel } from "./HeroPanel";
 import { ScheduleList } from "./ScheduleList";
 import { LowSupplyBanner } from "./LowSupplyBanner";
 
 const REFRESH_INTERVAL_MS = 60_000;
-
-// Local calendar date, not UTC — toISOString() would shift the date
-// for any user not on UTC, especially for several hours around local
-// midnight (e.g. a UTC-7 user sees tomorrow's date after 5pm local).
-function todayString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+const todayString = localDateString;
 
 export function DashboardClient() {
   const queryClient = useQueryClient();
