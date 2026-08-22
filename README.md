@@ -24,8 +24,11 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 ```
 
-Run the schema SQL for this project against your Supabase project before
-signing up/in — auth and every data page depend on it.
+Run `supabase/schema.sql` against your Supabase project (Project → SQL
+Editor → New query, paste, Run) before using any data page — medications,
+dose logs, etc. all depend on those tables. Auth (sign up/sign in) itself
+works as soon as the env vars above are set, since Supabase Auth manages
+its own `auth.users` table independently of this schema.
 
 ```bash
 npm run dev
