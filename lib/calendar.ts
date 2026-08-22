@@ -1,0 +1,117 @@
+import { finalizeMissedDoses } from "@/lib/dose-logs";
+import { generateDaySlots } from "@/lib/schedule";
+import type {
+  Medication,
+  MedicationGroup,
+  MedicationGroupMember,
+  MedicationStatusEvent,
+} from "@/lib/types/medications";
+
+/**
+ * Reconstructs whether a medication was active as of 23:59:59 on `date`,
+ * by replaying its status events up to that point rather than trusting the
+ * medication's current `active` flag (which only reflects "right now").
+ * No prior event at/before that date means the medication's default
+ * (active-since-creation) state. Port of the reference PHP app's
+ * wasMedicationActiveOnDate.
+ */
+export function wasActiveOnDate(
+  medicationId: string,
+  date: string,
+  statusEvents: MedicationStatusEvent[],
+): boolean {
+  const dateEnd = `${date}T23:59:59`;
+  const eventsForMed = statusEvents
+    .filter((e) => e.medication_id === medicationId && e.event_at <= dateEnd)
+    .sort((a, b) => b.event_at.localeCompare(a.event_at));
+  const lastEvent = eventsForMed[0];
+  if (!lastEvent) return true;
+  return lastEvent.event !== "discontinued";
+}
+
+/**
+ * Currently-inactive medications that were nonetheless active as of `date`
+ * — so calendar backfill can finalize missed doses for medications
+ * discontinued after that date instead of silently skipping them (the
+ * caller's "active medications" list only reflects "right now"). Requires
+ * an actual status event to exist before trusting the reconstruction: a
+ * medication with zero events has genuinely unknown history and is
+ * skipped rather than assumed active for every past date.
+ */
+export function historicallyActiveMedications(
+  date: string,
+  inactiveMedications: Medication[],
+  statusEvents: MedicationStatusEvent[],
+): Medication[] {
+  return inactiveMedications.filter(
+    (med) =>
+      statusEvents.some((e) => e.medication_id === med.id) &&
+      wasActiveOnDate(med.id, date, statusEvents),
+  );
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Re-runs missed-dose finalization for every past date in [monthStart,
+ * monthEnd] (today and future dates are skipped — there's nothing to
+ * finalize yet), so calendar days aren't permanently blank just because
+ * nobody had the app open that day. Idempotent per date via
+ * finalizeMissedDoses' ignoreDuplicates guard, so safe to re-run on every
+ * month load. Returns whether anything was actually finalized, so the
+ * caller can invalidate its queries only when there's something new to
+ * fetch (same pattern as the dashboard's own finalize effect).
+ */
+export async function backfillMonth(
+  monthStart: string,
+  monthEnd: string,
+  todayDate: string,
+  activeMedications: Medication[],
+  inactiveMedications: Medication[],
+  groups: MedicationGroup[],
+  groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id" | "quantity_per_dose">[],
+  statusEvents: MedicationStatusEvent[],
+  graceMinutes: number,
+): Promise<boolean> {
+  const lastBackfillDate = monthEnd < todayDate ? monthEnd : addDays(todayDate, -1);
+  if (lastBackfillDate < monthStart) return false;
+
+  let didFinalize = false;
+  for (
+    let date = monthStart;
+    date <= lastBackfillDate;
+    date = addDays(date, 1)
+  ) {
+    const medsForDate = [
+      ...activeMedications,
+      ...historicallyActiveMedications(date, inactiveMedications, statusEvents),
+    ];
+    const slots = generateDaySlots(date, medsForDate, groups, groupMembers, [], []);
+    const finalized = await finalizeMissedDoses(date, slots, graceMinutes);
+    didFinalize ||= finalized;
+  }
+  return didFinalize;
+}
+
+export type CalendarDayColor = "future" | "missed" | "skipped" | "taken" | "empty";
+
+/**
+ * Day-cell color priority, matching the reference app: future days are
+ * neutral regardless of data; otherwise missed beats skipped-only beats
+ * taken beats no data at all.
+ */
+export function calendarDayColor(
+  isFuture: boolean,
+  marker: { taken: number; skipped: number; missed: number } | undefined,
+): CalendarDayColor {
+  if (isFuture) return "future";
+  if (!marker) return "empty";
+  if (marker.missed > 0) return "missed";
+  if (marker.skipped > 0 && marker.taken === 0) return "skipped";
+  if (marker.taken > 0) return "taken";
+  return "empty";
+}
