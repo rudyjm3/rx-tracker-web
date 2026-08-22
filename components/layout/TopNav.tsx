@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { href: "/mood-wellbeing", label: "Mood & Wellbeing" },
   { href: "/history", label: "History" },
   { href: "/export", label: "Export" },
+  { href: "/family", label: "Family" },
 ];
 
 export function TopNav() {

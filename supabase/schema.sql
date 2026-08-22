@@ -329,6 +329,15 @@ create table if not exists profile_allergies (
   unique (owner_user_id, profile_id, allergy_catalog_id)
 );
 
+-- `unique (owner_user_id, profile_id, allergy_catalog_id)` above has the
+-- same gap as allergy_catalog_global_name_uidx above it: Postgres treats
+-- every NULL profile_id as distinct, so the composite constraint never
+-- fires for the owner's own allergies (profile_id IS NULL) — only for
+-- family members'. A partial unique index on just the owner-level rows
+-- closes that gap the same way.
+create unique index if not exists profile_allergies_owner_catalog_uidx
+  on profile_allergies (owner_user_id, allergy_catalog_id) where profile_id is null;
+
 -- ─────────────────────────────────────────
 -- APP SETTINGS (per-user key-value store)
 -- ─────────────────────────────────────────
