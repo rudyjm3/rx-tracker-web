@@ -26,6 +26,12 @@ export function TopNav() {
         {user && (
           <div className="flex items-center gap-4">
             <Link
+              href="/dashboard"
+              className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
+            >
+              Dashboard
+            </Link>
+            <Link
               href="/medications"
               className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
             >
