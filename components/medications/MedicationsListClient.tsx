@@ -19,21 +19,24 @@ import { GroupModal } from "./GroupModal";
 
 export function MedicationsListClient() {
   const queryClient = useQueryClient();
-  const { activeProfileId } = useActiveProfile();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const [showInactive, setShowInactive] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
 
   const activeQuery = useQuery({
     queryKey: ["medications", "active", activeProfileId],
     queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const inactiveQuery = useQuery({
     queryKey: ["medications", "inactive", activeProfileId],
     queryFn: () => getInactiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const groupsQuery = useQuery({
     queryKey: ["groups", activeProfileId],
     queryFn: () => getGroups(activeProfileId),
+    enabled: !isResolving,
   });
   const groupMembersQuery = useQuery({
     queryKey: ["group-members"],
@@ -42,6 +45,7 @@ export function MedicationsListClient() {
   const draftsQuery = useQuery({
     queryKey: ["drafts", activeProfileId],
     queryFn: () => getDrafts(activeProfileId),
+    enabled: !isResolving,
   });
 
   const discardDraftMutation = useMutation({
@@ -69,7 +73,7 @@ export function MedicationsListClient() {
     (m) => !groupedMedicationIds.has(m.id),
   );
 
-  if (activeQuery.isLoading) {
+  if (isResolving || activeQuery.isLoading) {
     return <p className="text-brand-text-muted">Loading medications…</p>;
   }
 

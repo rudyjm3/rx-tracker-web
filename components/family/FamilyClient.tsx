@@ -143,6 +143,13 @@ export function FamilyClient() {
                   </div>
                 </div>
 
+                {isConfirmingRemove && (
+                  <p className="text-xs text-status-danger">
+                    This permanently deletes {fp.display_name}&rsquo;s medications, dose history,
+                    and logs — not just their profile. This can&rsquo;t be undone.
+                  </p>
+                )}
+
                 {isExpanded && (
                   <div className="border-t border-brand-border pt-3">
                     <AllergyPanel profileId={fp.id} />

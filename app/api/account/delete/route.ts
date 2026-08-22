@@ -40,6 +40,18 @@ export async function POST(request: Request) {
   const admin = createServiceClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  // Avatar objects live under the user's own uid folder but aren't
+  // linked to auth.users by a foreign key, so deleting the user first
+  // would leave them orphaned in storage rather than being cleaned up
+  // automatically.
+  const { data: avatarFiles } = await admin.storage.from("avatars").list(user.id);
+  if (avatarFiles && avatarFiles.length > 0) {
+    await admin.storage
+      .from("avatars")
+      .remove(avatarFiles.map((file) => `${user.id}/${file.name}`));
+  }
+
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

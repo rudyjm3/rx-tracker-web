@@ -36,7 +36,7 @@ function formatSchedule(med: Medication): string {
 
 export function ExportClient() {
   const { user } = useAuth();
-  const { activeProfileId } = useActiveProfile();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(localDateString);
   const generatedAt = useMemo(() => new Date().toLocaleString(), []);
@@ -44,6 +44,7 @@ export function ExportClient() {
   const medicationsQuery = useQuery({
     queryKey: ["medications", "active", activeProfileId],
     queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const medications = useMemo(() => medicationsQuery.data ?? [], [medicationsQuery.data]);
 
@@ -55,6 +56,7 @@ export function ExportClient() {
   const inactiveMedicationsQuery = useQuery({
     queryKey: ["medications", "inactive", activeProfileId],
     queryFn: () => getInactiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const allMedicationIds = useMemo(
     () => [
@@ -129,6 +131,7 @@ export function ExportClient() {
   });
 
   const isLoading =
+    isResolving ||
     medicationsQuery.isLoading ||
     inactiveMedicationsQuery.isLoading ||
     doseLogsQuery.isLoading ||

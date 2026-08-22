@@ -31,18 +31,32 @@ function badgeVariantFor(row: CalendarLogRow, graceMinutes: number): BadgeVarian
 }
 
 export function HistoryClient() {
-  const { activeProfileId } = useActiveProfile();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const [selectedMedicationId, setSelectedMedicationId] = useState<string>(ALL_MEDICATIONS);
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(localDateString);
 
+  // A medication selected under a different profile no longer belongs
+  // to what's visible now — reset to "All medications" rather than keep
+  // querying that specific (now-hidden) medication's history. Adjusted
+  // during render (React's documented pattern for "reset state when a
+  // prop changes"), matching GroupModal's own use of the same pattern,
+  // rather than a useEffect+setState.
+  const [lastProfileId, setLastProfileId] = useState(activeProfileId);
+  if (activeProfileId !== lastProfileId) {
+    setLastProfileId(activeProfileId);
+    setSelectedMedicationId(ALL_MEDICATIONS);
+  }
+
   const activeMedicationsQuery = useQuery({
     queryKey: ["medications", "active", activeProfileId],
     queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const inactiveMedicationsQuery = useQuery({
     queryKey: ["medications", "inactive", activeProfileId],
     queryFn: () => getInactiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const allMedications = useMemo(
     () => [...(activeMedicationsQuery.data ?? []), ...(inactiveMedicationsQuery.data ?? [])],

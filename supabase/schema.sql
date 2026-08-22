@@ -48,7 +48,11 @@ create table if not exists user_profiles (
 create table if not exists medications (
   id                      uuid primary key default uuid_generate_v4(),
   user_id                 uuid not null references auth.users(id) on delete cascade,
-  profile_id              uuid references family_profiles(id) on delete set null,
+  -- cascade, not set null: profile_id null means "the account owner" in
+  -- the app, so removing a family member must remove their medications
+  -- (and everything that cascades from a medication row) rather than
+  -- silently reassigning them to the owner.
+  profile_id              uuid references family_profiles(id) on delete cascade,
   name                    text not null,
   dose                    text not null default '',
   dose_amount             numeric(10,3),
@@ -212,7 +216,7 @@ create table if not exists medication_status_events (
 create table if not exists medication_groups (
   id             uuid primary key default uuid_generate_v4(),
   user_id        uuid not null references auth.users(id) on delete cascade,
-  profile_id     uuid references family_profiles(id) on delete set null,
+  profile_id     uuid references family_profiles(id) on delete cascade,
   name           text not null,
   scheduled_time time not null,
   active         boolean not null default true,
@@ -246,7 +250,7 @@ create table if not exists medication_notes (
 create table if not exists medication_drafts (
   id             uuid primary key default uuid_generate_v4(),
   user_id        uuid not null references auth.users(id) on delete cascade,
-  profile_id     uuid references family_profiles(id) on delete set null,
+  profile_id     uuid references family_profiles(id) on delete cascade,
   form_data      text not null,
   current_step   smallint not null default 1,
   furthest_step  smallint not null default 1,
@@ -262,7 +266,7 @@ create table if not exists standalone_pain_mood_logs (
   id            uuid primary key default uuid_generate_v4(),
   user_id       uuid not null references auth.users(id) on delete cascade,
   medication_id uuid references medications(id) on delete cascade,
-  profile_id    uuid references family_profiles(id) on delete set null,
+  profile_id    uuid references family_profiles(id) on delete cascade,
   log_type      text not null check (log_type in ('pain','mood','both')),
   pain_level    smallint check (pain_level between 1 and 10),
   mood_level    smallint check (mood_level between 1 and 10),

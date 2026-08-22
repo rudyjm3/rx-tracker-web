@@ -32,7 +32,7 @@ function currentMonth(): string {
 
 export function CalendarClient() {
   const queryClient = useQueryClient();
-  const { activeProfileId } = useActiveProfile();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
   const month = searchParams.get("m") ?? currentMonth();
@@ -50,14 +50,17 @@ export function CalendarClient() {
   const activeMedicationsQuery = useQuery({
     queryKey: ["medications", "active", activeProfileId],
     queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const inactiveMedicationsQuery = useQuery({
     queryKey: ["medications", "inactive", activeProfileId],
     queryFn: () => getInactiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
   const groupsQuery = useQuery({
     queryKey: ["groups", activeProfileId],
     queryFn: () => getGroups(activeProfileId),
+    enabled: !isResolving,
   });
   const groupMembersQuery = useQuery({
     queryKey: ["group-members"],
@@ -191,6 +194,7 @@ export function CalendarClient() {
   }
 
   const isLoading =
+    isResolving ||
     activeMedicationsQuery.isLoading ||
     inactiveMedicationsQuery.isLoading ||
     groupsQuery.isLoading ||

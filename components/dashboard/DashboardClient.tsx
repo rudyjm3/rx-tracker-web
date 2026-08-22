@@ -32,7 +32,7 @@ const todayString = localDateString;
 
 export function DashboardClient() {
   const queryClient = useQueryClient();
-  const { activeProfileId } = useActiveProfile();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const [date, setDate] = useState(todayString);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [feedbackSlot, setFeedbackSlot] = useState<DaySlot | null>(null);
@@ -53,10 +53,12 @@ export function DashboardClient() {
     queryKey: ["medications", "active", activeProfileId],
     queryFn: () => getActiveMedications(activeProfileId),
     refetchInterval: REFRESH_INTERVAL_MS,
+    enabled: !isResolving,
   });
   const groupsQuery = useQuery({
     queryKey: ["groups", activeProfileId],
     queryFn: () => getGroups(activeProfileId),
+    enabled: !isResolving,
   });
   const groupMembersQuery = useQuery({
     queryKey: ["group-members"],
@@ -201,6 +203,7 @@ export function DashboardClient() {
   );
 
   const isLoading =
+    isResolving ||
     medicationsQuery.isLoading ||
     groupsQuery.isLoading ||
     groupMembersQuery.isLoading ||

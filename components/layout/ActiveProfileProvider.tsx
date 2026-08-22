@@ -13,6 +13,12 @@ interface ActiveProfileContextValue {
   activeProfile: FamilyProfile | null;
   familyProfiles: FamilyProfile[];
   setActiveProfileId: (id: string | null) => void;
+  // True while a persisted family-member choice can't yet be confirmed
+  // against the live family list — until then, activeProfileId falls
+  // back to null (the owner) even if a member is actually selected, so
+  // consumers should hold off firing profile-scoped queries rather than
+  // briefly showing the owner's data.
+  isResolving: boolean;
 }
 
 const ActiveProfileContext = createContext<ActiveProfileContextValue | null>(null);
@@ -45,6 +51,11 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
     ? (familyProfiles.find((p) => p.id === storedProfileId) ?? null)
     : null;
   const activeProfileId = activeProfile?.id ?? null;
+  // A persisted choice exists but the family list hasn't loaded yet, so
+  // there's no way yet to tell "really the owner" apart from "a member
+  // whose data we haven't fetched" — only the latter should block
+  // dependent queries.
+  const isResolving = !!user && storedProfileId !== null && familyQuery.data === undefined;
 
   function setActiveProfileId(id: string | null) {
     setStoredProfileId(id);
@@ -54,7 +65,7 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
 
   return (
     <ActiveProfileContext.Provider
-      value={{ activeProfileId, activeProfile, familyProfiles, setActiveProfileId }}
+      value={{ activeProfileId, activeProfile, familyProfiles, setActiveProfileId, isResolving }}
     >
       {children}
     </ActiveProfileContext.Provider>

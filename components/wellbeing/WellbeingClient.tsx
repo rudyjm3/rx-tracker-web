@@ -40,14 +40,27 @@ interface WellbeingClientProps {
 // MoodWellbeingClient as thin per-page wrappers.
 export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingClientProps) {
   const queryClient = useQueryClient();
-  const { activeProfileId } = useActiveProfile();
+  const { activeProfileId, isResolving } = useActiveProfile();
   const today = localDateString();
   const [selectedMedicationId, setSelectedMedicationId] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState<RangeDays>(0);
 
+  // A medication selected under a different profile no longer belongs
+  // to what's visible now — reset to "Independent" rather than keep
+  // querying that specific (now-hidden) medication's trend/history.
+  // Adjusted during render (React's documented pattern for "reset state
+  // when a prop changes"), matching GroupModal's own use of the same
+  // pattern, rather than a useEffect+setState.
+  const [lastProfileId, setLastProfileId] = useState(activeProfileId);
+  if (activeProfileId !== lastProfileId) {
+    setLastProfileId(activeProfileId);
+    setSelectedMedicationId(null);
+  }
+
   const medicationsQuery = useQuery({
     queryKey: ["medications", "active", activeProfileId],
     queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
   });
 
   const trackedMedications = useMemo(
@@ -59,10 +72,12 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
   const trendQuery = useQuery({
     queryKey: ["wellbeing-trend", metric, selectedMedicationId, start, end, activeProfileId],
     queryFn: () => getTrend(metric, selectedMedicationId, start, end, activeProfileId),
+    enabled: !isResolving,
   });
   const historyQuery = useQuery({
     queryKey: ["wellbeing-history", metric, selectedMedicationId, activeProfileId],
     queryFn: () => getHistory(metric, selectedMedicationId, 50, activeProfileId),
+    enabled: !isResolving,
   });
 
   const logMutation = useMutation({
