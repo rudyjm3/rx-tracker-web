@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { href: "/medications", label: "Medications" },
   { href: "/pain-tracking", label: "Pain Tracking" },
   { href: "/mood-wellbeing", label: "Mood & Wellbeing" },
+  { href: "/history", label: "History" },
 ];
 
 export function TopNav() {

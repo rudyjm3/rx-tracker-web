@@ -3,8 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { getMissedGraceMinutes } from "@/lib/app-settings";
-import { backfillMonth, buildDayDetails, monthBounds, type CalendarDayDetail } from "@/lib/calendar";
+import {
+  backfillMonth,
+  buildDayDetails,
+  monthBounds,
+  type CalendarDayDetail,
+  type CalendarDaySlot,
+} from "@/lib/calendar";
 import { getCalendarLogs, getCalendarMarkers } from "@/lib/dose-logs";
 import {
   getActiveMedications,
@@ -16,6 +23,7 @@ import {
 import { localDateString } from "@/lib/utils";
 import { MonthGrid } from "./MonthGrid";
 import { DayDetailDialog } from "./DayDetailDialog";
+import { EditDoseLogDialog, type EditableDoseLog } from "@/components/history/EditDoseLogDialog";
 
 function currentMonth(): string {
   return localDateString().slice(0, 7);
@@ -29,6 +37,7 @@ export function CalendarClient() {
   const bounds = monthBounds(month);
   const todayDate = localDateString();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [editingSlot, setEditingSlot] = useState<CalendarDaySlot | null>(null);
 
   function navigateToMonth(nextMonth: string) {
     const params = new URLSearchParams(searchParams);
@@ -142,6 +151,35 @@ export function CalendarClient() {
     return buildDayDetails(logsQuery.data, graceMinutes);
   }, [logsQuery.data, graceMinutes]);
 
+  const allMedications = useMemo(
+    () => [...(activeMedicationsQuery.data ?? []), ...(inactiveMedicationsQuery.data ?? [])],
+    [activeMedicationsQuery.data, inactiveMedicationsQuery.data],
+  );
+  const editingMedication = editingSlot
+    ? (allMedications.find((m) => m.id === editingSlot.medicationId) ?? null)
+    : null;
+  const editingLog: EditableDoseLog | null =
+    editingSlot && selectedDate
+      ? {
+          id: editingSlot.logId,
+          status: editingSlot.status,
+          scheduledForDate: selectedDate,
+          takenAt: editingSlot.takenAt,
+          painLevel: editingSlot.painLevel,
+          moodLevel: editingSlot.moodLevel,
+          note: editingSlot.note,
+        }
+      : null;
+
+  function refreshCalendarData() {
+    queryClient.invalidateQueries({
+      queryKey: ["calendar-markers", bounds.monthStart, bounds.monthEnd],
+    });
+    queryClient.invalidateQueries({
+      queryKey: ["calendar-logs", bounds.monthStart, bounds.monthEnd],
+    });
+  }
+
   const isLoading =
     activeMedicationsQuery.isLoading ||
     inactiveMedicationsQuery.isLoading ||
@@ -167,6 +205,22 @@ export function CalendarClient() {
       <DayDetailDialog
         day={selectedDate ? (dayDetails[selectedDate] ?? null) : null}
         onClose={() => setSelectedDate(null)}
+        onEditSlot={setEditingSlot}
+      />
+      <EditDoseLogDialog
+        log={editingLog}
+        medication={editingMedication}
+        onClose={() => setEditingSlot(null)}
+        onSaved={() => {
+          toast.success("Dose entry updated");
+          setEditingSlot(null);
+          refreshCalendarData();
+        }}
+        onDeleted={() => {
+          toast.success("Dose entry deleted");
+          setEditingSlot(null);
+          refreshCalendarData();
+        }}
       />
     </div>
   );

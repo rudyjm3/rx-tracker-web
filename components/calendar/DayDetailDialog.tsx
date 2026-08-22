@@ -2,7 +2,7 @@
 
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
-import type { CalendarDayDetail } from "@/lib/calendar";
+import type { CalendarDayDetail, CalendarDaySlot } from "@/lib/calendar";
 
 function badgeVariantFor(slot: CalendarDayDetail["medications"][number]["slots"][number]): BadgeVariant {
   if (slot.status === "taken") return slot.isLate ? "late" : "taken";
@@ -12,9 +12,10 @@ function badgeVariantFor(slot: CalendarDayDetail["medications"][number]["slots"]
 interface DayDetailDialogProps {
   day: CalendarDayDetail | null;
   onClose: () => void;
+  onEditSlot: (slot: CalendarDaySlot) => void;
 }
 
-export function DayDetailDialog({ day, onClose }: DayDetailDialogProps) {
+export function DayDetailDialog({ day, onClose, onEditSlot }: DayDetailDialogProps) {
   return (
     <Dialog open={day !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
@@ -52,11 +53,20 @@ export function DayDetailDialog({ day, onClose }: DayDetailDialogProps) {
                           className="flex items-center justify-between rounded-control bg-brand-bg px-2.5 py-1.5 text-sm"
                         >
                           <span className="text-brand-text">{slot.displayTime}</span>
-                          <Badge variant={badgeVariantFor(slot)}>
-                            {slot.status === "taken" && slot.isLate
-                              ? `Taken (${slot.lateLabel})`
-                              : undefined}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={badgeVariantFor(slot)}>
+                              {slot.status === "taken" && slot.isLate
+                                ? `Taken (${slot.lateLabel})`
+                                : undefined}
+                            </Badge>
+                            <button
+                              type="button"
+                              onClick={() => onEditSlot(slot)}
+                              className="text-xs text-brand-deep-blue hover:underline"
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>
