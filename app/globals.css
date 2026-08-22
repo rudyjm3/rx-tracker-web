@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand palette */
+  --color-brand-cyan: #14cfe0;
+  --color-brand-blue: #0a8ac8;
+  --color-brand-deep-blue: #0754a8;
+  --color-brand-navy: #102b57;
+  --color-brand-dark-navy: #071d3d;
+  --color-brand-bg: #eaf4ff;
+  --color-brand-card: #ffffff;
+  --color-brand-border: #d7e6f8;
+  --color-brand-text: #172033;
+  --color-brand-text-muted: #60708a;
+
+  /* Status colors */
+  --color-status-success: #18bfa6;
+  --color-status-warning: #f5a524;
+  --color-status-danger: #e5484d;
+
+  /* Radius tiers */
+  --radius-control: 10px;
+  --radius-card: 18px;
+  --radius-hero: 28px;
+
+  /* Shadow */
+  --shadow-card: 0 18px 45px rgba(7, 29, 61, 0.14);
+
+  /* Font */
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  --background: var(--color-brand-bg);
+  --foreground: var(--color-brand-text);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+@utility bg-gradient-brand {
+  background-image: linear-gradient(
+    135deg,
+    #14cfe0 0%,
+    #0a8ac8 48%,
+    #0754a8 100%
+  );
+}
+
+@utility bg-gradient-brand-dark {
+  background-image: linear-gradient(
+    135deg,
+    #102b57 0%,
+    #0754a8 60%,
+    #14cfe0 100%
+  );
+}
+
+@utility bg-gradient-brand-hero {
+  background-image: linear-gradient(
+    160deg,
+    #071d3d 0%,
+    #0754a8 45%,
+    #0a8ac8 75%,
+    #14cfe0 100%
+  );
+}
