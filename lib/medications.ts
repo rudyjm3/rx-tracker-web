@@ -159,6 +159,27 @@ export async function updateMedication(
 ): Promise<void> {
   const supabase = createClient();
 
+  const { data: existing, error: fetchError } = await supabase
+    .from("medications")
+    .select("dose_amount, dose_unit, inventory_enabled, current_quantity, starting_quantity")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw fetchError;
+
+  // current_quantity is the live balance doses/refills deduct from — an
+  // edit here should only (re)initialize it when inventory tracking is
+  // being turned on for the first time, never silently reset it just
+  // because the form resubmits a starting_quantity value.
+  const inventoryJustEnabled = input.inventory_enabled && !existing.inventory_enabled;
+  const startingQuantity = input.inventory_enabled
+    ? (inventoryJustEnabled ? input.starting_quantity : existing.starting_quantity)
+    : null;
+  const currentQuantity = input.inventory_enabled
+    ? (inventoryJustEnabled || existing.current_quantity == null
+        ? input.starting_quantity
+        : existing.current_quantity)
+    : null;
+
   const { error } = await supabase
     .from("medications")
     .update({
@@ -176,6 +197,8 @@ export async function updateMedication(
       medication_type: input.medication_type,
       inventory_type: input.inventory_type,
       inventory_unit: input.inventory_unit,
+      starting_quantity: startingQuantity,
+      current_quantity: currentQuantity,
       quantity_per_dose: input.quantity_per_dose,
       low_supply_threshold: input.low_supply_threshold,
       track_dose_feedback: input.feedback_type !== "none",
@@ -190,6 +213,22 @@ export async function updateMedication(
     })
     .eq("id", id);
   if (error) throw error;
+
+  const doseChanged =
+    existing.dose_amount !== (input.dose_amount ?? null) ||
+    existing.dose_unit !== (input.dose_unit ?? null);
+  if (doseChanged) {
+    const { error: doseChangeError } = await supabase
+      .from("medication_dose_changes")
+      .insert({
+        medication_id: id,
+        old_dose_amount: existing.dose_amount,
+        old_dose_unit: existing.dose_unit ?? "",
+        new_dose_amount: input.dose_amount ?? null,
+        new_dose_unit: input.dose_unit ?? "",
+      });
+    if (doseChangeError) throw doseChangeError;
+  }
 
   const { error: deleteError } = await supabase
     .from("medication_schedule_times")

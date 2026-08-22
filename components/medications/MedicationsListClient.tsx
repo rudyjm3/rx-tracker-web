@@ -45,7 +45,16 @@ export function MedicationsListClient() {
 
   const activeMedications = activeQuery.data ?? [];
   const groups = groupsQuery.data ?? [];
-  const groupMembers = groupMembersQuery.data ?? [];
+  // getGroupMembers() returns memberships for every group regardless of
+  // its active flag — deleteGroup() only soft-deletes the group row, it
+  // doesn't remove membership rows. Filter to active groups here so a
+  // deleted group's medications reappear as ungrouped instead of
+  // vanishing (excluded from "ungrouped" but never rendered under any
+  // group, since only active groups are iterated below).
+  const activeGroupIds = new Set(groups.map((g) => g.id));
+  const groupMembers = (groupMembersQuery.data ?? []).filter((m) =>
+    activeGroupIds.has(m.group_id),
+  );
 
   const groupedMedicationIds = new Set(groupMembers.map((m) => m.medication_id));
   const ungroupedMedications = activeMedications.filter(

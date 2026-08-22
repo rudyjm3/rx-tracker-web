@@ -61,6 +61,16 @@ export function RefillModal({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const amountValue = Number(amount);
+    const pillsOnHandValue = Number(pillsOnHand);
+    if (mode === "refill" && (!Number.isFinite(amountValue) || amountValue < 0)) {
+      toast.error("Amount added must be zero or greater");
+      return;
+    }
+    if (!Number.isFinite(pillsOnHandValue) || pillsOnHandValue < 0) {
+      toast.error("Quantity must be zero or greater");
+      return;
+    }
     mutation.mutate();
   }
 
@@ -78,6 +88,7 @@ export function RefillModal({
               <input
                 type="number"
                 step="any"
+                min="0"
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -95,6 +106,7 @@ export function RefillModal({
             <input
               type="number"
               step="any"
+              min="0"
               required
               value={pillsOnHand}
               onChange={(e) => setPillsOnHand(e.target.value)}

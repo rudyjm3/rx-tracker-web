@@ -77,12 +77,28 @@ export const medicationFormSchema = z
   .superRefine((data, ctx) => {
     if (data.asNeeded) return;
 
-    if (data.scheduleMode === "fixed_times" && data.scheduleTimes.length === 0) {
-      ctx.addIssue({
-        path: ["scheduleTimes"],
-        code: "custom",
-        message: "Add at least one reminder time",
-      });
+    if (data.scheduleMode === "fixed_times") {
+      if (data.scheduleTimes.length === 0) {
+        ctx.addIssue({
+          path: ["scheduleTimes"],
+          code: "custom",
+          message: "Add at least one reminder time",
+        });
+      }
+
+      // medication_schedule_times has a unique (medication_id,
+      // reminder_time) constraint, and every newly-added row defaults to
+      // the same time — catch duplicates here rather than letting the
+      // insert fail after the medication row (create) or after the old
+      // schedule rows are already deleted (edit).
+      const times = data.scheduleTimes.map((t) => t.reminderTime).filter(Boolean);
+      if (new Set(times).size !== times.length) {
+        ctx.addIssue({
+          path: ["scheduleTimes"],
+          code: "custom",
+          message: "Reminder times must be unique",
+        });
+      }
     }
 
     if (data.scheduleMode === "interval") {

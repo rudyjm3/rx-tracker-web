@@ -65,9 +65,9 @@ export function StepSchedule() {
                   </button>
                 </div>
               ))}
-              {errors.scheduleTimes?.message && (
+              {(errors.scheduleTimes?.message || errors.scheduleTimes?.root?.message) && (
                 <span className="text-xs text-status-danger">
-                  {errors.scheduleTimes.message}
+                  {errors.scheduleTimes.message ?? errors.scheduleTimes.root?.message}
                 </span>
               )}
               <Button

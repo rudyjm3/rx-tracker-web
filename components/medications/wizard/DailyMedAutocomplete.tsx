@@ -15,6 +15,18 @@ export function DailyMedAutocomplete() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // `name` can change from outside this component's own onChange — e.g.
+  // form.reset() populating the edit form or a resumed draft — which
+  // wouldn't otherwise reach local `term` state, leaving the visible
+  // input blank even though react-hook-form has the real value. Adjusted
+  // during render (React's documented pattern for this) rather than in
+  // a useEffect, to avoid an extra cascading render.
+  const [prevName, setPrevName] = useState(name);
+  if (name !== prevName) {
+    setPrevName(name);
+    setTerm(name ?? "");
+  }
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
