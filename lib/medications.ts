@@ -46,7 +46,7 @@ function formatDose(input: Pick<MedicationInput, "dose_amount" | "dose_unit" | "
     .join(" ");
 }
 
-async function getCurrentUserId() {
+export async function getCurrentUserId() {
   const supabase = createClient();
   const {
     data: { user },

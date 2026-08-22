@@ -505,6 +505,11 @@ create index if not exists idx_user_notifications_user_id on user_notifications(
 -- calls for that medication; security invoker (the default) means it
 -- runs with the calling user's own privileges, so the "own
 -- medications"/"own dose logs" RLS policies still apply inside it.
+-- p_pain_level/p_mood_level/p_note capture Take-time feedback for
+-- medications with feedback tracking enabled (step 6); like
+-- deducted_quantity, they only apply when p_status = 'taken' and reset
+-- to null/'' otherwise, since feedback describes how the dose actually
+-- taken felt, not a skipped one.
 -- ─────────────────────────────────────────
 create or replace function record_dose(
   p_medication_id uuid,
@@ -512,7 +517,10 @@ create or replace function record_dose(
   p_scheduled_time time,
   p_status text,
   p_quantity_per_dose numeric,
-  p_inventory_enabled boolean
+  p_inventory_enabled boolean,
+  p_pain_level smallint default null,
+  p_mood_level smallint default null,
+  p_note text default null
 )
 returns void
 language plpgsql
@@ -537,18 +545,24 @@ begin
 
   insert into dose_logs (
     medication_id, scheduled_for_date, scheduled_time, status,
-    deducted_quantity, taken_at
+    deducted_quantity, taken_at, pain_level, mood_level, note
   )
   values (
     p_medication_id, p_scheduled_for_date, p_scheduled_time, p_status,
     case when p_status = 'taken' then p_quantity_per_dose else null end,
-    case when p_status = 'taken' then now() else null end
+    case when p_status = 'taken' then now() else null end,
+    case when p_status = 'taken' then p_pain_level else null end,
+    case when p_status = 'taken' then p_mood_level else null end,
+    case when p_status = 'taken' then coalesce(p_note, '') else '' end
   )
   on conflict (medication_id, scheduled_for_date, scheduled_time)
   do update set
     status = excluded.status,
     deducted_quantity = excluded.deducted_quantity,
-    taken_at = excluded.taken_at;
+    taken_at = excluded.taken_at,
+    pain_level = excluded.pain_level,
+    mood_level = excluded.mood_level,
+    note = excluded.note;
 
   if not p_inventory_enabled then
     return;
@@ -570,4 +584,4 @@ begin
 end;
 $$;
 
-grant execute on function record_dose(uuid, date, time, text, numeric, boolean) to authenticated;
+grant execute on function record_dose(uuid, date, time, text, numeric, boolean, smallint, smallint, text) to authenticated;
