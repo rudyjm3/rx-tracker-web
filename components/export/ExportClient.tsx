@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { useAuth } from "@/components/layout/AuthProvider";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -35,13 +36,14 @@ function formatSchedule(med: Medication): string {
 
 export function ExportClient() {
   const { user } = useAuth();
+  const { activeProfileId } = useActiveProfile();
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(localDateString);
   const generatedAt = useMemo(() => new Date().toLocaleString(), []);
 
   const medicationsQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
   });
   const medications = useMemo(() => medicationsQuery.data ?? [], [medicationsQuery.data]);
 

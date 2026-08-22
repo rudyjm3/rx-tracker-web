@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import {
   getActiveMedications,
   getGroupMembers,
@@ -18,23 +19,30 @@ import { GroupModal } from "./GroupModal";
 
 export function MedicationsListClient() {
   const queryClient = useQueryClient();
+  const { activeProfileId } = useActiveProfile();
   const [showInactive, setShowInactive] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
 
   const activeQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
   });
   const inactiveQuery = useQuery({
-    queryKey: ["medications", "inactive"],
-    queryFn: getInactiveMedications,
+    queryKey: ["medications", "inactive", activeProfileId],
+    queryFn: () => getInactiveMedications(activeProfileId),
   });
-  const groupsQuery = useQuery({ queryKey: ["groups"], queryFn: getGroups });
+  const groupsQuery = useQuery({
+    queryKey: ["groups", activeProfileId],
+    queryFn: () => getGroups(activeProfileId),
+  });
   const groupMembersQuery = useQuery({
     queryKey: ["group-members"],
     queryFn: getGroupMembers,
   });
-  const draftsQuery = useQuery({ queryKey: ["drafts"], queryFn: () => getDrafts() });
+  const draftsQuery = useQuery({
+    queryKey: ["drafts", activeProfileId],
+    queryFn: () => getDrafts(activeProfileId),
+  });
 
   const discardDraftMutation = useMutation({
     mutationFn: (id: string) => deleteDraft(id),

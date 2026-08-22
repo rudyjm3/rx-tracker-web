@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
@@ -30,17 +31,18 @@ function badgeVariantFor(row: CalendarLogRow, graceMinutes: number): BadgeVarian
 }
 
 export function HistoryClient() {
+  const { activeProfileId } = useActiveProfile();
   const [selectedMedicationId, setSelectedMedicationId] = useState<string>(ALL_MEDICATIONS);
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(localDateString);
 
   const activeMedicationsQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
   });
   const inactiveMedicationsQuery = useQuery({
-    queryKey: ["medications", "inactive"],
-    queryFn: getInactiveMedications,
+    queryKey: ["medications", "inactive", activeProfileId],
+    queryFn: () => getInactiveMedications(activeProfileId),
   });
   const allMedications = useMemo(
     () => [...(activeMedicationsQuery.data ?? []), ...(inactiveMedicationsQuery.data ?? [])],

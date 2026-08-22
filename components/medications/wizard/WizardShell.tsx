@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import {
@@ -124,6 +125,7 @@ interface WizardShellProps {
 
 export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   const router = useRouter();
+  const { activeProfileId } = useActiveProfile();
   const [step, setStep] = useState(1);
   const [furthestStep, setFurthestStep] = useState(1);
   const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(draftId);
@@ -171,6 +173,7 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
         formData: form.getValues(),
         currentStep: stepToSave,
         furthestStep: Math.max(furthestStep, stepToSave),
+        profileId: activeProfileId,
       });
       setCurrentDraftId((prev) => prev ?? id);
     } catch {
@@ -214,11 +217,19 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       const scheduleTimes = toScheduleTimes(values);
 
       if (mode === "create") {
-        await createMedication(input, scheduleTimes);
+        await createMedication({ ...input, profile_id: activeProfileId }, scheduleTimes);
         if (currentDraftId) await deleteDraft(currentDraftId);
         toast.success("Medication added");
       } else {
-        await updateMedication(medicationId as string, input, scheduleTimes);
+        // Preserve the medication's existing profile assignment —
+        // editing doesn't move a medication between profiles, and
+        // updateMedication writes profile_id unconditionally on every
+        // save, so omitting it here would silently null it out.
+        await updateMedication(
+          medicationId as string,
+          { ...input, profile_id: editQuery.data?.profile_id ?? null },
+          scheduleTimes,
+        );
         toast.success("Medication updated");
       }
 

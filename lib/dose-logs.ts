@@ -201,13 +201,17 @@ export type CalendarLogRow = DoseLog & {
 export async function getCalendarMarkers(
   monthStart: string,
   monthEnd: string,
+  medicationIds?: string[],
 ): Promise<Record<string, CalendarDayMarker>> {
+  if (medicationIds && medicationIds.length === 0) return {};
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("dose_logs")
     .select("scheduled_for_date, status")
     .gte("scheduled_for_date", monthStart)
     .lte("scheduled_for_date", monthEnd);
+  if (medicationIds) query = query.in("medication_id", medicationIds);
+  const { data, error } = await query;
   if (error) throw error;
 
   const markers: Record<string, CalendarDayMarker> = {};
@@ -226,13 +230,17 @@ export async function getCalendarMarkers(
 export async function getCalendarLogs(
   monthStart: string,
   monthEnd: string,
+  medicationIds?: string[],
 ): Promise<CalendarLogRow[]> {
+  if (medicationIds && medicationIds.length === 0) return [];
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("dose_logs")
     .select("*, medications(name, dose)")
     .gte("scheduled_for_date", monthStart)
-    .lte("scheduled_for_date", monthEnd)
+    .lte("scheduled_for_date", monthEnd);
+  if (medicationIds) query = query.in("medication_id", medicationIds);
+  const { data, error } = await query
     .order("scheduled_for_date", { ascending: true })
     .order("scheduled_time", { ascending: true });
   if (error) throw error;

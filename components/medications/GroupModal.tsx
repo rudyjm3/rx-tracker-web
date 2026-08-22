@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ export function GroupModal({
   availableMedications,
 }: GroupModalProps) {
   const queryClient = useQueryClient();
+  const { activeProfileId } = useActiveProfile();
   const isEdit = Boolean(group);
 
   const [name, setName] = useState(group?.name ?? "");
@@ -68,9 +70,18 @@ export function GroupModal({
         }),
       );
       if (isEdit && group) {
-        await updateGroup(group.id, { name, scheduled_time: scheduledTime }, members);
+        // Preserve the group's existing profile assignment — editing
+        // doesn't move a group between profiles, same as medications.
+        await updateGroup(
+          group.id,
+          { name, scheduled_time: scheduledTime, profile_id: group.profile_id },
+          members,
+        );
       } else {
-        await createGroup({ name, scheduled_time: scheduledTime }, members);
+        await createGroup(
+          { name, scheduled_time: scheduledTime, profile_id: activeProfileId },
+          members,
+        );
       }
     },
     onSuccess: () => {

@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getActiveMedications } from "@/lib/medications";
 import {
   createStandaloneLog,
@@ -39,13 +40,14 @@ interface WellbeingClientProps {
 // MoodWellbeingClient as thin per-page wrappers.
 export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingClientProps) {
   const queryClient = useQueryClient();
+  const { activeProfileId } = useActiveProfile();
   const today = localDateString();
   const [selectedMedicationId, setSelectedMedicationId] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState<RangeDays>(0);
 
   const medicationsQuery = useQuery({
-    queryKey: ["medications", "active"],
-    queryFn: getActiveMedications,
+    queryKey: ["medications", "active", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
   });
 
   const trackedMedications = useMemo(
