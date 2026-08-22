@@ -64,7 +64,7 @@ export function generateDaySlots(
   date: string,
   medications: Medication[],
   groups: MedicationGroup[],
-  groupMembers: MedicationGroupMember[],
+  groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id" | "quantity_per_dose">[],
   doseLogs: DoseLog[],
   postpones: DosePostpone[],
 ): DaySlot[] {
