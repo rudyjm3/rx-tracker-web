@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/medications";
+import type { MoodChartScheme } from "@/lib/app-settings";
 import type {
   DoseLog,
   Medication,
@@ -32,12 +33,25 @@ export function medicationTracksMetric(
 // 3 severity bands (the reference PHP app's charts use 4 — this brand's
 // tokens only have success/warning/danger). Mood is inverted from pain:
 // a low mood score is the bad end, a low pain score is the good end.
-export function levelColor(metric: WellbeingMetric, level: number): string {
+// `scheme` is the reference app's "Teal mood chart" setting — mood-only
+// (pain always uses the classic bands, matching the reference, which
+// never offers the toggle for pain charts).
+export function levelColor(
+  metric: WellbeingMetric,
+  level: number,
+  scheme: MoodChartScheme = "classic",
+): string {
   const rounded = Math.round(level);
   if (metric === "pain") {
     if (rounded <= 3) return "var(--color-status-success)";
     if (rounded <= 6) return "var(--color-status-warning)";
     return "var(--color-status-danger)";
+  }
+  if (scheme === "teal") {
+    // Lighter teal = lower mood, darker teal = higher mood.
+    if (rounded <= 3) return "#a8dce4";
+    if (rounded <= 6) return "#4bb8c9";
+    return "#028aa9";
   }
   if (rounded <= 3) return "var(--color-status-danger)";
   if (rounded <= 6) return "var(--color-status-warning)";
