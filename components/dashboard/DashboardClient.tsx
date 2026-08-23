@@ -207,24 +207,39 @@ export function DashboardClient() {
       .map((s) => ({ status: s.status as DoseLogStatus })),
   );
 
-  // In-app "dose due" alert: fires once per slot per session (tracked in
-  // a ref, not state — no re-render needed) when a still-pending slot's
-  // effective time has passed. Rides the same 60s poll that already
-  // recomputes `slots`, so no separate timer of its own.
+  // In-app "dose due" alert: fires once per slot, keyed by its exact due
+  // time (effectiveTime) rather than its scheduled time, so a later
+  // snooze — which changes that time — can alarm again instead of being
+  // permanently suppressed by the first alarm's key. Only alarms while
+  // the due time has passed but the missed-dose grace cutoff hasn't, so
+  // a backlog of already-overdue-past-grace slots doesn't all alarm at
+  // once on load — those are about to be finalized as missed by the
+  // effect above instead. Driven by its own tick, not just `slots`
+  // changing reference: React Query structurally shares unchanged
+  // refetch results, so `slots` can keep the same object reference
+  // across a full poll cycle even once a slot's due time has newly
+  // passed, and this effect wouldn't otherwise re-run to notice.
   const alarmedKeysRef = useRef<Set<string>>(new Set());
+  const [alarmTick, setAlarmTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setAlarmTick((t) => t + 1), 20_000);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => {
     const now = Date.now();
     for (const slot of slots) {
       if (slot.status !== "pending") continue;
-      if (effectiveTime(slot) > now) continue;
-      const key = `${date}|${slot.medicationId}|${slot.scheduledTime}`;
+      const due = effectiveTime(slot);
+      if (due > now) continue;
+      if (now > due + graceMinutes * 60_000) continue;
+      const key = `${slot.medicationId}|${due}`;
       if (alarmedKeysRef.current.has(key)) continue;
       alarmedKeysRef.current.add(key);
       playAlarmSound();
       triggerVibration();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots, date]);
+  }, [slots, date, graceMinutes, alarmTick]);
 
   const isLoading =
     isResolving ||

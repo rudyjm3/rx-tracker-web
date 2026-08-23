@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuth } from "@/components/layout/AuthProvider";
 import {
   getMissedGraceMinutes,
   getMoodChartScheme,
@@ -23,10 +24,15 @@ import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 
 export function SettingsClient() {
+  const { user } = useAuth();
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-navy">Settings</h1>
-      <GeneralSettingsPanel />
+      {/* Keyed by user id so a sign-out/sign-in within the same browser
+          tab (the app_settings query cache is process-wide, not scoped
+          per user) forces a fresh mount instead of leaving the previous
+          account's values seeded into this panel's local edit state. */}
+      <GeneralSettingsPanel key={user?.id} />
       <AlarmSettingsPanel />
     </div>
   );
