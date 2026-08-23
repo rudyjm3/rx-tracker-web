@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
-import { getMissedGraceMinutes } from "@/lib/app-settings";
+import { getMissedGraceMinutes, getSnoozeMinutes } from "@/lib/app-settings";
 import {
   finalizeMissedDoses,
   getTodayLogs,
@@ -19,6 +19,7 @@ import {
   getGroups,
 } from "@/lib/medications";
 import { computeAdherence } from "@/lib/adherence";
+import { playAlarmSound, triggerVibration } from "@/lib/notifications";
 import { generateDaySlots, type DaySlot } from "@/lib/schedule";
 import { localDateString } from "@/lib/utils";
 import type { DoseLogStatus } from "@/lib/types/medications";
@@ -77,6 +78,10 @@ export function DashboardClient() {
   const graceQuery = useQuery({
     queryKey: ["app-settings", "missed_grace_minutes"],
     queryFn: getMissedGraceMinutes,
+  });
+  const snoozeSettingQuery = useQuery({
+    queryKey: ["app-settings", "snooze_minutes"],
+    queryFn: getSnoozeMinutes,
   });
 
   const slots = useMemo<DaySlot[]>(() => {
@@ -202,6 +207,25 @@ export function DashboardClient() {
       .map((s) => ({ status: s.status as DoseLogStatus })),
   );
 
+  // In-app "dose due" alert: fires once per slot per session (tracked in
+  // a ref, not state — no re-render needed) when a still-pending slot's
+  // effective time has passed. Rides the same 60s poll that already
+  // recomputes `slots`, so no separate timer of its own.
+  const alarmedKeysRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const now = Date.now();
+    for (const slot of slots) {
+      if (slot.status !== "pending") continue;
+      if (effectiveTime(slot) > now) continue;
+      const key = `${date}|${slot.medicationId}|${slot.scheduledTime}`;
+      if (alarmedKeysRef.current.has(key)) continue;
+      alarmedKeysRef.current.add(key);
+      playAlarmSound();
+      triggerVibration();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots, date]);
+
   const isLoading =
     isResolving ||
     medicationsQuery.isLoading ||
@@ -224,6 +248,7 @@ export function DashboardClient() {
         onTake={handleTake}
         onSkip={handleSkip}
         onSnooze={handleSnooze}
+        defaultSnoozeMinutes={snoozeSettingQuery.data}
         disabled={pendingKey !== null}
       />
 
@@ -238,6 +263,7 @@ export function DashboardClient() {
           onTake={handleTake}
           onSkip={handleSkip}
           onSnooze={handleSnooze}
+          defaultSnoozeMinutes={snoozeSettingQuery.data}
           pendingKey={pendingKey}
         />
       </div>

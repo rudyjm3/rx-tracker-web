@@ -32,6 +32,11 @@ export function resolveQuantityPerDose({
   );
 }
 
+// Snooze duration choices offered wherever a dose can be postponed —
+// single source of truth, was previously duplicated identically in
+// HeroPanel.tsx and DoseRow.tsx.
+export const SNOOZE_OPTIONS = [5, 10, 15, 30] as const;
+
 export interface DaySlot {
   medicationId: string;
   medicationName: string;

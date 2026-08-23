@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { computeAdherence } from "@/lib/adherence";
+import { getMoodChartScheme } from "@/lib/app-settings";
 import { getDoseLogHistory, getDoseLogStatusesInRange } from "@/lib/dose-logs";
 import { getActiveMedications, getInactiveMedications } from "@/lib/medications";
 import { getTrend, medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
@@ -47,6 +48,11 @@ export function ExportClient() {
     enabled: !isResolving,
   });
   const medications = useMemo(() => medicationsQuery.data ?? [], [medicationsQuery.data]);
+
+  const moodSchemeQuery = useQuery({
+    queryKey: ["app-settings", "mood_chart_scheme"],
+    queryFn: getMoodChartScheme,
+  });
 
   // A medication discontinued partway through the selected range still
   // has dose history/side effects worth including in the report, so the
@@ -228,7 +234,11 @@ export function ExportClient() {
                 <h2 className="mb-3 text-lg font-bold text-brand-navy">
                   Mood trend — {med.name}
                 </h2>
-                <ReportTrendChart metric="mood" points={moodTrendQueries[i]?.data ?? []} />
+                <ReportTrendChart
+                  metric="mood"
+                  points={moodTrendQueries[i]?.data ?? []}
+                  moodChartScheme={moodSchemeQuery.data}
+                />
               </section>
             ))}
 
