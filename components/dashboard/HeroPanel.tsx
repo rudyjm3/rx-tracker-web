@@ -9,10 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { to12h } from "@/lib/utils";
-import type { DaySlot } from "@/lib/schedule";
+import { SNOOZE_OPTIONS, type DaySlot } from "@/lib/schedule";
 import { AdherenceRing } from "./AdherenceRing";
-
-const SNOOZE_OPTIONS = [5, 10, 15, 30];
 
 interface HeroPanelProps {
   nextDose: DaySlot | null;
@@ -20,6 +18,7 @@ interface HeroPanelProps {
   onTake: (slot: DaySlot) => void;
   onSkip: (slot: DaySlot) => void;
   onSnooze: (slot: DaySlot, minutes: number) => void;
+  defaultSnoozeMinutes?: number;
   disabled?: boolean;
 }
 
@@ -29,6 +28,7 @@ export function HeroPanel({
   onTake,
   onSkip,
   onSnooze,
+  defaultSnoozeMinutes,
   disabled,
 }: HeroPanelProps) {
   return (
@@ -79,6 +79,7 @@ export function HeroPanel({
                         onSelect={() => onSnooze(nextDose, minutes)}
                       >
                         {minutes} minutes
+                        {minutes === defaultSnoozeMinutes && " (default)"}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>

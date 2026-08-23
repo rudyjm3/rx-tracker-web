@@ -10,9 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { to12h } from "@/lib/utils";
-import type { DaySlot } from "@/lib/schedule";
-
-const SNOOZE_OPTIONS = [5, 10, 15, 30];
+import { SNOOZE_OPTIONS, type DaySlot } from "@/lib/schedule";
 
 interface DoseRowProps {
   slot: DaySlot;
@@ -20,6 +18,7 @@ interface DoseRowProps {
   onTake: () => void;
   onSkip: () => void;
   onSnooze: (minutes: number) => void;
+  defaultSnoozeMinutes?: number;
   disabled?: boolean;
 }
 
@@ -29,6 +28,7 @@ export function DoseRow({
   onTake,
   onSkip,
   onSnooze,
+  defaultSnoozeMinutes,
   disabled,
 }: DoseRowProps) {
   return (
@@ -69,6 +69,7 @@ export function DoseRow({
               {SNOOZE_OPTIONS.map((minutes) => (
                 <DropdownMenuItem key={minutes} onSelect={() => onSnooze(minutes)}>
                   {minutes} minutes
+                  {minutes === defaultSnoozeMinutes && " (default)"}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

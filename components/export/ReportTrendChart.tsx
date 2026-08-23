@@ -10,9 +10,10 @@ import {
   YAxis,
   type DotItemDotProps,
 } from "recharts";
+import type { MoodChartScheme } from "@/lib/app-settings";
 import { groupDailyAverages, levelColor, type TrendPoint, type WellbeingMetric } from "@/lib/pain-mood";
 
-function renderDot(metric: WellbeingMetric) {
+function renderDot(metric: WellbeingMetric, scheme: MoodChartScheme) {
   function LevelDot(props: DotItemDotProps) {
     const { cx, cy, payload, index } = props;
     if (cx == null || cy == null) return null;
@@ -23,7 +24,7 @@ function renderDot(metric: WellbeingMetric) {
         cx={cx}
         cy={cy}
         r={4}
-        fill={levelColor(metric, level)}
+        fill={levelColor(metric, level, scheme)}
         stroke="#ffffff"
         strokeWidth={1.5}
       />
@@ -35,6 +36,7 @@ function renderDot(metric: WellbeingMetric) {
 interface ReportTrendChartProps {
   metric: WellbeingMetric;
   points: TrendPoint[];
+  moodChartScheme?: MoodChartScheme;
 }
 
 /**
@@ -43,7 +45,11 @@ interface ReportTrendChartProps {
  * the pain-tracking/mood-wellbeing pages); the report's own date range
  * already scopes `points`, and a printed page has no click handlers.
  */
-export function ReportTrendChart({ metric, points }: ReportTrendChartProps) {
+export function ReportTrendChart({
+  metric,
+  points,
+  moodChartScheme = "classic",
+}: ReportTrendChartProps) {
   const dailyAverages = groupDailyAverages(points);
   const metricLabel = metric === "pain" ? "Pain" : "Mood";
 
@@ -66,7 +72,7 @@ export function ReportTrendChart({ metric, points }: ReportTrendChartProps) {
           type="monotone"
           dataKey="level"
           stroke="var(--color-brand-blue)"
-          dot={renderDot(metric)}
+          dot={renderDot(metric, moodChartScheme)}
           isAnimationActive={false}
         />
       </LineChart>

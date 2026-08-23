@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
+import { getMoodChartScheme } from "@/lib/app-settings";
 import { getActiveMedications } from "@/lib/medications";
 import {
   createStandaloneLog,
@@ -61,6 +62,11 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
     queryKey: ["medications", "active", activeProfileId],
     queryFn: () => getActiveMedications(activeProfileId),
     enabled: !isResolving,
+  });
+
+  const moodSchemeQuery = useQuery({
+    queryKey: ["app-settings", "mood_chart_scheme"],
+    queryFn: getMoodChartScheme,
   });
 
   const trackedMedications = useMemo(
@@ -135,6 +141,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
           points={trendQuery.data ?? []}
           rangeDays={rangeDays}
           onRangeChange={setRangeDays}
+          moodChartScheme={moodSchemeQuery.data}
         />
       </div>
 

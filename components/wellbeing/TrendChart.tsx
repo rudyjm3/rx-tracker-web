@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/cn";
 import { minutesToTime, timeToMinutes, to12h } from "@/lib/utils";
+import type { MoodChartScheme } from "@/lib/app-settings";
 import {
   groupDailyAverages,
   levelColor,
@@ -28,7 +29,7 @@ export const RANGE_OPTIONS = [
 ];
 export type RangeDays = (typeof RANGE_OPTIONS)[number]["days"];
 
-function renderDot(metric: WellbeingMetric) {
+function renderDot(metric: WellbeingMetric, scheme: MoodChartScheme) {
   function LevelDot(props: DotItemDotProps) {
     const { cx, cy, payload, index } = props;
     if (cx == null || cy == null) return null;
@@ -39,7 +40,7 @@ function renderDot(metric: WellbeingMetric) {
         cx={cx}
         cy={cy}
         r={5}
-        fill={levelColor(metric, level)}
+        fill={levelColor(metric, level, scheme)}
         stroke="#ffffff"
         strokeWidth={1.5}
       />
@@ -53,9 +54,16 @@ interface TrendChartProps {
   points: TrendPoint[];
   rangeDays: RangeDays;
   onRangeChange: (days: RangeDays) => void;
+  moodChartScheme?: MoodChartScheme;
 }
 
-export function TrendChart({ metric, points, rangeDays, onRangeChange }: TrendChartProps) {
+export function TrendChart({
+  metric,
+  points,
+  rangeDays,
+  onRangeChange,
+  moodChartScheme = "classic",
+}: TrendChartProps) {
   const [drillDate, setDrillDate] = useState<string | null>(null);
 
   const showingDay = rangeDays === 0 ? (points[0]?.date ?? null) : drillDate;
@@ -132,7 +140,7 @@ export function TrendChart({ metric, points, rangeDays, onRangeChange }: TrendCh
               type="monotone"
               dataKey="level"
               stroke="var(--color-brand-blue)"
-              dot={renderDot(metric)}
+              dot={renderDot(metric, moodChartScheme)}
               isAnimationActive={false}
             />
           </LineChart>
@@ -156,7 +164,7 @@ export function TrendChart({ metric, points, rangeDays, onRangeChange }: TrendCh
               type="monotone"
               dataKey="level"
               stroke="var(--color-brand-blue)"
-              dot={renderDot(metric)}
+              dot={renderDot(metric, moodChartScheme)}
               isAnimationActive={false}
               className="cursor-pointer"
             />

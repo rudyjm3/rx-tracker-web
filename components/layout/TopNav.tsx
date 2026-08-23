@@ -115,6 +115,9 @@ export function TopNav() {
                 <DropdownMenuItem asChild>
                   <Link href="/family">Manage Family</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">Settings</Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Switch profile</DropdownMenuLabel>
                 <DropdownMenuItem
