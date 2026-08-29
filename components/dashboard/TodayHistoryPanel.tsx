@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import { ArrowUpDown } from "lucide-react";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getDoseLogHistory, type CalendarLogRow } from "@/lib/dose-logs";
+import { getInactiveMedications } from "@/lib/medications";
 import { getMissedGraceMinutes } from "@/lib/app-settings";
 import { formatLate, isLate, minutesLate, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
@@ -25,16 +27,27 @@ export function TodayHistoryPanel({
   medications,
 }: {
   date: string;
+  /** The active profile's currently-active medications; inactive ones are fetched here so a med discontinued later the same day it was logged still shows. */
   medications: Medication[];
 }) {
   const queryClient = useQueryClient();
+  const { activeProfileId } = useActiveProfile();
   const [newestFirst, setNewestFirst] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [editing, setEditing] = useState<{ log: EditableDoseLog; medication: Medication } | null>(
     null,
   );
 
-  const medicationIds = useMemo(() => medications.map((m) => m.id), [medications]);
+  const inactiveMedicationsQuery = useQuery({
+    queryKey: ["medications", "inactive", activeProfileId],
+    queryFn: () => getInactiveMedications(activeProfileId),
+  });
+  const allMedications = useMemo(
+    () => [...medications, ...(inactiveMedicationsQuery.data ?? [])],
+    [medications, inactiveMedicationsQuery.data],
+  );
+
+  const medicationIds = useMemo(() => allMedications.map((m) => m.id), [allMedications]);
   const graceQuery = useQuery({
     queryKey: ["app-settings", "missed_grace_minutes"],
     queryFn: getMissedGraceMinutes,
@@ -56,7 +69,7 @@ export function TodayHistoryPanel({
   const visible = showAll ? entries : entries.slice(0, COLLAPSED_COUNT);
 
   function handleEdit(row: CalendarLogRow) {
-    const medication = medications.find((m) => m.id === row.medication_id);
+    const medication = allMedications.find((m) => m.id === row.medication_id);
     if (!medication) return;
     setEditing({
       medication,
@@ -104,7 +117,7 @@ export function TodayHistoryPanel({
         <ol className="flex flex-col gap-2">
           {visible.map((row) => {
             const lateMin = row.status === "taken" ? minutesLate(row, graceMinutes) : null;
-            const medication = medications.find((m) => m.id === row.medication_id);
+            const medication = allMedications.find((m) => m.id === row.medication_id);
             const isSystemNote = row.note.startsWith("Auto-");
             return (
               <li

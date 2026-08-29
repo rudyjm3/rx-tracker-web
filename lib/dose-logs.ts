@@ -57,15 +57,15 @@ export async function recordDose(
  * current moment (a slot from earlier today, a past date, a genuinely
  * missed dose being corrected to "taken").
  *
- * Upserts via recordDose first — same atomic, row-locked inventory
- * deduction, keyed by (medication_id, scheduled_for_date,
- * scheduled_time), and it already handles a slot that has an existing
- * row (e.g. a "missed" log being corrected to "taken") via its own
- * ON CONFLICT DO UPDATE — then looks up that row's id and corrects
- * taken_at/feedback via editDoseLog, which (unlike record_dose) accepts
- * an explicit p_taken_at. editDoseLog's restore-then-deduct in that
- * second call is a net no-op on inventory, since it's operating on the
- * exact quantity the first call just deducted.
+ * Upserts via the record_dose_at_time RPC — same atomic, row-locked
+ * insert-or-update-plus-inventory-deduction shape as recordDose, keyed by
+ * (medication_id, scheduled_for_date, scheduled_time) and handling a
+ * slot with an existing row (e.g. a "missed" log being corrected to
+ * "taken") via its own ON CONFLICT DO UPDATE, but taking an explicit
+ * taken_at directly instead of always stamping now() — a single
+ * transaction, unlike a recordDose-then-editDoseLog pair, which could
+ * leave the log/inventory changed but the timestamp still wrong (or the
+ * whole write half-applied) if the second call failed.
  */
 export async function recordDoseAtTime(
   medication: Pick<Medication, "id" | "inventory_enabled">,
@@ -75,27 +75,19 @@ export async function recordDoseAtTime(
   quantityPerDose: number,
   feedback?: DoseFeedback,
 ): Promise<void> {
-  await recordDose(medication, scheduledForDate, scheduledTime, "taken", quantityPerDose, feedback);
-
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("dose_logs")
-    .select("id")
-    .eq("medication_id", medication.id)
-    .eq("scheduled_for_date", scheduledForDate)
-    .eq("scheduled_time", scheduledTime)
-    .single();
-  if (error) throw error;
-
-  await editDoseLog(data.id, {
-    status: "taken",
-    takenAt,
-    painLevel: feedback?.painLevel ?? null,
-    moodLevel: feedback?.moodLevel ?? null,
-    note: feedback?.note ?? "",
-    quantityPerDose,
-    inventoryEnabled: medication.inventory_enabled,
+  const { error } = await supabase.rpc("record_dose_at_time", {
+    p_medication_id: medication.id,
+    p_scheduled_for_date: scheduledForDate,
+    p_scheduled_time: scheduledTime,
+    p_taken_at: takenAt,
+    p_quantity_per_dose: quantityPerDose,
+    p_inventory_enabled: medication.inventory_enabled,
+    p_pain_level: feedback?.painLevel ?? null,
+    p_mood_level: feedback?.moodLevel ?? null,
+    p_note: feedback?.note ?? null,
   });
+  if (error) throw error;
 }
 
 export async function postponeDose(

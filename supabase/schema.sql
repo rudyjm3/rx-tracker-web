@@ -661,6 +661,86 @@ $$;
 grant execute on function record_dose(uuid, date, time, text, numeric, boolean, smallint, smallint, text) to authenticated;
 
 -- ─────────────────────────────────────────
+-- Same atomic, row-locked upsert as record_dose, but for logging a
+-- specific past taken_at (the Log Past Dose / Missed Dose / Free Log
+-- flow) instead of always stamping now(). Always status='taken' — there
+-- is no "log a past skip", so unlike record_dose this never branches on
+-- p_status. Exists because edit_dose_log requires the row to already
+-- exist (it raises if not), so recording an explicit past time for a
+-- slot with no log yet needs its own insert-or-update path rather than
+-- record_dose (which can create the row, but only at now()) followed by
+-- a second edit_dose_log call to correct the timestamp — that two-call
+-- sequence isn't atomic and can partially fail.
+-- ─────────────────────────────────────────
+create or replace function record_dose_at_time(
+  p_medication_id uuid,
+  p_scheduled_for_date date,
+  p_scheduled_time time,
+  p_taken_at timestamptz,
+  p_quantity_per_dose numeric,
+  p_inventory_enabled boolean,
+  p_pain_level smallint default null,
+  p_mood_level smallint default null,
+  p_note text default null
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_existing_status text;
+  v_existing_deducted numeric;
+begin
+  perform 1 from medications where id = p_medication_id for update;
+
+  select status, deducted_quantity
+    into v_existing_status, v_existing_deducted
+    from dose_logs
+   where medication_id = p_medication_id
+     and scheduled_for_date = p_scheduled_for_date
+     and scheduled_time = p_scheduled_time
+   for update;
+
+  insert into dose_logs (
+    medication_id, scheduled_for_date, scheduled_time, status,
+    deducted_quantity, taken_at, pain_level, mood_level, note,
+    feedback_edited_at
+  )
+  values (
+    p_medication_id, p_scheduled_for_date, p_scheduled_time, 'taken',
+    p_quantity_per_dose, coalesce(p_taken_at, now()), p_pain_level, p_mood_level,
+    coalesce(p_note, ''), now()
+  )
+  on conflict (medication_id, scheduled_for_date, scheduled_time)
+  do update set
+    status = 'taken',
+    deducted_quantity = excluded.deducted_quantity,
+    taken_at = excluded.taken_at,
+    pain_level = excluded.pain_level,
+    mood_level = excluded.mood_level,
+    note = excluded.note,
+    feedback_edited_at = now();
+
+  if not p_inventory_enabled then
+    return;
+  end if;
+
+  if v_existing_status = 'taken' and v_existing_deducted is not null then
+    update medications
+      set current_quantity = coalesce(current_quantity, 0) + v_existing_deducted,
+          updated_at = now()
+      where id = p_medication_id;
+  end if;
+
+  update medications
+    set current_quantity = coalesce(current_quantity, 0) - p_quantity_per_dose,
+        updated_at = now()
+    where id = p_medication_id;
+end;
+$$;
+
+grant execute on function record_dose_at_time(uuid, date, time, timestamptz, numeric, boolean, smallint, smallint, text) to authenticated;
+
+-- ─────────────────────────────────────────
 -- DOSE LOG EDIT/DELETE RPCs (step 7 — History)
 -- Same atomic, security-invoker, row-locked shape as record_dose, but
 -- keyed by an existing dose_logs row's id rather than the medication's

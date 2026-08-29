@@ -286,8 +286,16 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // hasn't yet crossed the missed-dose grace cutoff — the same window
   // finalizeMissedDoses/the sound alert below use, so the overlay only
   // ever covers a slot that's genuinely still actionable.
+  //
+  // Suppressed while the feedback or zero-pill follow-up dialog is open:
+  // both render as a Radix Dialog at z-50, below this overlay's z-[100],
+  // so leaving the overlay mounted on top would block the user from
+  // ever completing the Take flow that opened it.
   const dueNowEvent =
-    doseEvents.find((e) => e.time <= nowTick && nowTick <= e.time + graceMinutes * 60_000) ?? null;
+    feedbackQueue.length > 0 || zeroPillSlot !== null
+      ? null
+      : (doseEvents.find((e) => e.time <= nowTick && nowTick <= e.time + graceMinutes * 60_000) ??
+        null);
 
   const adherenceStats = computeAdherenceStats(
     slots
