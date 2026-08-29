@@ -6,6 +6,7 @@ export interface ParsedDraft<T = unknown> {
   formData: T;
   currentStep: number;
   furthestStep: number;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -15,6 +16,7 @@ function parseDraft<T>(row: MedicationDraft): ParsedDraft<T> {
     formData: JSON.parse(row.form_data) as T,
     currentStep: row.current_step,
     furthestStep: row.furthest_step,
+    createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }

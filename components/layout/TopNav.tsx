@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/layout/AuthProvider";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
+import { ResumeSetupBanner } from "@/components/layout/ResumeSetupBanner";
 import { Avatar } from "@/components/ui/Avatar";
 import {
   DropdownMenu,
@@ -30,6 +32,7 @@ const NAV_LINKS = [
 ];
 
 export function TopNav() {
+  const pathname = usePathname();
   const { user, signOut } = useAuth();
   const { activeProfileId, activeProfile, familyProfiles, setActiveProfileId } =
     useActiveProfile();
@@ -51,6 +54,7 @@ export function TopNav() {
 
   return (
     <header data-no-print className="border-b border-brand-border bg-brand-card">
+      {user && pathname !== "/settings" && <ResumeSetupBanner />}
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image

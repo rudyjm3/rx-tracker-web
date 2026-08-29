@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
@@ -26,17 +27,37 @@ import type { DoseLogStatus } from "@/lib/types/medications";
 import { HeroPanel } from "./HeroPanel";
 import { ScheduleList } from "./ScheduleList";
 import { LowSupplyBanner } from "./LowSupplyBanner";
+import { SetupCompleteBanner } from "./SetupCompleteBanner";
 import { FeedbackDialog } from "./FeedbackDialog";
 
 const REFRESH_INTERVAL_MS = 60_000;
 const todayString = localDateString;
 
-export function DashboardClient() {
+export function DashboardClient({ setupComplete = false }: { setupComplete?: boolean }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { activeProfileId, isResolving } = useActiveProfile();
   const [date, setDate] = useState(todayString);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [feedbackSlot, setFeedbackSlot] = useState<DaySlot | null>(null);
+
+  // Captured once into state rather than read directly from the prop:
+  // the router.replace below causes the server component to re-render
+  // with setupComplete=false almost immediately (often before the
+  // loading gate below even clears), and reading the prop directly at
+  // render time would make the banner disappear before it was ever
+  // visible. This snapshot keeps it showing for this mount regardless of
+  // when the URL-stripping replace resolves.
+  const [showSetupBanner] = useState(setupComplete);
+
+  // Strip ?setup=complete after the first render so a refresh doesn't
+  // re-show the one-time banner.
+  const hasStrippedSetupParam = useRef(false);
+  useEffect(() => {
+    if (!setupComplete || hasStrippedSetupParam.current) return;
+    hasStrippedSetupParam.current = true;
+    router.replace("/dashboard");
+  }, [setupComplete, router]);
 
   // A dashboard left open across local midnight would otherwise keep
   // refetching/recording against the frozen initial date forever.
@@ -255,6 +276,7 @@ export function DashboardClient() {
 
   return (
     <div className="flex flex-col gap-6">
+      {showSetupBanner && <SetupCompleteBanner />}
       <LowSupplyBanner medications={medicationsQuery.data ?? []} />
 
       <HeroPanel

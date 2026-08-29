@@ -62,17 +62,30 @@ export function formatLate(minutes: number): string {
   return mins > 0 ? `${hrs}hr ${mins}mins late` : `${hrs}hr late`;
 }
 
+// Single source of truth for "how many doses a day" a schedule implies —
+// used both for runout projections and for estimating remaining supply
+// from a fill date. The Math.max(1, ...) floor matters for long
+// intervals (e.g. 49h) where a bare round(24/hours) would hit 0 and
+// silently make every "per day" calculation a no-op.
+export function dosesPerDay(
+  scheduleMode: "fixed_times" | "interval",
+  scheduleTimesCount: number,
+  intervalHours: number | null | undefined,
+): number {
+  if (scheduleMode === "fixed_times") return scheduleTimesCount;
+  return intervalHours ? Math.max(1, Math.round(24 / intervalHours)) : 0;
+}
+
 export function daysUntilRunout(medication: Medication): number | null {
   const qty = medication.current_quantity ?? 0;
   if (qty <= 0) return 0;
-  const dosesPerDay =
-    medication.schedule_mode === "fixed_times"
-      ? (medication.medication_schedule_times?.length ?? 0)
-      : medication.interval_hours
-        ? Math.max(1, Math.round(24 / medication.interval_hours))
-        : 0;
-  if (dosesPerDay <= 0) return null;
-  return Math.floor(qty / dosesPerDay);
+  const perDay = dosesPerDay(
+    medication.schedule_mode,
+    medication.medication_schedule_times?.length ?? 0,
+    medication.interval_hours,
+  );
+  if (perDay <= 0) return null;
+  return Math.floor(qty / perDay);
 }
 
 // Whole years between a birth date and today — falls back to a birth

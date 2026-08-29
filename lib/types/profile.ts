@@ -55,3 +55,22 @@ export interface ProfileAllergy {
 // every allergy list/UI actually consumes, matching the reference app's
 // AllergyRepository query joins.
 export type ProfileAllergyWithName = ProfileAllergy & { name: string };
+
+export type OnboardingStatus = "not_started" | "in_progress" | "completed" | "skipped";
+export type OnboardingStep =
+  | "medications"
+  | "tracking"
+  | "schedule"
+  | "inventory"
+  | "reconcile"
+  | "activate";
+
+export interface ProfileOnboarding {
+  id: string;
+  user_id: string;
+  profile_id: string | null;
+  status: OnboardingStatus;
+  current_step: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
