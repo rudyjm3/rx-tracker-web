@@ -42,6 +42,7 @@ import { MedsOverviewPanel } from "./MedsOverviewPanel";
 import { TodayHistoryPanel } from "./TodayHistoryPanel";
 import { RequiredDosesModal } from "./RequiredDosesModal";
 import { AlarmOverlay } from "./AlarmOverlay";
+import { ZeroPillModal } from "./ZeroPillModal";
 
 const REFRESH_INTERVAL_MS = 60_000;
 const todayString = localDateString;
@@ -58,6 +59,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // rather than the last one silently winning.
   const [feedbackQueue, setFeedbackQueue] = useState<DaySlot[]>([]);
   const feedbackSlot = feedbackQueue[0] ?? null;
+  const [zeroPillSlot, setZeroPillSlot] = useState<DaySlot | null>(null);
   // High-water mark of the current feedback batch's size, so the dialog
   // can show "2 of 3" instead of a shrinking-only "3 left, 2 left, 1
   // left" — kept in state (not a ref) and synced via effect rather than
@@ -224,13 +226,25 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     onSettled: () => setPendingKey(null),
   });
 
-  function handleTake(slot: DaySlot) {
+  function proceedTake(slot: DaySlot) {
     if (slot.medication.feedback_type !== "none") {
       setFeedbackQueue((q) => [...q, slot]);
       return;
     }
     setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
     takeMutation.mutate({ slot });
+  }
+  function handleTake(slot: DaySlot) {
+    if (slot.medication.inventory_enabled && (slot.medication.current_quantity ?? 0) <= 0) {
+      setZeroPillSlot(slot);
+      return;
+    }
+    proceedTake(slot);
+  }
+  function handleZeroPillTakeAnyway() {
+    const slot = zeroPillSlot;
+    setZeroPillSlot(null);
+    if (slot) proceedTake(slot);
   }
   function handleFeedbackSubmit(feedback?: DoseFeedback) {
     const slot = feedbackQueue[0];
@@ -427,6 +441,12 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
         onSnoozeOne={handleSnooze}
         defaultSnoozeMinutes={snoozeSettingQuery.data}
         disabled={pendingKey !== null}
+      />
+      <ZeroPillModal
+        slot={zeroPillSlot}
+        onClose={() => setZeroPillSlot(null)}
+        onTakeAnyway={handleZeroPillTakeAnyway}
+        onCancelDose={() => setZeroPillSlot(null)}
       />
     </div>
   );
