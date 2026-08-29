@@ -11,6 +11,7 @@ export const buttonVariants = cva(
         secondary:
           "border border-brand-border bg-white text-brand-navy hover:bg-brand-bg",
         ghost: "text-brand-deep-blue hover:bg-brand-bg",
+        danger: "bg-status-danger text-white shadow-card hover:opacity-90",
       },
       size: {
         default: "px-4 py-2.5 text-sm",

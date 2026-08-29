@@ -10,14 +10,16 @@ export const DialogTrigger = DialogPrimitive.Trigger;
 export function DialogContent({
   className,
   children,
+  size = "default",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { size?: "default" | "wide" }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-brand-dark-navy/50 backdrop-blur-sm" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-hero bg-brand-card p-6 shadow-card focus:outline-none",
+          "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-full -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-hero bg-brand-card p-6 shadow-card focus:outline-none",
+          size === "wide" ? "max-w-2xl" : "max-w-md",
           className,
         )}
         {...props}

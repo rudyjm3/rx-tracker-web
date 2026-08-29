@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { CalendarDays } from "lucide-react";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getMissedGraceMinutes, getSnoozeMinutes } from "@/lib/app-settings";
 import {
@@ -19,16 +21,20 @@ import {
   getGroupMembers,
   getGroups,
 } from "@/lib/medications";
-import { computeAdherence } from "@/lib/adherence";
+import { computeAdherenceStats } from "@/lib/adherence";
 import { playAlarmSound, triggerVibration } from "@/lib/notifications";
-import { generateDaySlots, type DaySlot } from "@/lib/schedule";
-import { localDateString } from "@/lib/utils";
-import type { DoseLogStatus } from "@/lib/types/medications";
+import { buildDoseEvents, generateDaySlots, slotDueTime, type DaySlot } from "@/lib/schedule";
+import { isLate, localDateString } from "@/lib/utils";
 import { HeroPanel } from "./HeroPanel";
 import { ScheduleList } from "./ScheduleList";
 import { LowSupplyBanner } from "./LowSupplyBanner";
 import { SetupCompleteBanner } from "./SetupCompleteBanner";
 import { FeedbackDialog } from "./FeedbackDialog";
+import { PwaInstallBanner } from "./PwaInstallBanner";
+import { QuickActionsPanel } from "./QuickActionsPanel";
+import { MedsOverviewPanel } from "./MedsOverviewPanel";
+import { TodayHistoryPanel } from "./TodayHistoryPanel";
+import { RequiredDosesModal } from "./RequiredDosesModal";
 
 const REFRESH_INTERVAL_MS = 60_000;
 const todayString = localDateString;
@@ -212,21 +218,29 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     snoozeMutation.mutate({ slot, minutes });
   }
 
-  const effectiveTime = (slot: DaySlot) =>
-    slot.postponedUntil
-      ? new Date(slot.postponedUntil).getTime()
-      : new Date(`${date}T${slot.scheduledTime}`).getTime();
+  const effectiveTime = (slot: DaySlot) => slotDueTime(slot, date);
 
-  const nextDose =
-    slots
-      .filter((s) => s.status === "pending")
-      .sort((a, b) => effectiveTime(a) - effectiveTime(b))[0] ?? null;
-
-  const adherencePercent = computeAdherence(
-    slots
-      .filter((s) => s.status !== "pending" && s.medication.adherence_enabled)
-      .map((s) => ({ status: s.status as DoseLogStatus })),
+  const doseEvents = useMemo(
+    () => buildDoseEvents(slots.filter((s) => s.status === "pending"), date),
+    [slots, date],
   );
+
+  const adherenceStats = computeAdherenceStats(
+    slots
+      .filter((s) => s.status !== "pending" && s.medication.adherence_enabled && !s.isPrn)
+      .map((s) => ({
+        status: s.status as "taken" | "skipped" | "missed",
+        late: isLate(
+          { status: s.status, taken_at: s.takenAt, scheduled_for_date: date, scheduled_time: s.scheduledTime },
+          graceMinutes,
+        ),
+      })),
+  );
+
+  const [requiredDosesOpen, setRequiredDosesOpen] = useState(false);
+  const todaysDosesCount = slots.length;
+  const dosesTaken = slots.filter((s) => s.status === "taken").length;
+  const dosesMissed = slots.filter((s) => s.status === "missed").length;
 
   // In-app "dose due" alert: fires once per slot, keyed by its exact due
   // time (effectiveTime) rather than its scheduled time, so a later
@@ -274,41 +288,81 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     return <p className="text-brand-text-muted">Loading dashboard…</p>;
   }
 
+  const todayLabel = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
     <div className="flex flex-col gap-6">
       {showSetupBanner && <SetupCompleteBanner />}
       <LowSupplyBanner medications={medicationsQuery.data ?? []} />
 
-      <HeroPanel
-        nextDose={nextDose}
-        adherencePercent={adherencePercent}
-        onTake={handleTake}
-        onSkip={handleSkip}
-        onSnooze={handleSnooze}
-        defaultSnoozeMinutes={snoozeSettingQuery.data}
-        disabled={pendingKey !== null}
-      />
+      <HeroPanel events={doseEvents} adherenceStats={adherenceStats} />
 
-      <div>
-        <h2 className="mb-3 text-lg font-bold text-brand-navy">
-          Today&apos;s schedule
-        </h2>
-        <ScheduleList
-          slots={slots}
-          date={date}
-          graceMinutes={graceMinutes}
-          onTake={handleTake}
-          onSkip={handleSkip}
-          onSnooze={handleSnooze}
-          defaultSnoozeMinutes={snoozeSettingQuery.data}
-          pendingKey={pendingKey}
-        />
+      <PwaInstallBanner />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="rounded-card border border-brand-border bg-brand-card p-4 shadow-card sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-brand-navy">Today schedule</h2>
+              <span className="rounded-full bg-brand-bg px-2 py-0.5 text-xs text-brand-text-muted">
+                {todayLabel}
+              </span>
+            </div>
+            <Link
+              href="/calendar"
+              className="flex items-center gap-1 text-sm font-medium text-brand-deep-blue hover:underline"
+            >
+              <CalendarDays size={14} />
+              View calendar
+            </Link>
+          </div>
+          <div className="max-h-[28rem] overflow-y-auto pr-1">
+            <ScheduleList
+              slots={slots}
+              date={date}
+              graceMinutes={graceMinutes}
+              onTake={handleTake}
+              onSkip={handleSkip}
+              onSnooze={handleSnooze}
+              defaultSnoozeMinutes={snoozeSettingQuery.data}
+              pendingKey={pendingKey}
+            />
+          </div>
+          <Link
+            href="/calendar"
+            className="mt-3 block text-center text-sm font-medium text-brand-deep-blue hover:underline"
+          >
+            View full schedule
+          </Link>
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <QuickActionsPanel />
+          <MedsOverviewPanel
+            activeCount={medicationsQuery.data?.length ?? 0}
+            todaysDosesCount={todaysDosesCount}
+            dosesTaken={dosesTaken}
+            dosesMissed={dosesMissed}
+            onViewRequiredDoses={() => setRequiredDosesOpen(true)}
+          />
+        </div>
       </div>
+
+      <TodayHistoryPanel date={date} medications={medicationsQuery.data ?? []} />
 
       <FeedbackDialog
         slot={feedbackSlot}
         onSubmit={handleFeedbackSubmit}
         onClose={() => setFeedbackSlot(null)}
+      />
+      <RequiredDosesModal
+        open={requiredDosesOpen}
+        onClose={() => setRequiredDosesOpen(false)}
+        slots={slots}
       />
     </div>
   );
