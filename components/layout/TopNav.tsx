@@ -3,11 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu } from "lucide-react";
+import { CircleUser, HelpCircle, Menu, Settings, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/layout/AuthProvider";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { ResumeSetupBanner } from "@/components/layout/ResumeSetupBanner";
+import { FamilyContextBanner } from "@/components/layout/FamilyContextBanner";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Avatar } from "@/components/ui/Avatar";
 import {
   DropdownMenu,
@@ -18,17 +20,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { getUserProfile } from "@/lib/user-profile";
+import { cn } from "@/lib/cn";
 import { fallbackDisplayName } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/calendar", label: "Calendar" },
   { href: "/medications", label: "Medications" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/export", label: "Export" },
   { href: "/pain-tracking", label: "Pain Tracking" },
   { href: "/mood-wellbeing", label: "Mood & Wellbeing" },
-  { href: "/history", label: "History" },
-  { href: "/export", label: "Export" },
-  { href: "/family", label: "Family" },
 ];
 
 export function TopNav() {
@@ -55,7 +56,7 @@ export function TopNav() {
   return (
     <header data-no-print className="border-b border-brand-border bg-brand-card">
       {user && pathname !== "/settings" && <ResumeSetupBanner />}
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image
             src="/icons/logo-round.png"
@@ -69,17 +70,25 @@ export function TopNav() {
           </span>
         </Link>
         {user && (
-          <div className="flex items-center gap-4">
-            <nav className="hidden items-center gap-4 lg:flex">
-              {NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-sm font-medium text-brand-text hover:text-brand-deep-blue"
-                >
-                  {link.label}
-                </Link>
-              ))}
+          <div className="flex items-center gap-2">
+            <nav className="hidden items-center gap-1 lg:flex">
+              {NAV_LINKS.map((link) => {
+                const active = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "rounded-control px-3 py-1.5 text-sm font-medium transition-colors",
+                      active
+                        ? "bg-brand-deep-blue text-white"
+                        : "text-brand-text hover:bg-brand-bg",
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
 
             <DropdownMenu>
@@ -101,6 +110,8 @@ export function TopNav() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <NotificationBell />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -114,16 +125,11 @@ export function TopNav() {
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem asChild>
-                  <Link href="/profile">My Profile</Link>
+                  <Link href="/profile" className="flex items-center gap-2">
+                    <CircleUser size={15} />
+                    My Profile
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/family">Manage Family</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">Settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Switch profile</DropdownMenuLabel>
                 <DropdownMenuItem
                   onSelect={() => setActiveProfileId(null)}
                   className={activeProfileId === null ? "bg-brand-bg" : undefined}
@@ -133,29 +139,59 @@ export function TopNav() {
                   </span>
                   {ownerName}
                 </DropdownMenuItem>
-                {familyProfiles.map((fp) => (
-                  <DropdownMenuItem
-                    key={fp.id}
-                    onSelect={() => setActiveProfileId(fp.id)}
-                    className={activeProfileId === fp.id ? "bg-brand-bg" : undefined}
-                  >
-                    <span className="block h-5 w-5 shrink-0 overflow-hidden rounded-full">
-                      <Avatar
-                        pictureUrl={fp.profile_picture}
-                        label={fp.display_name}
-                        color={fp.avatar_color}
-                      />
-                    </span>
-                    {fp.display_name}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuItem asChild>
+                  <Link href="/family" className="flex items-center gap-2">
+                    <Users size={15} />
+                    Manage Family
+                  </Link>
+                </DropdownMenuItem>
+                {familyProfiles.length > 0 && (
+                  <>
+                    <DropdownMenuLabel>Family members</DropdownMenuLabel>
+                    {familyProfiles.map((fp) => (
+                      <DropdownMenuItem
+                        key={fp.id}
+                        onSelect={() => setActiveProfileId(fp.id)}
+                        className={activeProfileId === fp.id ? "bg-brand-bg" : undefined}
+                      >
+                        <span className="block h-5 w-5 shrink-0 overflow-hidden rounded-full">
+                          <Avatar
+                            pictureUrl={fp.profile_picture}
+                            label={fp.display_name}
+                            color={fp.avatar_color}
+                          />
+                        </span>
+                        <span className="flex-1">{fp.display_name}</span>
+                        {fp.relationship && (
+                          <span className="text-xs text-brand-text-muted">{fp.relationship}</span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => signOut()}>Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="rounded-control p-2 text-brand-text hover:bg-brand-bg"
+            >
+              <Settings size={18} />
+            </Link>
+            <Link
+              href="/help"
+              aria-label="Help"
+              className="rounded-control p-2 text-brand-text hover:bg-brand-bg"
+            >
+              <HelpCircle size={18} />
+            </Link>
           </div>
         )}
       </div>
+      {user && <FamilyContextBanner />}
     </header>
   );
 }

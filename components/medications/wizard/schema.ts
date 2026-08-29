@@ -34,8 +34,10 @@ export const medicationFormSchema = z
     doseForm: z.string().optional(),
     instructions: z.string().optional(),
     medicationType: z.enum(["prescription", "otc", "supplement"]),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
 
-    // Step 2 — Schedule
+    // Step 3 — Schedule
     asNeeded: z.boolean(),
     scheduleMode: z.enum(["fixed_times", "interval"]),
     scheduleTimes: z.array(scheduleTimeSchema),
@@ -44,10 +46,12 @@ export const medicationFormSchema = z
       .string()
       .optional()
       .refine((v) => !v || timePattern.test(v), "Enter a valid time"),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
+    // Optional single-group assignment made during Schedule step; "" means
+    // no group. Not a medications table column — WizardShell wires it
+    // through to medication_group_members via setMedicationGroup().
+    groupId: z.string().optional(),
 
-    // Step 3 — Inventory
+    // Step 2 — Inventory
     inventoryEnabled: z.boolean(),
     inventoryType: z.string(),
     inventoryUnit: z.string(),
@@ -144,14 +148,15 @@ export const defaultFormValues: MedicationFormValues = {
   doseForm: "",
   instructions: "",
   medicationType: "prescription",
+  startDate: "",
+  endDate: "",
 
   asNeeded: false,
   scheduleMode: "fixed_times",
   scheduleTimes: [],
   intervalHours: "",
   firstDoseTime: "",
-  startDate: "",
-  endDate: "",
+  groupId: "",
 
   inventoryEnabled: false,
   inventoryType: "pills",
@@ -168,17 +173,17 @@ export const defaultFormValues: MedicationFormValues = {
 };
 
 export const STEP_FIELDS: Record<number, (keyof MedicationFormValues)[]> = {
-  1: ["name", "doseAmount", "doseUnit", "doseForm", "instructions", "medicationType"],
-  2: [
-    "asNeeded",
-    "scheduleMode",
-    "scheduleTimes",
-    "intervalHours",
-    "firstDoseTime",
+  1: [
+    "name",
+    "doseAmount",
+    "doseUnit",
+    "doseForm",
+    "instructions",
+    "medicationType",
     "startDate",
     "endDate",
   ],
-  3: [
+  2: [
     "inventoryEnabled",
     "inventoryType",
     "inventoryUnit",
@@ -187,7 +192,15 @@ export const STEP_FIELDS: Record<number, (keyof MedicationFormValues)[]> = {
     "quantityPerDose",
     "lowSupplyThreshold",
   ],
+  3: [
+    "asNeeded",
+    "scheduleMode",
+    "scheduleTimes",
+    "intervalHours",
+    "firstDoseTime",
+    "groupId",
+  ],
   4: ["feedbackType", "dashboardEnabled", "remindersEnabled", "adherenceEnabled"],
 };
 
-export const STEP_LABELS = ["Identity", "Schedule", "Inventory", "Feedback"];
+export const STEP_LABELS = ["Identity", "Inventory", "Schedule", "Feedback"];

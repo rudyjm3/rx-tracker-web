@@ -48,6 +48,7 @@ export interface DaySlot {
   status: DoseLogStatus | "pending";
   takenAt: string | null;
   postponedUntil: string | null;
+  isPrn: boolean;
   medication: Medication;
 }
 
@@ -57,8 +58,9 @@ export interface DaySlot {
  * dose_postpones. Fixed-times medications get one slot per
  * medication_schedule_times row; interval medications step from
  * first_dose_time by interval_hours through the day with no
- * wraparound into the next day. as_needed medications never get slots
- * — they're logged ad hoc, not scheduled.
+ * wraparound into the next day. as_needed (PRN) medications only get a
+ * slot when grouped with scheduled medications, at the group's time —
+ * an ungrouped PRN medication is logged ad hoc instead.
  *
  * Grouping is determined by matching a medication's group membership
  * (medication_group_members) against that group's scheduled_time —
@@ -99,7 +101,6 @@ export function generateDaySlots(
   const slots: DaySlot[] = [];
 
   for (const med of medications) {
-    if (med.as_needed) continue;
     if (!med.dashboard_enabled) continue;
     if (med.start_date && date < med.start_date) continue;
     if (med.end_date && date > med.end_date) continue;
@@ -107,7 +108,14 @@ export function generateDaySlots(
     const medGroups = groupsByMedication.get(med.id) ?? [];
     const times: { time: string; scheduleTimeOverride: number | null }[] = [];
 
-    if (med.schedule_mode === "fixed_times") {
+    if (med.as_needed) {
+      // PRN medications only get a dashboard slot when they're bundled
+      // into a group, at that group's scheduled time — otherwise
+      // they're logged ad hoc rather than scheduled.
+      for (const { group } of medGroups) {
+        times.push({ time: group.scheduled_time.slice(0, 5), scheduleTimeOverride: null });
+      }
+    } else if (med.schedule_mode === "fixed_times") {
       for (const st of med.medication_schedule_times ?? []) {
         times.push({
           time: st.reminder_time.slice(0, 5),
@@ -149,6 +157,7 @@ export function generateDaySlots(
         status: log?.status ?? "pending",
         takenAt: log?.taken_at ?? null,
         postponedUntil: postpone?.postponed_until ?? null,
+        isPrn: med.as_needed,
         medication: med,
       });
     }
@@ -157,4 +166,57 @@ export function generateDaySlots(
   return slots.sort(
     (a, b) => timeToMinutes(a.scheduledTime) - timeToMinutes(b.scheduledTime),
   );
+}
+
+/** Effective due time for a slot: its postpone time if snoozed, else its scheduled time. */
+export function slotDueTime(slot: DaySlot, date: string): number {
+  return slot.postponedUntil
+    ? new Date(slot.postponedUntil).getTime()
+    : new Date(`${date}T${slot.scheduledTime}`).getTime();
+}
+
+export interface NextDoseGroupEvent {
+  kind: "group";
+  time: number;
+  groupId: string;
+  groupName: string;
+  members: DaySlot[];
+}
+export interface NextDoseSingleEvent {
+  kind: "single";
+  time: number;
+  slot: DaySlot;
+}
+export type NextDoseEvent = NextDoseGroupEvent | NextDoseSingleEvent;
+
+/**
+ * Collapses a list of (already-pending-filtered) slots into chronological
+ * "dose events" for the hero card: consecutive slots sharing a group and a
+ * due time collapse into one group event, everything else is its own
+ * single event. Powers both the Next Dose card (events[0]) and the
+ * Upcoming row (the first event after it with a later due time).
+ */
+export function buildDoseEvents(pendingSlots: DaySlot[], date: string): NextDoseEvent[] {
+  const sorted = [...pendingSlots].sort(
+    (a, b) => slotDueTime(a, date) - slotDueTime(b, date),
+  );
+  const events: NextDoseEvent[] = [];
+  const seenGroupKeys = new Set<string>();
+
+  for (const slot of sorted) {
+    const time = slotDueTime(slot, date);
+    if (slot.groupId) {
+      const key = `${slot.groupId}|${time}`;
+      if (seenGroupKeys.has(key)) continue;
+      seenGroupKeys.add(key);
+      const members = sorted.filter(
+        (s) => s.groupId === slot.groupId && slotDueTime(s, date) === time,
+      );
+      events.push({ kind: "group", time, groupId: slot.groupId, groupName: slot.groupName!, members });
+    } else {
+      events.push({ kind: "single", time, slot });
+    }
+  }
+
+  return events;
 }

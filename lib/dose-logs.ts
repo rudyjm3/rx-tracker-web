@@ -48,6 +48,48 @@ export async function recordDose(
   if (error) throw error;
 }
 
+/**
+ * Like recordDose, but for logging a dose at a specific *actual* time
+ * taken rather than "now" — record_dose's SQL (see supabase/schema.sql)
+ * always stamps taken_at = now(), which is correct for the dashboard's
+ * Take button but wrong for the Log Past Dose / Missed Dose / Free Log
+ * flows, where the whole point is a taken_at that can differ from the
+ * current moment (a slot from earlier today, a past date, a genuinely
+ * missed dose being corrected to "taken").
+ *
+ * Upserts via the record_dose_at_time RPC — same atomic, row-locked
+ * insert-or-update-plus-inventory-deduction shape as recordDose, keyed by
+ * (medication_id, scheduled_for_date, scheduled_time) and handling a
+ * slot with an existing row (e.g. a "missed" log being corrected to
+ * "taken") via its own ON CONFLICT DO UPDATE, but taking an explicit
+ * taken_at directly instead of always stamping now() — a single
+ * transaction, unlike a recordDose-then-editDoseLog pair, which could
+ * leave the log/inventory changed but the timestamp still wrong (or the
+ * whole write half-applied) if the second call failed.
+ */
+export async function recordDoseAtTime(
+  medication: Pick<Medication, "id" | "inventory_enabled">,
+  scheduledForDate: string,
+  scheduledTime: string,
+  takenAt: string,
+  quantityPerDose: number,
+  feedback?: DoseFeedback,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("record_dose_at_time", {
+    p_medication_id: medication.id,
+    p_scheduled_for_date: scheduledForDate,
+    p_scheduled_time: scheduledTime,
+    p_taken_at: takenAt,
+    p_quantity_per_dose: quantityPerDose,
+    p_inventory_enabled: medication.inventory_enabled,
+    p_pain_level: feedback?.painLevel ?? null,
+    p_mood_level: feedback?.moodLevel ?? null,
+    p_note: feedback?.note ?? null,
+  });
+  if (error) throw error;
+}
+
 export async function postponeDose(
   medicationId: string,
   scheduledForDate: string,

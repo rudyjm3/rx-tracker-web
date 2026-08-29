@@ -4,9 +4,11 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { Field, inputClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { X } from "lucide-react";
+import { to12h } from "@/lib/utils";
+import type { MedicationGroup } from "@/lib/types/medications";
 import type { MedicationFormValues } from "./schema";
 
-export function StepSchedule() {
+export function StepSchedule({ groups }: { groups: MedicationGroup[] }) {
   const {
     register,
     control,
@@ -105,14 +107,16 @@ export function StepSchedule() {
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Start date">
-          <input type="date" className={inputClass} {...register("startDate")} />
-        </Field>
-        <Field label="End date (optional)">
-          <input type="date" className={inputClass} {...register("endDate")} />
-        </Field>
-      </div>
+      <Field label="Group (optional)">
+        <select className={inputClass} {...register("groupId")}>
+          <option value="">No group</option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name} ({to12h(g.scheduled_time.slice(0, 5))})
+            </option>
+          ))}
+        </select>
+      </Field>
     </div>
   );
 }

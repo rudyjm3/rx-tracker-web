@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Layers } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import {
@@ -13,14 +14,17 @@ import {
 import { deleteDraft, getDrafts } from "@/lib/drafts";
 import { Button, buttonVariants } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
+import { to12h } from "@/lib/utils";
 import { MedicationCard } from "./MedicationCard";
 import { GroupCard } from "./GroupCard";
 import { GroupModal } from "./GroupModal";
 
+type Tab = "active" | "inactive" | "groups";
+
 export function MedicationsListClient() {
   const queryClient = useQueryClient();
   const { activeProfileId, isResolving } = useActiveProfile();
-  const [showInactive, setShowInactive] = useState(false);
+  const [tab, setTab] = useState<Tab>("active");
   const [creatingGroup, setCreatingGroup] = useState(false);
 
   const activeQuery = useQuery({
@@ -56,6 +60,7 @@ export function MedicationsListClient() {
   });
 
   const activeMedications = activeQuery.data ?? [];
+  const inactiveMedications = inactiveQuery.data ?? [];
   const groups = groupsQuery.data ?? [];
   // getGroupMembers() returns memberships for every group regardless of
   // its active flag — deleteGroup() only soft-deletes the group row, it
@@ -75,6 +80,19 @@ export function MedicationsListClient() {
 
   if (isResolving || activeQuery.isLoading) {
     return <p className="text-brand-text-muted">Loading medications…</p>;
+  }
+
+  const tabs: { key: Tab; label: string; count: number }[] = [
+    { key: "active", label: "Active", count: activeMedications.length },
+    { key: "inactive", label: "Inactive", count: inactiveMedications.length },
+    { key: "groups", label: "Groups", count: groups.length },
+  ];
+
+  function membersOf(groupId: string) {
+    const memberIds = groupMembers
+      .filter((m) => m.group_id === groupId)
+      .map((m) => m.medication_id);
+    return activeMedications.filter((m) => memberIds.includes(m.id));
   }
 
   return (
@@ -109,61 +127,93 @@ export function MedicationsListClient() {
         </div>
       )}
 
-      <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => setCreatingGroup(true)}>
-          + New group
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={cn(
+                "rounded-control px-4 py-2 text-sm font-semibold transition-opacity",
+                tab === t.key
+                  ? "bg-gradient-brand text-white shadow-card"
+                  : "border border-brand-border bg-white text-brand-navy hover:bg-brand-bg",
+              )}
+            >
+              {t.label} ({t.count})
+            </button>
+          ))}
+        </div>
         <Link href="/medications/new" className={cn(buttonVariants())}>
           + Add medication
         </Link>
       </div>
 
-      {activeMedications.length === 0 ? (
-        <p className="text-brand-text-muted">
-          No medications yet. Add your first one to get started.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {groups.map((group) => {
-            const memberIds = groupMembers
-              .filter((m) => m.group_id === group.id)
-              .map((m) => m.medication_id);
-            const members = activeMedications.filter((m) => memberIds.includes(m.id));
-            if (members.length === 0) return null;
-            return (
-              <GroupCard
-                key={group.id}
-                group={group}
-                members={members}
-                memberOverrides={groupMembers.filter((m) => m.group_id === group.id)}
-                allActiveMedications={activeMedications}
-              />
-            );
-          })}
+      {tab === "active" &&
+        (activeMedications.length === 0 ? (
+          <p className="text-brand-text-muted">
+            No medications yet. Add your first one to get started.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {groups.map((group) => {
+              const members = membersOf(group.id);
+              if (members.length === 0) return null;
+              return (
+                <div key={group.id} className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 px-1 text-sm font-semibold text-brand-text-muted">
+                    <Layers size={14} />
+                    {group.name} · {to12h(group.scheduled_time.slice(0, 5))}
+                  </div>
+                  {members.map((med) => (
+                    <MedicationCard key={med.id} medication={med} />
+                  ))}
+                </div>
+              );
+            })}
 
-          {ungroupedMedications.map((med) => (
-            <MedicationCard key={med.id} medication={med} />
-          ))}
-        </div>
-      )}
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowInactive((s) => !s)}
-          className="text-sm font-medium text-brand-text-muted hover:text-brand-text"
-        >
-          {showInactive ? "Hide" : "Show"} inactive medications (
-          {inactiveQuery.data?.length ?? 0})
-        </button>
-        {showInactive && (
-          <div className="mt-3 flex flex-col gap-2">
-            {(inactiveQuery.data ?? []).map((med) => (
+            {ungroupedMedications.map((med) => (
               <MedicationCard key={med.id} medication={med} />
             ))}
           </div>
-        )}
-      </div>
+        ))}
+
+      {tab === "inactive" &&
+        (inactiveMedications.length === 0 ? (
+          <p className="text-brand-text-muted">No inactive medications.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {inactiveMedications.map((med) => (
+              <MedicationCard key={med.id} medication={med} />
+            ))}
+          </div>
+        ))}
+
+      {tab === "groups" && (
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setCreatingGroup(true)}>
+              + New group
+            </Button>
+          </div>
+          {groups.length === 0 ? (
+            <p className="text-brand-text-muted">
+              No groups yet. Create one to bundle medications taken together.
+            </p>
+          ) : (
+            groups.map((group) => (
+              <GroupCard
+                key={group.id}
+                group={group}
+                members={membersOf(group.id)}
+                memberOverrides={groupMembers.filter((m) => m.group_id === group.id)}
+                allActiveMedications={activeMedications}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       <GroupModal
         open={creatingGroup}

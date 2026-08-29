@@ -2,14 +2,28 @@
 
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
-import { createMedication, getMedication, updateMedication } from "@/lib/medications";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
+import {
+  createMedication,
+  getGroupMembers,
+  getGroups,
+  getMedication,
+  setMedicationGroup,
+  updateMedication,
+} from "@/lib/medications";
 import { deleteDraft, getDraft, saveDraft } from "@/lib/drafts";
 import {
   defaultFormValues,
@@ -24,8 +38,6 @@ import { StepSchedule } from "./StepSchedule";
 import { StepInventory } from "./StepInventory";
 import { StepFeedback } from "./StepFeedback";
 
-const STEP_COMPONENTS = [StepIdentity, StepSchedule, StepInventory, StepFeedback];
-
 interface WizardShellProps {
   mode: "create" | "edit";
   medicationId?: string;
@@ -34,11 +46,15 @@ interface WizardShellProps {
 
 export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { activeProfileId } = useActiveProfile();
   const [step, setStep] = useState(1);
   const [furthestStep, setFurthestStep] = useState(1);
   const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(draftId);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const hasHydrated = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,10 +75,33 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
     enabled: mode === "create" && Boolean(draftId),
   });
 
+  // Shares the same cache entries as MedicationsListClient/GroupModal so
+  // switching to this page doesn't force a second round trip — the
+  // Schedule step's group selector needs the group list, and edit mode
+  // additionally needs group-members to find the medication's current
+  // group (medications don't carry their own group id).
+  const groupsQuery = useQuery({
+    queryKey: ["groups", activeProfileId],
+    queryFn: () => getGroups(activeProfileId),
+  });
+  const groupMembersQuery = useQuery({
+    queryKey: ["group-members"],
+    queryFn: getGroupMembers,
+    enabled: mode === "edit",
+  });
+  const groups = groupsQuery.data ?? [];
+
   useEffect(() => {
     if (hasHydrated.current) return;
     if (mode === "edit" && editQuery.data) {
-      form.reset(medicationToFormValues(editQuery.data));
+      if (groupMembersQuery.data === undefined) return;
+      const membership = groupMembersQuery.data.find(
+        (m) => m.medication_id === medicationId,
+      );
+      form.reset({
+        ...medicationToFormValues(editQuery.data),
+        groupId: membership?.group_id ?? "",
+      });
       hasHydrated.current = true;
     }
     if (mode === "create" && draftQuery.data) {
@@ -71,23 +110,54 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       setFurthestStep(draftQuery.data.furthestStep);
       hasHydrated.current = true;
     }
-  }, [mode, editQuery.data, draftQuery.data, form]);
+  }, [mode, editQuery.data, draftQuery.data, groupMembersQuery.data, medicationId, form]);
+
+  async function doSaveDraft(stepToSave: number): Promise<void> {
+    const id = await saveDraft({
+      id: currentDraftId,
+      formData: form.getValues(),
+      currentStep: stepToSave,
+      furthestStep: Math.max(furthestStep, stepToSave),
+      profileId: activeProfileId,
+    });
+    setCurrentDraftId((prev) => prev ?? id);
+  }
 
   async function persistDraft(explicitStep?: number) {
     if (mode !== "create") return;
-    const stepToSave = explicitStep ?? step;
     try {
-      const id = await saveDraft({
-        id: currentDraftId,
-        formData: form.getValues(),
-        currentStep: stepToSave,
-        furthestStep: Math.max(furthestStep, stepToSave),
-        profileId: activeProfileId,
-      });
-      setCurrentDraftId((prev) => prev ?? id);
+      await doSaveDraft(explicitStep ?? step);
     } catch {
       // Best-effort autosave — not worth interrupting the user over a
       // transient failure; the guaranteed save on step change will retry.
+    }
+  }
+
+  async function handleSaveDraft() {
+    if (mode !== "create") return;
+    setSavingDraft(true);
+    try {
+      await doSaveDraft(step);
+      toast.success("Draft saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save draft");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  async function handleDiscard() {
+    setDiscarding(true);
+    try {
+      if (mode === "create" && currentDraftId) {
+        await deleteDraft(currentDraftId);
+      }
+      router.push("/medications");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setDiscarding(false);
+      setShowDiscardConfirm(false);
     }
   }
 
@@ -126,7 +196,11 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       const scheduleTimes = toScheduleTimes(values);
 
       if (mode === "create") {
-        await createMedication({ ...input, profile_id: activeProfileId }, scheduleTimes);
+        const created = await createMedication(
+          { ...input, profile_id: activeProfileId },
+          scheduleTimes,
+        );
+        await setMedicationGroup(created.id, values.groupId || null);
         if (currentDraftId) await deleteDraft(currentDraftId);
         toast.success("Medication added");
       } else {
@@ -139,9 +213,12 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
           { ...input, profile_id: editQuery.data?.profile_id ?? null },
           scheduleTimes,
         );
+        await setMedicationGroup(medicationId as string, values.groupId || null);
         toast.success("Medication updated");
       }
 
+      queryClient.invalidateQueries({ queryKey: ["group-members"] });
+      queryClient.invalidateQueries({ queryKey: ["medications"] });
       router.push("/medications");
       router.refresh();
     } catch (err) {
@@ -159,8 +236,22 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
     return <p className="text-brand-text-muted">Loading…</p>;
   }
 
-  const StepComponent = STEP_COMPONENTS[step - 1];
   const isLastStep = step === STEP_LABELS.length;
+
+  function renderStep() {
+    switch (step) {
+      case 1:
+        return <StepIdentity />;
+      case 2:
+        return <StepInventory />;
+      case 3:
+        return <StepSchedule groups={groups} />;
+      case 4:
+        return <StepFeedback />;
+      default:
+        return null;
+    }
+  }
 
   // The primary button always stays type="button" and is always the same
   // DOM node across steps — it never swaps to type="submit". A step
@@ -212,28 +303,79 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       </div>
 
       <div className="rounded-card border border-brand-border bg-brand-card p-6 shadow-card">
-        <StepComponent />
+        {renderStep()}
 
-        <div className="mt-8 flex justify-between">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleBack}
-            disabled={step === 1}
-          >
-            Back
-          </Button>
-          <Button type="button" onClick={handlePrimaryAction} disabled={submitting}>
-            {isLastStep
-              ? submitting
-                ? "Saving…"
-                : mode === "create"
-                  ? "Add medication"
-                  : "Save changes"
-              : "Next"}
-          </Button>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowDiscardConfirm(true)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleBack}
+              disabled={step === 1}
+            >
+              Back
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            {mode === "create" && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleSaveDraft}
+                disabled={savingDraft}
+              >
+                {savingDraft ? "Saving…" : "Save draft"}
+              </Button>
+            )}
+            <Button type="button" onClick={handlePrimaryAction} disabled={submitting}>
+              {isLastStep
+                ? submitting
+                  ? "Saving…"
+                  : mode === "create"
+                    ? "Add medication"
+                    : "Save changes"
+                : "Next"}
+            </Button>
+          </div>
         </div>
       </div>
+
+      <Dialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard this medication?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-brand-text-muted">
+            {mode === "create"
+              ? "Your progress on this medication won't be saved."
+              : "Your changes won't be saved."}
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowDiscardConfirm(false)}
+            >
+              Keep editing
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleDiscard}
+              disabled={discarding}
+            >
+              {discarding ? "Discarding…" : "Discard"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </FormProvider>
   );
 }

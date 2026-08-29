@@ -12,7 +12,7 @@ import {
   type DotItemDotProps,
 } from "recharts";
 import { cn } from "@/lib/cn";
-import { minutesToTime, timeToMinutes, to12h } from "@/lib/utils";
+import { localDateString, minutesToTime, timeToMinutes, to12h } from "@/lib/utils";
 import type { MoodChartScheme } from "@/lib/app-settings";
 import {
   groupDailyAverages,
@@ -28,6 +28,22 @@ export const RANGE_OPTIONS = [
   { label: "90 days", days: 90 as const },
 ];
 export type RangeDays = (typeof RANGE_OPTIONS)[number]["days"];
+
+// Shared by any caller that fetches a trend for a given range — the
+// page-level orchestrator (WellbeingClient) and the per-medication
+// GraphModal both need the same "today"/"7d"/"30d"/"90d" -> {start, end}
+// mapping, so it lives once here alongside the RangeDays type it's
+// keyed on.
+export function rangeDatesForDays(
+  rangeDays: RangeDays,
+  today: string,
+): { start: string; end: string } {
+  if (rangeDays === 0) return { start: today, end: today };
+  const end = new Date(`${today}T00:00:00`);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (rangeDays - 1));
+  return { start: localDateString(start), end: today };
+}
 
 function renderDot(metric: WellbeingMetric, scheme: MoodChartScheme) {
   function LevelDot(props: DotItemDotProps) {

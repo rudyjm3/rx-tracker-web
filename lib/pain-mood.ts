@@ -114,6 +114,40 @@ export async function createStandaloneLog(input: CreateStandaloneLogInput): Prom
   if (error) throw error;
 }
 
+export interface UpdateStandaloneLogInput {
+  medicationId: string | null;
+  painLevel?: number | null;
+  moodLevel?: number | null;
+  note?: string;
+  tags?: string;
+  loggedAt?: string;
+}
+
+export async function updateStandaloneLog(
+  id: string,
+  input: UpdateStandaloneLogInput,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("standalone_pain_mood_logs")
+    .update({
+      medication_id: input.medicationId,
+      pain_level: input.painLevel ?? null,
+      mood_level: input.moodLevel ?? null,
+      note: input.note ?? "",
+      tags: input.tags ?? "",
+      ...(input.loggedAt ? { logged_at: input.loggedAt } : {}),
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteStandaloneLog(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("standalone_pain_mood_logs").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ── Mood tags ────────────────────────────────────────────────────────
 
 export async function getMoodTags(): Promise<MoodTag[]> {

@@ -8,13 +8,19 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { computeAdherence } from "@/lib/adherence";
+import { ALLERGY_SEVERITY_LABELS, getProfileAllergies } from "@/lib/allergies";
 import { getMoodChartScheme } from "@/lib/app-settings";
 import { getDoseLogHistory, getDoseLogStatusesInRange } from "@/lib/dose-logs";
-import { getActiveMedications, getInactiveMedications } from "@/lib/medications";
+import {
+  getActiveMedications,
+  getDoseHistory,
+  getInactiveMedications,
+  type DoseHistoryEntry,
+} from "@/lib/medications";
 import { getTrend, medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
 import { getSideEffectsInRange } from "@/lib/side-effects";
-import { localDateString, to12h } from "@/lib/utils";
-import type { Medication } from "@/lib/types/medications";
+import { daysUntilRunout, localDateString, to12h } from "@/lib/utils";
+import type { Medication, MedicationDoseChange } from "@/lib/types/medications";
 import { ReportTrendChart } from "./ReportTrendChart";
 
 const HISTORY_CAP = 500;
@@ -33,6 +39,31 @@ function formatSchedule(med: Medication): string {
   const times = med.medication_schedule_times ?? [];
   if (times.length === 0) return "—";
   return times.map((t) => to12h(t.reminder_time.slice(0, 5))).join(", ");
+}
+
+// "42 tablets" style, matching the LowSupplyBanner/MedicationCard
+// convention elsewhere in the app — "—" when supply isn't tracked.
+function formatSupply(med: Medication): string {
+  if (!med.inventory_enabled || med.current_quantity == null) return "—";
+  return `${med.current_quantity} ${med.inventory_unit}`;
+}
+
+function formatRunout(med: Medication): string {
+  if (!med.inventory_enabled) return "—";
+  const days = daysUntilRunout(med);
+  if (days === null) return "—";
+  if (days <= 0) return "Out of supply";
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function formatDoseChange(change: MedicationDoseChange): string {
+  const from =
+    change.old_dose_amount != null ? `${change.old_dose_amount}${change.old_dose_unit}` : null;
+  const to = change.new_dose_amount != null ? `${change.new_dose_amount}${change.new_dose_unit}` : null;
+  if (from && to) return `${from} → ${to}`;
+  if (to) return `Set to ${to}`;
+  if (from) return `Removed from ${from}`;
+  return "—";
 }
 
 export function ExportClient() {
@@ -64,12 +95,13 @@ export function ExportClient() {
     queryFn: () => getInactiveMedications(activeProfileId),
     enabled: !isResolving,
   });
-  const allMedicationIds = useMemo(
-    () => [
-      ...medications.map((m) => m.id),
-      ...(inactiveMedicationsQuery.data ?? []).map((m) => m.id),
-    ],
+  const allMedications = useMemo(
+    () => [...medications, ...(inactiveMedicationsQuery.data ?? [])],
     [medications, inactiveMedicationsQuery.data],
+  );
+  const allMedicationIds = useMemo(
+    () => allMedications.map((m) => m.id),
+    [allMedications],
   );
 
   const doseLogsQuery = useQuery({
@@ -103,6 +135,34 @@ export function ExportClient() {
     enabled: inactiveMedicationsQuery.data !== undefined,
   });
   const adherenceStatuses = adherenceStatusesQuery.data ?? [];
+
+  // Dose change history is per-medication (not date-range scoped, per
+  // spec) — fetched via the same getDoseHistory() the medication detail
+  // page's DoseHistoryPanel already uses, across every medication this
+  // profile has ever had (active + inactive), then filtered down to just
+  // the "dose_change" entries (status events already surface elsewhere).
+  const doseHistoryQueries = useQueries({
+    queries: allMedicationIds.map((id) => ({
+      queryKey: ["export-dose-history", id],
+      queryFn: () => getDoseHistory(id),
+    })),
+  });
+  const doseChangeGroups = allMedications
+    .map((medication, i) => ({
+      medication,
+      changes: (doseHistoryQueries[i]?.data ?? []).filter(
+        (entry): entry is Extract<DoseHistoryEntry, { type: "dose_change" }> =>
+          entry.type === "dose_change",
+      ),
+    }))
+    .filter((group) => group.changes.length > 0);
+
+  const allergiesQuery = useQuery({
+    queryKey: ["export-allergies", activeProfileId],
+    queryFn: () => getProfileAllergies(activeProfileId),
+    enabled: !isResolving,
+  });
+  const allergies = allergiesQuery.data ?? [];
 
   const adherenceEligibleMeds = useMemo(
     () => medications.filter((m) => !m.as_needed && m.adherence_enabled),
@@ -143,6 +203,8 @@ export function ExportClient() {
     doseLogsQuery.isLoading ||
     sideEffectsQuery.isLoading ||
     adherenceStatusesQuery.isLoading ||
+    allergiesQuery.isLoading ||
+    doseHistoryQueries.some((q) => q.isLoading) ||
     painTrendQueries.some((q) => q.isLoading) ||
     moodTrendQueries.some((q) => q.isLoading);
 
@@ -184,6 +246,180 @@ export function ExportClient() {
           <p className="text-brand-text-muted">Loading report…</p>
         ) : (
           <>
+            {/* 1. Active medications */}
+            <section data-report-section>
+              <h2 className="mb-3 text-lg font-bold text-brand-navy">Active medications</h2>
+              {medications.length === 0 ? (
+                <p className="text-sm text-brand-text-muted">No active medications.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-brand-border text-left text-xs text-brand-text-muted">
+                        <th className="py-1.5 pr-3 font-medium">Name</th>
+                        <th className="py-1.5 pr-3 font-medium">Dose</th>
+                        <th className="py-1.5 pr-3 font-medium">Schedule</th>
+                        <th className="py-1.5 pr-3 font-medium">Instructions</th>
+                        <th className="py-1.5 pr-3 font-medium">Current supply</th>
+                        <th className="py-1.5 pr-3 font-medium">Days until runout</th>
+                        <th className="py-1.5 font-medium">Start date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {medications.map((med) => (
+                        <tr key={med.id} className="border-b border-brand-border align-top">
+                          <td className="py-1.5 pr-3 font-medium text-brand-text">{med.name}</td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">{med.dose || "—"}</td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {formatSchedule(med)}
+                          </td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {med.instructions || "—"}
+                          </td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {formatSupply(med)}
+                          </td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {formatRunout(med)}
+                          </td>
+                          <td className="py-1.5 text-brand-text-muted">
+                            {med.start_date ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* 2. Dose change history, per medication */}
+            <section data-report-section>
+              <h2 className="mb-3 text-lg font-bold text-brand-navy">Dose change history</h2>
+              {doseChangeGroups.length === 0 ? (
+                <p className="text-sm text-brand-text-muted">No dose changes recorded.</p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {doseChangeGroups.map(({ medication, changes }) => (
+                    <div key={medication.id}>
+                      <h3 className="mb-1.5 text-sm font-semibold text-brand-text">
+                        {medication.name}
+                      </h3>
+                      <ul className="flex flex-col gap-1">
+                        {changes.map((change) => (
+                          <li key={change.data.id} className="text-sm text-brand-text-muted">
+                            <span className="text-brand-text">
+                              {new Date(change.at).toLocaleDateString()}
+                            </span>
+                            {" — "}
+                            {formatDoseChange(change.data)}
+                            {change.data.comment && ` (${change.data.comment})`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* 3. Dose history — last HISTORY_CAP logs, with pain/mood/notes */}
+            <section data-report-section>
+              <h2 className="mb-3 text-lg font-bold text-brand-navy">Dose history</h2>
+              {doseLogs.length === 0 ? (
+                <p className="text-sm text-brand-text-muted">No doses logged for this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-brand-border text-left text-xs text-brand-text-muted">
+                        <th className="py-1.5 pr-3 font-medium">Date</th>
+                        <th className="py-1.5 pr-3 font-medium">Medication</th>
+                        <th className="py-1.5 pr-3 font-medium">Time</th>
+                        <th className="py-1.5 pr-3 font-medium">Status</th>
+                        <th className="py-1.5 pr-3 font-medium">Pain</th>
+                        <th className="py-1.5 pr-3 font-medium">Mood</th>
+                        <th className="py-1.5 font-medium">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {doseLogs.map((log) => (
+                        <tr key={log.id} className="border-b border-brand-border align-top">
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {log.scheduled_for_date}
+                          </td>
+                          <td className="py-1.5 pr-3 text-brand-text">{log.medications.name}</td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {to12h(log.scheduled_time.slice(0, 5))}
+                          </td>
+                          <td className="py-1.5 pr-3">
+                            <Badge variant={log.status === "taken" ? "taken" : log.status} />
+                          </td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {log.pain_level ?? "—"}
+                          </td>
+                          <td className="py-1.5 pr-3 text-brand-text-muted">
+                            {log.mood_level ?? "—"}
+                          </td>
+                          <td className="py-1.5 text-brand-text-muted">{log.note || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {doseLogs.length === HISTORY_CAP && (
+                <p className="mt-2 text-xs text-brand-text-muted">
+                  Showing the most recent {HISTORY_CAP} entries for this period.
+                </p>
+              )}
+            </section>
+
+            {/* 4. Side effects */}
+            <section data-report-section>
+              <h2 className="mb-3 text-lg font-bold text-brand-navy">Side effects</h2>
+              {sideEffects.length === 0 ? (
+                <p className="text-sm text-brand-text-muted">None reported for this period.</p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {sideEffects.map((se) => (
+                    <li key={se.id} className="text-sm">
+                      <span className="font-medium text-brand-text">{se.occurred_date}</span>
+                      {" — "}
+                      {se.medications.name}: {se.description} ({se.severity})
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* 5. Allergies */}
+            <section data-report-section>
+              <h2 className="mb-3 text-lg font-bold text-brand-navy">Allergies</h2>
+              {allergies.length === 0 ? (
+                <p className="text-sm text-brand-text-muted">No allergies recorded.</p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {allergies.map((a) => (
+                    <li key={a.id} className="text-sm">
+                      <span className="font-medium text-brand-text">{a.name}</span>
+                      {!a.is_active && (
+                        <span className="ml-2 text-xs text-brand-text-muted">(inactive)</span>
+                      )}
+                      <span className="text-brand-text-muted">
+                        {" — "}
+                        {a.allergy_type === "allergy" ? "Allergy" : "Intolerance"}
+                        {a.life_threatening
+                          ? " · Life-threatening"
+                          : a.severity && ` · ${ALLERGY_SEVERITY_LABELS[a.severity]}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* Value-adds beyond the spec'd sections — kept, placed after them */}
             <section data-report-section>
               <h2 className="mb-3 text-lg font-bold text-brand-navy">Adherence</h2>
               <p className="text-sm text-brand-text">
@@ -195,25 +431,6 @@ export function ExportClient() {
                     <li key={medication.id} className="flex justify-between text-sm text-brand-text-muted">
                       <span>{medication.name}</span>
                       <span>{percent}%</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section data-report-section>
-              <h2 className="mb-3 text-lg font-bold text-brand-navy">Medications</h2>
-              {medications.length === 0 ? (
-                <p className="text-sm text-brand-text-muted">No active medications.</p>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {medications.map((med) => (
-                    <li key={med.id} className="text-sm">
-                      <span className="font-medium text-brand-text">{med.name}</span>
-                      {med.dose && <span className="text-brand-text-muted"> · {med.dose}</span>}
-                      <span className="block text-xs text-brand-text-muted">
-                        {formatSchedule(med)}
-                      </span>
                     </li>
                   ))}
                 </ul>
@@ -241,52 +458,6 @@ export function ExportClient() {
                 />
               </section>
             ))}
-
-            <section data-report-section>
-              <h2 className="mb-3 text-lg font-bold text-brand-navy">Side effects</h2>
-              {sideEffects.length === 0 ? (
-                <p className="text-sm text-brand-text-muted">None reported for this period.</p>
-              ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {sideEffects.map((se) => (
-                    <li key={se.id} className="text-sm">
-                      <span className="font-medium text-brand-text">{se.occurred_date}</span>
-                      {" — "}
-                      {se.medications.name}: {se.description} ({se.severity})
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section data-report-section>
-              <h2 className="mb-3 text-lg font-bold text-brand-navy">Dose history</h2>
-              {doseLogs.length === 0 ? (
-                <p className="text-sm text-brand-text-muted">No doses logged for this period.</p>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {doseLogs.map((log) => (
-                    <li
-                      key={log.id}
-                      className="flex items-center justify-between gap-2 border-b border-brand-border py-1 text-sm"
-                    >
-                      <span className="text-brand-text-muted">
-                        {log.scheduled_for_date} · {to12h(log.scheduled_time.slice(0, 5))}
-                      </span>
-                      <span className="flex-1 truncate px-2 text-brand-text">
-                        {log.medications.name}
-                      </span>
-                      <Badge variant={log.status === "taken" ? "taken" : log.status} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {doseLogs.length === HISTORY_CAP && (
-                <p className="mt-2 text-xs text-brand-text-muted">
-                  Showing the first {HISTORY_CAP} entries for this period.
-                </p>
-              )}
-            </section>
           </>
         )}
       </div>

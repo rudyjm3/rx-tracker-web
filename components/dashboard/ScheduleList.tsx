@@ -10,7 +10,12 @@ function badgeVariantFor(
   date: string,
   graceMinutes: number,
 ): BadgeVariant | null {
-  if (slot.status === "pending") return null;
+  if (slot.status === "pending") {
+    if (slot.postponedUntil && new Date(slot.postponedUntil).getTime() > Date.now()) {
+      return "snoozed";
+    }
+    return null;
+  }
   if (slot.status === "missed") return "missed";
   if (slot.status === "skipped") return "skipped";
   // taken
@@ -63,6 +68,8 @@ export function ScheduleList({
           <DoseRow
             key={key}
             slot={slot}
+            date={date}
+            graceMinutes={graceMinutes}
             badgeVariant={badgeVariantFor(slot, date, graceMinutes)}
             onTake={() => onTake(slot)}
             onSkip={() => onSkip(slot)}

@@ -55,6 +55,15 @@ export function minutesLate(log: LateCheckLog, graceMinutes: number): number | n
   return diffMs > 0 ? Math.ceil(diffMs / 60000) : null;
 }
 
+// Wall-clock time (12h) a timestamp falls on, in the viewer's local
+// timezone — used for "Snoozed until X:XX PM" pills.
+export function formatClockTime(iso: string): string {
+  const d = new Date(iso);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return to12h(`${h}:${m}`);
+}
+
 export function formatLate(minutes: number): string {
   if (minutes < 60) return `${minutes}mins late`;
   const hrs = Math.floor(minutes / 60);
