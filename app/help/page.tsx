@@ -89,7 +89,7 @@ export default function HelpPage() {
   return (
     <>
       <TopNav />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <div className="flex flex-col gap-6">
           <div>
             <h1 className="text-2xl font-bold text-brand-navy">Help &amp; FAQ</h1>
