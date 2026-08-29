@@ -17,6 +17,9 @@ interface FeedbackDialogProps {
   slot: DaySlot | null;
   onSubmit: (feedback?: DoseFeedback) => void;
   onClose: () => void;
+  /** 1-based position and total size of the current feedback batch (e.g. a bulk group take). Omit, or a total of 1, for a single dose. */
+  queuePosition?: number;
+  queueTotal?: number;
 }
 
 /**
@@ -26,7 +29,13 @@ interface FeedbackDialogProps {
  * if feedback tracking were off, rather than blocking the core Take
  * action on data entry.
  */
-export function FeedbackDialog({ slot, onSubmit, onClose }: FeedbackDialogProps) {
+export function FeedbackDialog({
+  slot,
+  onSubmit,
+  onClose,
+  queuePosition,
+  queueTotal,
+}: FeedbackDialogProps) {
   const [painLevel, setPainLevel] = useState<number | null>(null);
   const [moodLevel, setMoodLevel] = useState<number | null>(null);
   const [note, setNote] = useState("");
@@ -69,6 +78,11 @@ export function FeedbackDialog({ slot, onSubmit, onClose }: FeedbackDialogProps)
         <DialogHeader>
           <DialogTitle>How are you feeling?</DialogTitle>
           <p className="text-sm text-brand-text-muted">{slot.medicationName}</p>
+          {queueTotal != null && queueTotal > 1 && (
+            <p className="mt-1 text-xs font-medium text-brand-deep-blue">
+              {queuePosition ?? 1} of {queueTotal}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="flex flex-col gap-4">

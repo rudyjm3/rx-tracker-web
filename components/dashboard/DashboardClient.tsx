@@ -23,7 +23,13 @@ import {
 } from "@/lib/medications";
 import { computeAdherenceStats } from "@/lib/adherence";
 import { playAlarmSound, triggerVibration } from "@/lib/notifications";
-import { buildDoseEvents, generateDaySlots, slotDueTime, type DaySlot } from "@/lib/schedule";
+import {
+  buildDoseEvents,
+  generateDaySlots,
+  slotDueTime,
+  type DaySlot,
+  type NextDoseEvent,
+} from "@/lib/schedule";
 import { isLate, localDateString } from "@/lib/utils";
 import { HeroPanel } from "./HeroPanel";
 import { ScheduleList } from "./ScheduleList";
@@ -35,6 +41,7 @@ import { QuickActionsPanel } from "./QuickActionsPanel";
 import { MedsOverviewPanel } from "./MedsOverviewPanel";
 import { TodayHistoryPanel } from "./TodayHistoryPanel";
 import { RequiredDosesModal } from "./RequiredDosesModal";
+import { AlarmOverlay } from "./AlarmOverlay";
 
 const REFRESH_INTERVAL_MS = 60_000;
 const todayString = localDateString;
@@ -45,7 +52,30 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   const { activeProfileId, isResolving } = useActiveProfile();
   const [date, setDate] = useState(todayString);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const [feedbackSlot, setFeedbackSlot] = useState<DaySlot | null>(null);
+  // A queue, not a single slot: taking every member of a group at once
+  // (bulk "Take Now" from the Alarm Overlay) can hit several medications
+  // that each need feedback, and each needs its own turn at the dialog
+  // rather than the last one silently winning.
+  const [feedbackQueue, setFeedbackQueue] = useState<DaySlot[]>([]);
+  const feedbackSlot = feedbackQueue[0] ?? null;
+  // High-water mark of the current feedback batch's size, so the dialog
+  // can show "2 of 3" instead of a shrinking-only "3 left, 2 left, 1
+  // left" — kept in state (not a ref) and synced via effect rather than
+  // computed during render, since render must stay pure.
+  const [feedbackBatchTotal, setFeedbackBatchTotal] = useState(feedbackQueue.length);
+  const [lastQueueLength, setLastQueueLength] = useState(feedbackQueue.length);
+  if (feedbackQueue.length !== lastQueueLength) {
+    setLastQueueLength(feedbackQueue.length);
+    setFeedbackBatchTotal(
+      feedbackQueue.length === 0 ? 0 : Math.max(feedbackBatchTotal, feedbackQueue.length),
+    );
+  }
+
+  // Current time as state (not a raw Date.now() read during render, which
+  // would make this component impure) — refreshed every 20s by the
+  // interval below, and read here (and in dueNowEvent) to decide what's
+  // due right now.
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   // Captured once into state rather than read directly from the prop:
   // the router.replace below causes the server component to re-render
@@ -196,16 +226,16 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
 
   function handleTake(slot: DaySlot) {
     if (slot.medication.feedback_type !== "none") {
-      setFeedbackSlot(slot);
+      setFeedbackQueue((q) => [...q, slot]);
       return;
     }
     setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
     takeMutation.mutate({ slot });
   }
   function handleFeedbackSubmit(feedback?: DoseFeedback) {
-    if (!feedbackSlot) return;
-    const slot = feedbackSlot;
-    setFeedbackSlot(null);
+    const slot = feedbackQueue[0];
+    if (!slot) return;
+    setFeedbackQueue((q) => q.slice(1));
     setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
     takeMutation.mutate({ slot, feedback });
   }
@@ -218,12 +248,32 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     snoozeMutation.mutate({ slot, minutes });
   }
 
+  function eventSlots(event: NextDoseEvent): DaySlot[] {
+    return event.kind === "group" ? event.members : [event.slot];
+  }
+  function handleTakeAll(event: NextDoseEvent) {
+    eventSlots(event).forEach(handleTake);
+  }
+  function handleSkipAll(event: NextDoseEvent) {
+    eventSlots(event).forEach(handleSkip);
+  }
+  function handleSnoozeAll(event: NextDoseEvent, minutes: number) {
+    eventSlots(event).forEach((slot) => handleSnooze(slot, minutes));
+  }
+
   const effectiveTime = (slot: DaySlot) => slotDueTime(slot, date);
 
   const doseEvents = useMemo(
     () => buildDoseEvents(slots.filter((s) => s.status === "pending"), date),
     [slots, date],
   );
+
+  // The earliest pending event whose due time has already passed but
+  // hasn't yet crossed the missed-dose grace cutoff — the same window
+  // finalizeMissedDoses/the sound alert below use, so the overlay only
+  // ever covers a slot that's genuinely still actionable.
+  const dueNowEvent =
+    doseEvents.find((e) => e.time <= nowTick && nowTick <= e.time + graceMinutes * 60_000) ?? null;
 
   const adherenceStats = computeAdherenceStats(
     slots
@@ -255,13 +305,12 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // across a full poll cycle even once a slot's due time has newly
   // passed, and this effect wouldn't otherwise re-run to notice.
   const alarmedKeysRef = useRef<Set<string>>(new Set());
-  const [alarmTick, setAlarmTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setAlarmTick((t) => t + 1), 20_000);
+    const id = setInterval(() => setNowTick(Date.now()), 20_000);
     return () => clearInterval(id);
   }, []);
   useEffect(() => {
-    const now = Date.now();
+    const now = nowTick;
     for (const slot of slots) {
       if (slot.status !== "pending") continue;
       const due = effectiveTime(slot);
@@ -274,7 +323,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       triggerVibration();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots, date, graceMinutes, alarmTick]);
+  }, [slots, date, graceMinutes, nowTick]);
 
   const isLoading =
     isResolving ||
@@ -293,6 +342,8 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     month: "short",
     day: "numeric",
   });
+
+  const feedbackQueuePosition = feedbackBatchTotal - feedbackQueue.length + 1;
 
   return (
     <div className="flex flex-col gap-6">
@@ -356,13 +407,26 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
 
       <FeedbackDialog
         slot={feedbackSlot}
+        queuePosition={feedbackQueuePosition}
+        queueTotal={feedbackBatchTotal}
         onSubmit={handleFeedbackSubmit}
-        onClose={() => setFeedbackSlot(null)}
+        onClose={() => setFeedbackQueue((q) => q.slice(1))}
       />
       <RequiredDosesModal
         open={requiredDosesOpen}
         onClose={() => setRequiredDosesOpen(false)}
         slots={slots}
+      />
+      <AlarmOverlay
+        event={dueNowEvent}
+        onTakeAll={() => dueNowEvent && handleTakeAll(dueNowEvent)}
+        onSkipAll={() => dueNowEvent && handleSkipAll(dueNowEvent)}
+        onSnoozeAll={(minutes) => dueNowEvent && handleSnoozeAll(dueNowEvent, minutes)}
+        onTakeOne={handleTake}
+        onSkipOne={handleSkip}
+        onSnoozeOne={handleSnooze}
+        defaultSnoozeMinutes={snoozeSettingQuery.data}
+        disabled={pendingKey !== null}
       />
     </div>
   );
