@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 
-const MISSED_GRACE_OPTIONS = [30, 60] as const;
+export const MISSED_GRACE_MIN_MINUTES = 5;
+export const MISSED_GRACE_MAX_MINUTES = 240;
 const DEFAULT_MISSED_GRACE_MINUTES = 60;
 
 const SNOOZE_OPTIONS = [5, 10, 15, 30] as const;
@@ -49,14 +50,22 @@ export async function setSetting(key: string, value: string): Promise<void> {
 export async function getMissedGraceMinutes(): Promise<number> {
   const raw = await getSetting("missed_grace_minutes");
   const parsed = raw ? Number(raw) : NaN;
-  return MISSED_GRACE_OPTIONS.includes(parsed as (typeof MISSED_GRACE_OPTIONS)[number])
+  return Number.isInteger(parsed) &&
+    parsed >= MISSED_GRACE_MIN_MINUTES &&
+    parsed <= MISSED_GRACE_MAX_MINUTES
     ? parsed
     : DEFAULT_MISSED_GRACE_MINUTES;
 }
 
 export async function setMissedGraceMinutes(minutes: number): Promise<void> {
-  if (!MISSED_GRACE_OPTIONS.includes(minutes as (typeof MISSED_GRACE_OPTIONS)[number])) {
-    throw new Error("Grace period must be 30 or 60 minutes.");
+  if (
+    !Number.isInteger(minutes) ||
+    minutes < MISSED_GRACE_MIN_MINUTES ||
+    minutes > MISSED_GRACE_MAX_MINUTES
+  ) {
+    throw new Error(
+      `Grace period must be a whole number between ${MISSED_GRACE_MIN_MINUTES} and ${MISSED_GRACE_MAX_MINUTES} minutes.`,
+    );
   }
   await setSetting("missed_grace_minutes", String(minutes));
 }

@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { HelpCircle, Smartphone, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/layout/AuthProvider";
 import {
   getMissedGraceMinutes,
   getMoodChartScheme,
   getSnoozeMinutes,
+  MISSED_GRACE_MAX_MINUTES,
+  MISSED_GRACE_MIN_MINUTES,
   setMissedGraceMinutes,
   setMoodChartScheme,
   setSnoozeMinutes,
@@ -20,6 +24,11 @@ import {
   setAlarmSoundEnabled,
   setVibrationEnabled,
 } from "@/lib/notifications";
+import {
+  getPushSubscriptions,
+  removePushSubscription,
+  type PushSubscriptionRow,
+} from "@/lib/push-subscriptions";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 
@@ -34,6 +43,8 @@ export function SettingsClient() {
           account's values seeded into this panel's local edit state. */}
       <GeneralSettingsPanel key={user?.id} />
       <AlarmSettingsPanel />
+      <PushSubscriptionsPanel key={`push-${user?.id}`} />
+      <HelpPanel />
     </div>
   );
 }
@@ -82,7 +93,12 @@ function GeneralSettingsPanel() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Couldn't save settings"),
   });
 
-  const loading = graceMinutes === null || snoozeMinutes === null;
+  const loading = !seededGrace || !seededSnooze;
+  const graceInvalid =
+    graceMinutes === null ||
+    !Number.isInteger(graceMinutes) ||
+    graceMinutes < MISSED_GRACE_MIN_MINUTES ||
+    graceMinutes > MISSED_GRACE_MAX_MINUTES;
 
   return (
     <section className="flex flex-col gap-4 rounded-card border border-brand-border bg-brand-card p-4">
@@ -98,20 +114,35 @@ function GeneralSettingsPanel() {
             saveMutation.mutate();
           }}
         >
-          <Field label="Missed-dose grace period">
-            <select
-              className={inputClass}
-              value={graceMinutes}
-              onChange={(e) => setGraceMinutes(Number(e.target.value))}
-            >
-              <option value={30}>30 minutes</option>
-              <option value={60}>60 minutes</option>
-            </select>
+          <Field
+            label="Mark dose missed after"
+            error={
+              graceInvalid
+                ? `Enter a whole number between ${MISSED_GRACE_MIN_MINUTES} and ${MISSED_GRACE_MAX_MINUTES}.`
+                : undefined
+            }
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={MISSED_GRACE_MIN_MINUTES}
+                max={MISSED_GRACE_MAX_MINUTES}
+                step={1}
+                className={`${inputClass} w-24`}
+                value={graceMinutes ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value === "" ? null : Number(e.target.value);
+                  setGraceMinutes(value);
+                }}
+              />
+              <span className="text-sm text-brand-text-muted">minutes</span>
+            </div>
           </Field>
           <Field label="Default snooze duration">
             <select
               className={inputClass}
-              value={snoozeMinutes}
+              value={snoozeMinutes ?? ""}
               onChange={(e) => setSnoozeMinutesState(Number(e.target.value))}
             >
               <option value={5}>5 minutes</option>
@@ -120,7 +151,11 @@ function GeneralSettingsPanel() {
               <option value={30}>30 minutes</option>
             </select>
           </Field>
-          <Button type="submit" disabled={saveMutation.isPending} className="self-start">
+          <Button
+            type="submit"
+            disabled={saveMutation.isPending || graceInvalid}
+            className="self-start"
+          >
             {saveMutation.isPending ? "Saving…" : "Save settings"}
           </Button>
         </form>
@@ -219,6 +254,106 @@ function AlarmSettingsPanel() {
       <Button type="button" variant="secondary" onClick={previewAlarm} className="self-start">
         Test alarm
       </Button>
+    </section>
+  );
+}
+
+function PushSubscriptionsPanel() {
+  const queryClient = useQueryClient();
+  const queryKey = ["push-subscriptions"];
+
+  const devicesQuery = useQuery({
+    queryKey,
+    queryFn: getPushSubscriptions,
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => removePushSubscription(id),
+    onSuccess: () => {
+      toast.success("Device removed");
+      queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Couldn't remove device"),
+  });
+
+  const devices = devicesQuery.data ?? [];
+
+  return (
+    <section className="flex flex-col gap-4 rounded-card border border-brand-border bg-brand-card p-4">
+      <div>
+        <h2 className="text-base font-bold text-brand-navy">Push Notification Status</h2>
+        <p className="mt-1 text-sm text-brand-text-muted">
+          Push notifications for dose reminders are delivered by the RxTracker Android app.
+          This web app doesn&apos;t register its own push subscription — the devices below are
+          whatever the mobile app has registered for your account. You can remove a device
+          here if you no longer use it; to add one, sign in on the mobile app.
+        </p>
+      </div>
+
+      {devicesQuery.isLoading ? (
+        <p className="text-sm text-brand-text-muted">Loading…</p>
+      ) : devices.length === 0 ? (
+        <p className="text-sm text-brand-text-muted">
+          No devices registered for push notifications yet. Install and sign in to the RxTracker
+          Android app to start receiving push reminders.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {devices.map((device: PushSubscriptionRow) => (
+            <li
+              key={device.id}
+              className="flex items-center justify-between gap-3 rounded-control border border-brand-border px-3 py-2"
+            >
+              <span className="flex items-center gap-2 text-sm text-brand-text">
+                <Smartphone size={16} className="shrink-0 text-brand-text-muted" />
+                <span>
+                  <span className="block font-medium">
+                    {device.device_name || "Unnamed device"}
+                  </span>
+                  <span className="block text-xs text-brand-text-muted">
+                    Registered {new Date(device.created_at).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </span>
+              </span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                disabled={removeMutation.isPending}
+                onClick={() => removeMutation.mutate(device.id)}
+                className="shrink-0"
+              >
+                <Trash2 size={14} />
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function HelpPanel() {
+  return (
+    <section className="flex flex-col gap-3 rounded-card border border-brand-border bg-brand-card p-4">
+      <h2 className="text-base font-bold text-brand-navy">Help &amp; Documentation</h2>
+      <p className="text-sm text-brand-text-muted">
+        Answers to common questions about reminders, inventory tracking, adherence, and
+        exporting a doctor visit report.
+      </p>
+      <Link
+        href="/help"
+        className="inline-flex w-fit items-center gap-2 rounded-control border border-brand-border bg-white px-4 py-2 text-sm font-semibold text-brand-navy hover:bg-brand-bg"
+      >
+        <HelpCircle size={16} />
+        View Help &amp; FAQ
+      </Link>
     </section>
   );
 }
