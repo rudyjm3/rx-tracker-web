@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AllergyPanel } from "@/components/profile/AllergyPanel";
 import { AvatarPicker } from "@/components/profile/AvatarPicker";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import {
@@ -30,6 +32,8 @@ import type { FamilyProfile } from "@/lib/types/profile";
 
 export function FamilyClient() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const { setActiveProfileId } = useActiveProfile();
   const [editing, setEditing] = useState<FamilyProfile | "new" | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null);
@@ -167,9 +171,16 @@ export function FamilyClient() {
             <FamilyMemberForm
               key={editing === "new" ? "new" : editing.id}
               existing={editing === "new" ? null : editing}
-              onSaved={() => {
+              onSaved={(created) => {
                 setEditing(null);
                 refresh();
+                // Brand-new family member — send them straight into
+                // onboarding for that profile, mirroring the account
+                // owner's post-signup redirect.
+                if (created) {
+                  setActiveProfileId(created.id);
+                  router.push("/onboarding");
+                }
               }}
               onCancel={() => setEditing(null)}
             />
@@ -182,7 +193,7 @@ export function FamilyClient() {
 
 interface FamilyMemberFormProps {
   existing: FamilyProfile | null;
-  onSaved: () => void;
+  onSaved: (created?: FamilyProfile) => void;
   onCancel: () => void;
 }
 
@@ -244,10 +255,11 @@ function FamilyMemberForm({ existing, onSaved, onCancel }: FamilyMemberFormProps
 
       if (existing) {
         await updateFamilyProfile(existing.id, input);
+        onSaved();
       } else {
-        await createFamilyProfile(input);
+        const created = await createFamilyProfile(input);
+        onSaved(created);
       }
-      onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save family member");
       setSaving(false);

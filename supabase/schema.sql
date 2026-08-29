@@ -391,7 +391,12 @@ create table if not exists profile_onboarding (
   current_step text not null default 'medications',
   started_at   timestamptz default now(),
   completed_at timestamptz,
-  unique (user_id, profile_id)
+  -- nulls not distinct: profile_id is NULL for the account owner, and
+  -- Postgres's default UNIQUE treats every NULL as distinct from every
+  -- other NULL — without this, two concurrent first-writes for the owner
+  -- (double-click, two tabs) could both insert a row instead of the
+  -- second one conflicting into an update.
+  unique nulls not distinct (user_id, profile_id)
 );
 
 -- ─────────────────────────────────────────

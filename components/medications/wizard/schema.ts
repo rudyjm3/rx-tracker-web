@@ -51,6 +51,14 @@ export const medicationFormSchema = z
     inventoryEnabled: z.boolean(),
     inventoryType: z.string(),
     inventoryUnit: z.string(),
+    // Onboarding-only: which method (StepInventory.tsx) produced
+    // startingQuantity. "count" means the value already reflects
+    // whatever was physically on hand at entry time, including any
+    // doses already taken today — activateOnboarding uses this to avoid
+    // double-deducting those doses again during reconciliation.
+    // Undefined outside onboarding (the single-medication wizard never
+    // sets it) and treated the same as "count".
+    inventoryMethod: z.enum(["count", "estimate", "skip"]).optional(),
     startingQuantity: z
       .string()
       .optional()
@@ -148,6 +156,7 @@ export const defaultFormValues: MedicationFormValues = {
   inventoryEnabled: false,
   inventoryType: "pills",
   inventoryUnit: "tablets",
+  inventoryMethod: undefined,
   startingQuantity: "",
   quantityPerDose: "1",
   lowSupplyThreshold: "5",
@@ -174,6 +183,7 @@ export const STEP_FIELDS: Record<number, (keyof MedicationFormValues)[]> = {
     "inventoryType",
     "inventoryUnit",
     "startingQuantity",
+    "inventoryMethod",
     "quantityPerDose",
     "lowSupplyThreshold",
   ],
