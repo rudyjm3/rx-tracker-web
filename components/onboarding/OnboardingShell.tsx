@@ -76,6 +76,26 @@ export function OnboardingShell() {
     }
   }, [progressQuery.data, router]);
 
+  // Resume at the persisted step once progress loads, rather than always
+  // restarting at Medications. furthestStep isn't itself persisted (only
+  // current_step is), so it's set to the same resumed step — reasonable,
+  // since it only controls which step-dots read as reachable, and the
+  // user has necessarily reached at least this one before. Adjusted
+  // during render, guarded by state (not a ref — refs can't be read
+  // during render) — the same technique DailyMedAutocomplete.tsx uses for
+  // deriving state from data that arrives after mount, rather than a
+  // useEffect, which would call setState after an extra commit instead of
+  // before this render paints.
+  const [hydratedProgressId, setHydratedProgressId] = useState<string | undefined>(undefined);
+  if (progressQuery.data && progressQuery.data.id !== hydratedProgressId) {
+    setHydratedProgressId(progressQuery.data.id);
+    const idx = STEP_KEYS.indexOf(progressQuery.data.current_step as OnboardingStep);
+    if (idx >= 0) {
+      setStep(idx + 1);
+      setFurthestStep(idx + 1);
+    }
+  }
+
   const drafts = useMemo(
     () =>
       (draftsQuery.data ?? [])

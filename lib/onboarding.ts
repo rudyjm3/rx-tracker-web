@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { createMedication, getCurrentUserId } from "@/lib/medications";
 import { recordDose } from "@/lib/dose-logs";
+import { adjustQuantity } from "@/lib/inventory";
 import { deleteDraft, getDrafts } from "@/lib/drafts";
 import { localDateString } from "@/lib/utils";
 import {
@@ -24,29 +25,36 @@ export async function getOnboardingProgress(
   return data as ProfileOnboarding | null;
 }
 
-// Select-then-insert rather than upsert-by-(user_id,profile_id): Postgres
-// treats two NULL profile_ids as distinct, so an upsert keyed on that
-// column pair would never dedupe the account owner's row (only a real
-// family_profiles uuid dedupes correctly). Every write below routes
-// through this so there's exactly one place that can create a row.
+// Atomic upsert with ignoreDuplicates (ON CONFLICT DO NOTHING) rather
+// than select-then-insert: two concurrent first-writes for the same
+// profile (double-click, two tabs) both racing the initial select would
+// otherwise both see "no row" and both insert. The DB's
+// (user_id, profile_id) unique constraint is "nulls not distinct"
+// (migration profile_onboarding_nulls_not_distinct), so this is safe for
+// the account-owner row (profile_id null) too, not just real family
+// member uuids. A losing insert returns zero rows here — that's the
+// signal to fall back to reading the winner's row.
 async function getOrCreateProgress(profileId?: string | null): Promise<ProfileOnboarding> {
-  const existing = await getOnboardingProgress(profileId);
-  if (existing) return existing;
-
   const supabase = createClient();
   const userId = await getCurrentUserId();
-  const { data, error } = await supabase
+  const { data: inserted, error: insertError } = await supabase
     .from("profile_onboarding")
-    .insert({
-      user_id: userId,
-      profile_id: profileId ?? null,
-      status: "in_progress",
-      current_step: "medications",
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ProfileOnboarding;
+    .upsert(
+      {
+        user_id: userId,
+        profile_id: profileId ?? null,
+        status: "in_progress",
+        current_step: "medications",
+      },
+      { onConflict: "user_id,profile_id", ignoreDuplicates: true },
+    )
+    .select();
+  if (insertError) throw insertError;
+  if (inserted && inserted.length > 0) return inserted[0] as ProfileOnboarding;
+
+  const existing = await getOnboardingProgress(profileId);
+  if (!existing) throw new Error("Failed to load onboarding progress");
+  return existing;
 }
 
 export async function startOnboarding(profileId?: string | null): Promise<ProfileOnboarding> {
@@ -126,9 +134,33 @@ export async function activateOnboarding(
         toScheduleTimes(values),
       );
 
-      const marksForDraft = reconcileMarks.filter((m) => m.draftId === draft.id);
+      // Only marks against a time still in this draft's *final* schedule —
+      // if the user marked a dose, went back, and changed the schedule
+      // before activating, a stale mark for a since-removed time would
+      // otherwise record a phantom dose log (and phantom inventory
+      // deduction) for a slot that no longer exists.
+      const validTimes = new Set(values.scheduleTimes.map((t) => t.reminderTime));
+      const marksForDraft = reconcileMarks.filter(
+        (m) => m.draftId === draft.id && validTimes.has(m.scheduledTime),
+      );
       for (const mark of marksForDraft) {
         await recordDose(medication, today, mark.scheduledTime, mark.status, mark.quantityPerDose);
+      }
+
+      // A "Count now" quantity was measured at entry time, so it already
+      // reflects any doses taken earlier today — recordDose's "taken"
+      // deductions above would otherwise subtract those doses a second
+      // time. Re-assert the user's counted value as ground truth after
+      // reconciliation rather than letting the deductions stand. Not
+      // needed for "estimate from fill", whose formula deliberately stops
+      // at full elapsed days and doesn't already include today.
+      const hasTakenMark = marksForDraft.some((m) => m.status === "taken");
+      if (values.inventoryEnabled && values.inventoryMethod !== "estimate" && hasTakenMark) {
+        await adjustQuantity(
+          medication.id,
+          Number(values.startingQuantity) || 0,
+          "Onboarding: count already reflected today's doses",
+        );
       }
 
       await deleteDraft(draft.id);

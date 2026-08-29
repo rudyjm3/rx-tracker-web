@@ -57,7 +57,7 @@ function InventoryCard({ draft }: { draft: ParsedDraft<MedicationFormValues> }) 
       if (method === "skip") {
         await saveDraft({
           id: draft.id,
-          formData: { ...draft.formData, inventoryEnabled: false },
+          formData: { ...draft.formData, inventoryEnabled: false, inventoryMethod: "skip" },
           currentStep: 4,
           furthestStep: Math.max(draft.furthestStep, 4),
           profileId,
@@ -71,7 +71,7 @@ function InventoryCard({ draft }: { draft: ParsedDraft<MedicationFormValues> }) 
         }
         await saveDraft({
           id: draft.id,
-          formData: { ...draft.formData, startingQuantity: quantity },
+          formData: { ...draft.formData, startingQuantity: quantity, inventoryMethod: method },
           currentStep: 4,
           furthestStep: Math.max(draft.furthestStep, 4),
           profileId,
