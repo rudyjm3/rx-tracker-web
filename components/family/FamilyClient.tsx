@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AllergyPanel } from "@/components/profile/AllergyPanel";
 import { AvatarPicker } from "@/components/profile/AvatarPicker";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Avatar } from "@/components/ui/Avatar";
@@ -35,7 +35,6 @@ export function FamilyClient() {
   const router = useRouter();
   const { setActiveProfileId } = useActiveProfile();
   const [editing, setEditing] = useState<FamilyProfile | "new" | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null);
 
   const familyQuery = useQuery({
@@ -80,7 +79,6 @@ export function FamilyClient() {
         <ul className="flex flex-col gap-3">
           {family.map((fp) => {
             const age = calculateAge(fp.birth_date, fp.birth_year);
-            const isExpanded = expandedId === fp.id;
             const isConfirmingRemove = confirmingRemoveId === fp.id;
             return (
               <li
@@ -88,9 +86,8 @@ export function FamilyClient() {
                 className="flex flex-col gap-3 rounded-card border border-brand-border bg-brand-card p-4"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(isExpanded ? null : fp.id)}
+                  <Link
+                    href={`/family/${fp.id}`}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                   >
                     <span className="block h-10 w-10 shrink-0 overflow-hidden rounded-full">
@@ -101,15 +98,27 @@ export function FamilyClient() {
                       />
                     </span>
                     <span className="min-w-0">
-                      <span className="block font-medium text-brand-text">{fp.display_name}</span>
+                      <span className="block font-medium text-brand-text hover:underline">
+                        {fp.display_name}
+                      </span>
                       <span className="block text-xs text-brand-text-muted">
                         {[fp.relationship, age !== null ? `${age} yrs` : null]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>
                     </span>
-                  </button>
+                  </Link>
                   <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveProfileId(fp.id);
+                        router.push("/dashboard");
+                      }}
+                      className="text-xs text-brand-deep-blue hover:underline"
+                    >
+                      Switch to this profile
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditing(fp)}
@@ -152,12 +161,6 @@ export function FamilyClient() {
                     This permanently deletes {fp.display_name}&rsquo;s medications, dose history,
                     and logs — not just their profile. This can&rsquo;t be undone.
                   </p>
-                )}
-
-                {isExpanded && (
-                  <div className="border-t border-brand-border pt-3">
-                    <AllergyPanel profileId={fp.id} />
-                  </div>
                 )}
               </li>
             );

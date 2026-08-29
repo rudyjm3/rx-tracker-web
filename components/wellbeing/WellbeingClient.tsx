@@ -149,7 +149,23 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
         <h2 className="mb-3 text-lg font-bold text-brand-navy">
           {metric === "pain" ? "Pain" : "Mood"} log history
         </h2>
-        <LevelHistoryList metric={metric} points={historyQuery.data ?? []} />
+        <LevelHistoryList
+          metric={metric}
+          points={historyQuery.data ?? []}
+          medicationId={selectedMedicationId}
+          medications={trackedMedications}
+          renderTagPicker={renderTagPicker}
+          onSaved={() => {
+            toast.success(`${metric === "pain" ? "Pain" : "Mood"} log updated`);
+            queryClient.invalidateQueries({ queryKey: ["wellbeing-trend", metric] });
+            queryClient.invalidateQueries({ queryKey: ["wellbeing-history", metric] });
+          }}
+          onDeleted={() => {
+            toast.success(`${metric === "pain" ? "Pain" : "Mood"} log deleted`);
+            queryClient.invalidateQueries({ queryKey: ["wellbeing-trend", metric] });
+            queryClient.invalidateQueries({ queryKey: ["wellbeing-history", metric] });
+          }}
+        />
       </div>
     </div>
   );
