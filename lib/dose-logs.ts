@@ -48,6 +48,56 @@ export async function recordDose(
   if (error) throw error;
 }
 
+/**
+ * Like recordDose, but for logging a dose at a specific *actual* time
+ * taken rather than "now" — record_dose's SQL (see supabase/schema.sql)
+ * always stamps taken_at = now(), which is correct for the dashboard's
+ * Take button but wrong for the Log Past Dose / Missed Dose / Free Log
+ * flows, where the whole point is a taken_at that can differ from the
+ * current moment (a slot from earlier today, a past date, a genuinely
+ * missed dose being corrected to "taken").
+ *
+ * Upserts via recordDose first — same atomic, row-locked inventory
+ * deduction, keyed by (medication_id, scheduled_for_date,
+ * scheduled_time), and it already handles a slot that has an existing
+ * row (e.g. a "missed" log being corrected to "taken") via its own
+ * ON CONFLICT DO UPDATE — then looks up that row's id and corrects
+ * taken_at/feedback via editDoseLog, which (unlike record_dose) accepts
+ * an explicit p_taken_at. editDoseLog's restore-then-deduct in that
+ * second call is a net no-op on inventory, since it's operating on the
+ * exact quantity the first call just deducted.
+ */
+export async function recordDoseAtTime(
+  medication: Pick<Medication, "id" | "inventory_enabled">,
+  scheduledForDate: string,
+  scheduledTime: string,
+  takenAt: string,
+  quantityPerDose: number,
+  feedback?: DoseFeedback,
+): Promise<void> {
+  await recordDose(medication, scheduledForDate, scheduledTime, "taken", quantityPerDose, feedback);
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("id")
+    .eq("medication_id", medication.id)
+    .eq("scheduled_for_date", scheduledForDate)
+    .eq("scheduled_time", scheduledTime)
+    .single();
+  if (error) throw error;
+
+  await editDoseLog(data.id, {
+    status: "taken",
+    takenAt,
+    painLevel: feedback?.painLevel ?? null,
+    moodLevel: feedback?.moodLevel ?? null,
+    note: feedback?.note ?? "",
+    quantityPerDose,
+    inventoryEnabled: medication.inventory_enabled,
+  });
+}
+
 export async function postponeDose(
   medicationId: string,
   scheduledForDate: string,

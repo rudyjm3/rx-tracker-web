@@ -18,7 +18,7 @@ import { RefillModal } from "./RefillModal";
 import { SideEffectModal } from "./SideEffectModal";
 import { NotesModal } from "./NotesModal";
 import { DoseHistoryPanel } from "./DoseHistoryPanel";
-import { LogDoseModal } from "./LogDoseModal";
+import { LogPastDoseModal } from "./log-past-dose/LogPastDoseModal";
 import { DiscontinueModal } from "./DiscontinueModal";
 import { ResumeModal } from "./ResumeModal";
 
@@ -168,7 +168,7 @@ export function MedicationCard({ medication }: { medication: Medication }) {
         </div>
       )}
 
-      <LogDoseModal
+      <LogPastDoseModal
         open={openModal === "logDose"}
         onOpenChange={(open) => setOpenModal(open ? "logDose" : null)}
         medication={medication}
