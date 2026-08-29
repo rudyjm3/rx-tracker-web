@@ -259,6 +259,7 @@ export async function updateMedication(
 export async function deactivateMedication(
   id: string,
   reason = "",
+  comment = "",
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -269,11 +270,15 @@ export async function deactivateMedication(
 
   const { error: eventError } = await supabase
     .from("medication_status_events")
-    .insert({ medication_id: id, event: "discontinued", reason });
+    .insert({ medication_id: id, event: "discontinued", reason, comment });
   if (eventError) throw eventError;
 }
 
-export async function activateMedication(id: string): Promise<void> {
+export async function activateMedication(
+  id: string,
+  reason = "",
+  comment = "",
+): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from("medications")
@@ -283,8 +288,45 @@ export async function activateMedication(id: string): Promise<void> {
 
   const { error: eventError } = await supabase
     .from("medication_status_events")
-    .insert({ medication_id: id, event: "resumed" });
+    .insert({ medication_id: id, event: "resumed", reason, comment });
   if (eventError) throw eventError;
+}
+
+/**
+ * Assigns (or clears) which single group a medication belongs to — the
+ * wizard's Schedule-step group selector is a single-select control, so
+ * this always replaces any existing membership row for the medication
+ * rather than appending to a possibly-multi-group set the way
+ * GroupModal's checkbox list does. Pass groupId = null for "No group".
+ */
+export async function setMedicationGroup(
+  medicationId: string,
+  groupId: string | null,
+): Promise<void> {
+  const supabase = createClient();
+  const { error: deleteError } = await supabase
+    .from("medication_group_members")
+    .delete()
+    .eq("medication_id", medicationId);
+  if (deleteError) throw deleteError;
+
+  if (!groupId) return;
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("medication_group_members")
+    .select("sort_order")
+    .eq("group_id", groupId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (fetchError) throw fetchError;
+  const nextSortOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
+
+  const { error } = await supabase.from("medication_group_members").insert({
+    group_id: groupId,
+    medication_id: medicationId,
+    sort_order: nextSortOrder,
+  });
+  if (error) throw error;
 }
 
 // ── Medication groups ──────────────────────────────────────────────

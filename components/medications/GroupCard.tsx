@@ -66,9 +66,13 @@ export function GroupCard({
       </div>
 
       <div className="flex flex-col gap-2">
-        {members.map((med) => (
-          <MedicationCard key={med.id} medication={med} />
-        ))}
+        {members.length === 0 ? (
+          <p className="text-sm text-brand-text-muted">
+            No medications in this group yet.
+          </p>
+        ) : (
+          members.map((med) => <MedicationCard key={med.id} medication={med} />)
+        )}
       </div>
 
       <GroupModal

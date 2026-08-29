@@ -37,6 +37,7 @@ export function DoseHistoryPanel({ medicationId }: { medicationId: string }) {
             <span>
               {entry.data.event === "discontinued" ? "Discontinued" : "Resumed"}
               {entry.data.reason && ` — ${entry.data.reason}`}
+              {entry.data.comment && ` (${entry.data.comment})`}
             </span>
           )}
         </li>
