@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
+import { Button } from "@/components/ui/Button";
 import { getMoodChartScheme } from "@/lib/app-settings";
 import { getActiveMedications } from "@/lib/medications";
 import {
@@ -14,18 +15,11 @@ import {
   type WellbeingMetric,
 } from "@/lib/pain-mood";
 import { localDateString } from "@/lib/utils";
+import { GraphModal } from "./GraphModal";
 import { LogLevelModal, type LogLevelSubmitInput } from "./LogLevelModal";
 import { MedicationSelector } from "./MedicationSelector";
-import { TrendChart, type RangeDays } from "./TrendChart";
+import { rangeDatesForDays, TrendChart, type RangeDays } from "./TrendChart";
 import { LevelHistoryList } from "./LevelHistoryList";
-
-function rangeDates(rangeDays: RangeDays, today: string): { start: string; end: string } {
-  if (rangeDays === 0) return { start: today, end: today };
-  const end = new Date(`${today}T00:00:00`);
-  const start = new Date(end);
-  start.setDate(start.getDate() - (rangeDays - 1));
-  return { start: localDateString(start), end: today };
-}
 
 interface WellbeingClientProps {
   metric: WellbeingMetric;
@@ -45,6 +39,12 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
   const today = localDateString();
   const [selectedMedicationId, setSelectedMedicationId] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState<RangeDays>(0);
+  // Which medication's (or Independent's) dedicated graph modal is open,
+  // if any — separate from selectedMedicationId, which drives the
+  // page-level trend section/history below rather than the modal.
+  const [graphTarget, setGraphTarget] = useState<{ id: string | null; name: string } | null>(
+    null,
+  );
 
   // A medication selected under a different profile no longer belongs
   // to what's visible now — reset to "Independent" rather than keep
@@ -74,7 +74,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
     [medicationsQuery.data, metric],
   );
 
-  const { start, end } = rangeDates(rangeDays, today);
+  const { start, end } = rangeDatesForDays(rangeDays, today);
   const trendQuery = useQuery({
     queryKey: ["wellbeing-trend", metric, selectedMedicationId, start, end, activeProfileId],
     queryFn: () => getTrend(metric, selectedMedicationId, start, end, activeProfileId),
@@ -126,8 +126,38 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
         renderTagPicker={renderTagPicker}
       />
 
+      {trackedMedications.length > 0 && (
+        <div>
+          <h2 className="mb-3 text-lg font-bold text-brand-navy">Tracked medications</h2>
+          <ul className="flex flex-col gap-2">
+            {trackedMedications.map((med) => (
+              <li
+                key={med.id}
+                className="flex items-center justify-between gap-3 rounded-card border border-brand-border bg-brand-card p-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-brand-text">{med.name}</p>
+                  {med.dose && <p className="text-xs text-brand-text-muted">{med.dose}</p>}
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  className="shrink-0"
+                  onClick={() => setGraphTarget({ id: med.id, name: med.name })}
+                >
+                  View {metric} graph
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div>
-        <h2 className="mb-3 text-lg font-bold text-brand-navy">Tracked medications</h2>
+        <h2 className="mb-3 text-lg font-bold text-brand-navy">
+          {metric === "pain" ? "Pain" : "Mood"} trend
+        </h2>
         <MedicationSelector
           medications={trackedMedications}
           selectedId={selectedMedicationId}
@@ -144,6 +174,18 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
           moodChartScheme={moodSchemeQuery.data}
         />
       </div>
+
+      <GraphModal
+        metric={metric}
+        medicationId={graphTarget?.id ?? null}
+        medicationName={graphTarget?.name ?? ""}
+        open={graphTarget !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setGraphTarget(null);
+        }}
+        profileId={activeProfileId}
+        moodChartScheme={moodSchemeQuery.data}
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-bold text-brand-navy">

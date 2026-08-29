@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import { AllergyPanel } from "@/components/profile/AllergyPanel";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { ImageLightbox } from "@/components/ui/ImageLightbox";
 import { getFamilyProfile } from "@/lib/family";
 import { calculateAge, formatFeetInches, heightToInches } from "@/lib/utils";
 
@@ -17,6 +19,7 @@ interface FamilyMemberDetailClientProps {
 export function FamilyMemberDetailClient({ profileId }: FamilyMemberDetailClientProps) {
   const router = useRouter();
   const { setActiveProfileId } = useActiveProfile();
+  const [avatarLightboxOpen, setAvatarLightboxOpen] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ["family-profile", profileId],
@@ -58,13 +61,24 @@ export function FamilyMemberDetailClient({ profileId }: FamilyMemberDetailClient
 
       <section className="flex flex-col gap-4 rounded-card border border-brand-border bg-brand-card p-4">
         <div className="flex items-center gap-3">
-          <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-full">
-            <Avatar
-              pictureUrl={profile.profile_picture}
-              label={profile.display_name}
-              color={profile.avatar_color}
-            />
-          </span>
+          {profile.profile_picture ? (
+            <button
+              type="button"
+              onClick={() => setAvatarLightboxOpen(true)}
+              aria-label="View larger profile picture"
+              className="block h-14 w-14 shrink-0 overflow-hidden rounded-full"
+            >
+              <Avatar
+                pictureUrl={profile.profile_picture}
+                label={profile.display_name}
+                color={profile.avatar_color}
+              />
+            </button>
+          ) : (
+            <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-full">
+              <Avatar pictureUrl={null} label={profile.display_name} color={profile.avatar_color} />
+            </span>
+          )}
           <div>
             <p className="text-lg font-semibold text-brand-text">{profile.display_name}</p>
             {profile.relationship && (
@@ -94,6 +108,13 @@ export function FamilyMemberDetailClient({ profileId }: FamilyMemberDetailClient
       <section className="rounded-card border border-brand-border bg-brand-card p-4">
         <AllergyPanel profileId={profile.id} />
       </section>
+
+      <ImageLightbox
+        imageUrl={profile.profile_picture ?? ""}
+        caption={profile.display_name}
+        open={avatarLightboxOpen && !!profile.profile_picture}
+        onClose={() => setAvatarLightboxOpen(false)}
+      />
     </div>
   );
 }

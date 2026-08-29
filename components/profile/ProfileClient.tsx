@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
 import { buttonVariants } from "@/components/ui/Button";
+import { ImageLightbox } from "@/components/ui/ImageLightbox";
 import { createClient } from "@/lib/supabase/client";
 import {
   deleteAvatarIfManaged,
@@ -37,6 +38,7 @@ export function ProfileClient() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [avatarLightboxOpen, setAvatarLightboxOpen] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ["user-profile"],
@@ -72,9 +74,20 @@ export function ProfileClient() {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-full">
-            <Avatar pictureUrl={profile?.profile_picture ?? null} label={displayName} />
-          </span>
+          {profile?.profile_picture ? (
+            <button
+              type="button"
+              onClick={() => setAvatarLightboxOpen(true)}
+              aria-label="View larger profile picture"
+              className="block h-14 w-14 shrink-0 overflow-hidden rounded-full"
+            >
+              <Avatar pictureUrl={profile.profile_picture} label={displayName} />
+            </button>
+          ) : (
+            <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-full">
+              <Avatar pictureUrl={null} label={displayName} />
+            </span>
+          )}
           <p className="text-lg font-semibold text-brand-text">{displayName}</p>
         </div>
 
@@ -118,6 +131,13 @@ export function ProfileClient() {
           />
         </DialogContent>
       </Dialog>
+
+      <ImageLightbox
+        imageUrl={profile?.profile_picture ?? ""}
+        caption={displayName}
+        open={avatarLightboxOpen && !!profile?.profile_picture}
+        onClose={() => setAvatarLightboxOpen(false)}
+      />
     </div>
   );
 }
