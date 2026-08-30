@@ -5,8 +5,10 @@ export default function ProfilePage() {
   return (
     <>
       <TopNav />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <ProfileClient />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+        <div className="mx-auto w-full max-w-2xl">
+          <ProfileClient />
+        </div>
       </main>
     </>
   );

@@ -9,7 +9,7 @@ export default function MoodWellbeingPage() {
           GraphModal.tsx) prints just the chart, not the page behind it —
           the modal itself renders into a Radix portal outside this
           <main>, so it stays visible. */}
-      <main data-no-print className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      <main data-no-print className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <MoodWellbeingClient />
       </main>
     </>

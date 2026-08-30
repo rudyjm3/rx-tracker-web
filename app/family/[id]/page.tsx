@@ -11,7 +11,7 @@ export default async function FamilyMemberDetailPage({
   return (
     <>
       <TopNav />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <FamilyMemberDetailClient profileId={id} />
       </main>
     </>
