@@ -741,6 +741,88 @@ $$;
 grant execute on function record_dose_at_time(uuid, date, time, timestamptz, numeric, boolean, smallint, smallint, text) to authenticated;
 
 -- ─────────────────────────────────────────
+-- REFILL / ADJUST RPCs
+-- Same row-locked shape as record_dose — a client-side read of
+-- current_quantity followed by a later write lets a dose taken (or
+-- another refill logged) in between get silently clobbered by a total
+-- computed from the stale read. p_pills_on_hand null means the caller
+-- left "new total" blank, so the resolved total is derived from
+-- whatever current_quantity actually is under the lock, not a value
+-- read moments earlier on the client.
+-- ─────────────────────────────────────────
+create or replace function log_refill(
+  p_medication_id uuid,
+  p_amount numeric,
+  p_pills_on_hand numeric default null,
+  p_note text default ''
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_current numeric;
+  v_resolved numeric;
+begin
+  select current_quantity into v_current
+    from medications
+   where id = p_medication_id
+   for update;
+
+  v_resolved := coalesce(p_pills_on_hand, coalesce(v_current, 0) + p_amount);
+
+  insert into medication_refills (
+    medication_id, refill_date, amount, pills_on_hand, note, entry_type
+  )
+  values (
+    p_medication_id, current_date, p_amount, v_resolved, coalesce(p_note, ''), 'refill'
+  );
+
+  update medications
+    set current_quantity = v_resolved,
+        updated_at = now()
+    where id = p_medication_id;
+end;
+$$;
+
+grant execute on function log_refill(uuid, numeric, numeric, text) to authenticated;
+
+-- Records a manual "correct current quantity to X" entry — the stored
+-- amount is the delta (X minus current_quantity under the lock) so the
+-- Refill History view can show a meaningful +/- badge for adjustments.
+create or replace function adjust_quantity(
+  p_medication_id uuid,
+  p_new_quantity numeric,
+  p_note text default ''
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_current numeric;
+begin
+  select current_quantity into v_current
+    from medications
+   where id = p_medication_id
+   for update;
+
+  insert into medication_refills (
+    medication_id, refill_date, amount, pills_on_hand, note, entry_type
+  )
+  values (
+    p_medication_id, current_date, p_new_quantity - coalesce(v_current, 0), p_new_quantity,
+    coalesce(p_note, ''), 'adjustment'
+  );
+
+  update medications
+    set current_quantity = p_new_quantity,
+        updated_at = now()
+    where id = p_medication_id;
+end;
+$$;
+
+grant execute on function adjust_quantity(uuid, numeric, text) to authenticated;
+
+-- ─────────────────────────────────────────
 -- DOSE LOG EDIT/DELETE RPCs (step 7 — History)
 -- Same atomic, security-invoker, row-locked shape as record_dose, but
 -- keyed by an existing dose_logs row's id rather than the medication's
