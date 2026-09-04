@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 
@@ -63,11 +64,11 @@ function LoginForm() {
 
   return (
     <div>
-      <h1 className="mb-1 text-[1.65rem] font-extrabold text-brand-text">
+      <h1 className="mb-2 text-center text-[1.65rem] font-extrabold leading-tight text-brand-navy">
         Welcome back!
       </h1>
-      <p className="mb-7 text-[0.92rem] text-brand-text-muted">
-        Sign in to your account
+      <p className="mb-8 text-center text-[0.92rem] text-brand-text-muted">
+        Sign in to continue tracking your medications.
       </p>
 
       {error && (
@@ -82,15 +83,22 @@ function LoginForm() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-[1.1rem]">
         <label className="flex flex-col gap-1.5 text-[0.87rem] font-bold text-brand-text">
           Email address
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-control border-[1.5px] border-brand-border bg-brand-bg px-4 py-3 text-[0.95rem] font-normal text-brand-text outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-          />
+          <span className="relative block">
+            <Mail
+              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-text-muted"
+              aria-hidden="true"
+            />
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              autoFocus
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-control border-[1.5px] border-brand-border bg-white py-3 pl-11 pr-4 text-[0.95rem] font-normal text-brand-text outline-none transition placeholder:text-brand-text-muted/75 focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+            />
+          </span>
         </label>
 
         <div>
@@ -98,13 +106,18 @@ function LoginForm() {
             Password
           </label>
           <div className="relative">
+            <Lock
+              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-text-muted"
+              aria-hidden="true"
+            />
             <input
               type={showPassword ? "text" : "password"}
               required
               autoComplete="current-password"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-control border-[1.5px] border-brand-border bg-brand-bg px-4 py-3 pr-12 text-[0.95rem] text-brand-text outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+              className="w-full rounded-control border-[1.5px] border-brand-border bg-white py-3 pl-11 pr-12 text-[0.95rem] text-brand-text outline-none transition placeholder:text-brand-text-muted/75 focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
             />
             <button
               type="button"
@@ -112,7 +125,11 @@ function LoginForm() {
               onClick={() => setShowPassword((value) => !value)}
               className="absolute inset-y-0 right-3 flex items-center text-brand-text-muted hover:text-brand-deep-blue"
             >
-              {showPassword ? "Hide" : "Show"}
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <Eye className="h-4 w-4" aria-hidden="true" />
+              )}
             </button>
           </div>
           <Link
@@ -134,11 +151,11 @@ function LoginForm() {
         </label>
 
         <Button type="submit" disabled={loading} className="mt-2 w-full">
-          {loading ? "Signing in…" : "Sign In"}
+          {loading ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 
-      <div className="my-5 flex items-center gap-2 text-xs font-semibold uppercase text-brand-text-muted">
+      <div className="my-5 flex items-center gap-2 text-xs font-semibold text-brand-text-muted">
         <div className="h-px flex-1 bg-brand-border" />
         or
         <div className="h-px flex-1 bg-brand-border" />
@@ -147,10 +164,10 @@ function LoginForm() {
       <Button
         type="button"
         variant="secondary"
-        className="w-full"
+        className="w-full bg-white"
         onClick={handleGoogleSignIn}
       >
-        <span aria-hidden="true" className="font-bold">
+        <span aria-hidden="true" className="font-bold text-[#4285f4]">
           G
         </span>
         Continue with Google
@@ -160,16 +177,6 @@ function LoginForm() {
         Don&apos;t have an account?{" "}
         <Link href="/signup" className="font-bold text-brand-blue hover:underline">
           Sign up
-        </Link>
-      </p>
-
-      <p className="mt-2 text-center text-xs text-brand-text-muted">
-        <Link href="/terms" className="text-brand-blue hover:underline">
-          Terms of Use
-        </Link>{" "}
-        ·{" "}
-        <Link href="/privacy" className="text-brand-blue hover:underline">
-          Privacy Policy
         </Link>
       </p>
     </div>
