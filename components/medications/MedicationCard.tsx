@@ -157,13 +157,22 @@ export function MedicationCard({ medication }: { medication: Medication }) {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button
-            variant="secondary"
-            size="compact"
-            onClick={() => setOpenModal("resume")}
-          >
-            Reactivate
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="compact"
+              onClick={() => setOpenModal("refillHistory")}
+            >
+              Refill History
+            </Button>
+            <Button
+              variant="secondary"
+              size="compact"
+              onClick={() => setOpenModal("resume")}
+            >
+              Reactivate
+            </Button>
+          </div>
         )}
       </div>
 

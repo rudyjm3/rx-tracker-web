@@ -29,6 +29,15 @@ function daysBetween(a: string, b: string): number {
   return Math.round((parseDate(b).getTime() - parseDate(a).getTime()) / 86400000);
 }
 
+// Same-day refills need a stable chronological order — refill_date alone
+// ties, and the API returns rows created_at-descending, which would put
+// the later same-day refill first and hand it the earlier one's gap.
+function byDateThenCreatedAtAsc(a: MedicationRefill, b: MedicationRefill): number {
+  const dateCmp = a.refill_date.localeCompare(b.refill_date);
+  if (dateCmp !== 0) return dateCmp;
+  return a.created_at.localeCompare(b.created_at);
+}
+
 export function RefillHistoryModal({
   open,
   onOpenChange,
@@ -52,7 +61,7 @@ export function RefillHistoryModal({
     const refillsAsc = entries
       .filter((e) => e.entry_type === "refill")
       .slice()
-      .sort((a, b) => a.refill_date.localeCompare(b.refill_date));
+      .sort(byDateThenCreatedAtAsc);
     const map = new Map<string, number>();
     for (let i = 1; i < refillsAsc.length; i++) {
       map.set(refillsAsc[i].id, daysBetween(refillsAsc[i - 1].refill_date, refillsAsc[i].refill_date));
@@ -77,7 +86,7 @@ export function RefillHistoryModal({
   const yearStats = useMemo(() => {
     const refillsInYear = entries
       .filter((e) => e.entry_type === "refill" && parseDate(e.refill_date).getFullYear() === viewedYear)
-      .sort((a, b) => a.refill_date.localeCompare(b.refill_date));
+      .sort(byDateThenCreatedAtAsc);
     if (refillsInYear.length === 0) return null;
     let avgDays: number | null = null;
     if (refillsInYear.length >= 2) {
