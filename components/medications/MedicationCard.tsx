@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn";
 import { to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import { RefillModal } from "./RefillModal";
+import { RefillHistoryModal } from "./RefillHistoryModal";
 import { SideEffectModal } from "./SideEffectModal";
 import { NotesModal } from "./NotesModal";
 import { DoseHistoryPanel } from "./DoseHistoryPanel";
@@ -40,6 +41,7 @@ function scheduleSummary(med: Medication): string {
 
 type ModalKind =
   | "refill"
+  | "refillHistory"
   | "adjust"
   | "notes"
   | "sideEffects"
@@ -134,6 +136,9 @@ export function MedicationCard({ medication }: { medication: Medication }) {
               <DropdownMenuItem onSelect={() => setOpenModal("refill")}>
                 Log Refill
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setOpenModal("refillHistory")}>
+                Refill History
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("adjust")}>
                 Adjust Quantity
               </DropdownMenuItem>
@@ -184,6 +189,11 @@ export function MedicationCard({ medication }: { medication: Medication }) {
         onOpenChange={(open) => setOpenModal(open ? "adjust" : null)}
         medication={medication}
         mode="adjust"
+      />
+      <RefillHistoryModal
+        open={openModal === "refillHistory"}
+        onOpenChange={(open) => setOpenModal(open ? "refillHistory" : null)}
+        medication={medication}
       />
       <NotesModal
         open={openModal === "notes"}

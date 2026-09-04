@@ -39,7 +39,7 @@ export function RefillModal({
         await logRefill(
           medication.id,
           Number(amount) || 0,
-          Number(pillsOnHand) || 0,
+          pillsOnHand.trim() === "" ? null : Number(pillsOnHand),
           note,
         );
       } else {
@@ -49,6 +49,7 @@ export function RefillModal({
     onSuccess: () => {
       toast.success(mode === "refill" ? "Refill logged" : "Quantity adjusted");
       queryClient.invalidateQueries({ queryKey: ["medications"] });
+      queryClient.invalidateQueries({ queryKey: ["refill-history", medication.id] });
       setAmount("");
       setPillsOnHand("");
       setNote("");
@@ -62,14 +63,24 @@ export function RefillModal({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const amountValue = Number(amount);
-    const pillsOnHandValue = Number(pillsOnHand);
     if (mode === "refill" && (!Number.isFinite(amountValue) || amountValue < 0)) {
       toast.error("Amount added must be zero or greater");
       return;
     }
-    if (!Number.isFinite(pillsOnHandValue) || pillsOnHandValue < 0) {
-      toast.error("Quantity must be zero or greater");
-      return;
+    const pillsOnHandEntered = pillsOnHand.trim() !== "";
+    if (mode === "refill" && pillsOnHandEntered) {
+      const pillsOnHandValue = Number(pillsOnHand);
+      if (!Number.isFinite(pillsOnHandValue) || pillsOnHandValue < 0) {
+        toast.error("New total on hand must be zero or greater");
+        return;
+      }
+    }
+    if (mode === "adjust") {
+      const pillsOnHandValue = Number(pillsOnHand);
+      if (!Number.isFinite(pillsOnHandValue) || pillsOnHandValue < 0) {
+        toast.error("Quantity must be zero or greater");
+        return;
+      }
     }
     mutation.mutate();
   }
@@ -99,7 +110,7 @@ export function RefillModal({
           <Field
             label={
               mode === "refill"
-                ? `New total on hand (${medication.inventory_unit})`
+                ? `New total on hand (${medication.inventory_unit}) — optional`
                 : `Correct current quantity (${medication.inventory_unit})`
             }
           >
@@ -107,7 +118,12 @@ export function RefillModal({
               type="number"
               step="any"
               min="0"
-              required
+              required={mode === "adjust"}
+              placeholder={
+                mode === "refill"
+                  ? `Leave blank to add to current (${medication.current_quantity ?? 0})`
+                  : undefined
+              }
               value={pillsOnHand}
               onChange={(e) => setPillsOnHand(e.target.value)}
               className={inputClass}
