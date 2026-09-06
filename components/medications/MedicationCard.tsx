@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MoreVertical } from "lucide-react";
+import { ChevronsDown, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,6 +84,7 @@ export function MedicationCard({ medication }: { medication: Medication }) {
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
+          aria-expanded={expanded}
           className="flex-1 text-left"
         >
           <div className="flex items-center gap-2">
@@ -113,6 +114,16 @@ export function MedicationCard({ medication }: { medication: Medication }) {
               </p>
             </div>
           )}
+          <div className="mt-2 flex justify-center">
+            <ChevronsDown
+              aria-hidden="true"
+              size={16}
+              className={cn(
+                "text-brand-text-muted transition-transform",
+                expanded && "rotate-180",
+              )}
+            />
+          </div>
         </button>
 
         {medication.active ? (
@@ -178,6 +189,9 @@ export function MedicationCard({ medication }: { medication: Medication }) {
 
       {expanded && (
         <div className={cn("mt-3 border-t border-brand-border pt-3")}>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-text-muted">
+            Dose history
+          </p>
           <DoseHistoryPanel medicationId={medication.id} />
         </div>
       )}

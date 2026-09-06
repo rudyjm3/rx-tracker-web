@@ -14,7 +14,7 @@ export function DoseHistoryPanel({ medicationId }: { medicationId: string }) {
   }
 
   if (!entries || entries.length === 0) {
-    return <p className="text-xs text-brand-text-muted">No history yet.</p>;
+    return <p className="text-xs text-brand-text-muted">No dose history yet.</p>;
   }
 
   return (
