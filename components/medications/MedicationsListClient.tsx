@@ -6,13 +6,18 @@ import { Layers } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
+  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import {
   getActiveMedications,
@@ -45,6 +50,7 @@ export function MedicationsListClient() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const activeQuery = useQuery({
@@ -184,11 +190,33 @@ export function MedicationsListClient() {
     const reordered = [...ids];
     reordered.splice(oldIndex, 1);
     reordered.splice(newIndex, 0, String(active.id));
-    // Ungrouped-only reorder writes sequential sort_order values starting
-    // at 0 across just this filtered subset — grouped medications keep
-    // whatever sort_order they already had, since they're never part of
-    // this drag context.
-    reorderMutation.mutate(reordered);
+    
+    // Merge the reordered visible subset back into the full ungrouped list
+    // to preserve positions of hidden (filtered-out) medications, avoiding
+    // duplicate sort_order values when the filter is cleared or changed.
+    const allUngroupedIds = ungroupedMedications.map((m) => m.id);
+    const reorderedSet = new Set(reordered);
+    
+    // Insert each hidden medication back into its original relative position
+    // among the reordered visible medications.
+    const byId = new Map(ungroupedMedications.map((m, i) => [m.id, i]));
+    const merged: string[] = [];
+    let visibleIdx = 0;
+    
+    for (const id of allUngroupedIds) {
+      if (reorderedSet.has(id)) {
+        merged.push(reordered[visibleIdx++]);
+      } else {
+        // Find where this hidden medication sits relative to visible ones
+        const originalPos = byId.get(id) ?? 0;
+        const beforeCount = allUngroupedIds
+          .slice(0, originalPos)
+          .filter((beforeId) => reorderedSet.has(beforeId)).length;
+        merged.splice(beforeCount, 0, id);
+      }
+    }
+    
+    reorderMutation.mutate(merged);
   }
 
   return (

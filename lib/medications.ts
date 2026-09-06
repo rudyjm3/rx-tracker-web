@@ -98,17 +98,20 @@ export async function getInactiveMedications(
  * medication ids in their new top-to-bottom order and writes sequential
  * sort_order values — the same column getActiveMedications() already
  * orders by, so no other read path needs to change.
+ * 
+ * Uses a database function to ensure all updates commit atomically in a
+ * single transaction, avoiding partial success states where some rows
+ * update while others fail.
  */
 export async function reorderMedications(orderedIds: string[]): Promise<void> {
   const supabase = createClient();
-  await Promise.all(
-    orderedIds.map((id, index) =>
-      supabase.from("medications").update({ sort_order: index }).eq("id", id),
-    ),
-  ).then((results) => {
-    const failed = results.find((r) => r.error);
-    if (failed?.error) throw failed.error;
+  
+  // Call a PostgreSQL function that updates all rows in a single transaction
+  const { error } = await supabase.rpc("reorder_medications", {
+    medication_ids: orderedIds,
   });
+  
+  if (error) throw error;
 }
 
 export async function getMedication(id: string): Promise<Medication> {
