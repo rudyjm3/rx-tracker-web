@@ -109,7 +109,7 @@ export function MedicationCard({ medication }: { medication: Medication }) {
 
   return (
     <div className="rounded-card border border-brand-border bg-brand-card p-4 shadow-card">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 pl-5">
         <button
           type="button"
           onClick={() => setOpenModal("details")}
