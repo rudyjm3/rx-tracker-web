@@ -6,6 +6,7 @@ import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { useAuth } from "@/components/layout/AuthProvider";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Field, inputClass } from "@/components/ui/Field";
 import { computeAdherence } from "@/lib/adherence";
 import { ALLERGY_SEVERITY_LABELS, getProfileAllergies } from "@/lib/allergies";
@@ -17,7 +18,7 @@ import {
   getInactiveMedications,
   type DoseHistoryEntry,
 } from "@/lib/medications";
-import { getTrend, medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
+import { getTrend, groupDailyAverages, medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
 import { getSideEffectsInRange } from "@/lib/side-effects";
 import { daysUntilRunout, localDateString, to12h } from "@/lib/utils";
 import type { Medication, MedicationDoseChange } from "@/lib/types/medications";
@@ -71,6 +72,10 @@ export function ExportClient() {
   const { activeProfileId, isResolving } = useActiveProfile();
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(localDateString);
+  const [excludedMedicationIds, setExcludedMedicationIds] = useState<Set<string>>(new Set());
+  const [includePain, setIncludePain] = useState(true);
+  const [includeMood, setIncludeMood] = useState(true);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const generatedAt = useMemo(() => new Date().toLocaleString(), []);
 
   const medicationsQuery = useQuery({
@@ -104,6 +109,23 @@ export function ExportClient() {
     [allMedications],
   );
 
+  // Report scoping: fetch data for every medication regardless of
+  // selection (queries above), then filter here — a checkbox toggle
+  // shouldn't refetch, since the underlying data is already local.
+  function toggleMedication(id: string) {
+    setExcludedMedicationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  const isMedicationSelected = (id: string) => !excludedMedicationIds.has(id);
+  const selectedMedications = useMemo(
+    () => medications.filter((m) => !excludedMedicationIds.has(m.id)),
+    [medications, excludedMedicationIds],
+  );
+
   const doseLogsQuery = useQuery({
     queryKey: ["export-dose-logs", startDate, endDate, allMedicationIds],
     queryFn: () =>
@@ -116,14 +138,16 @@ export function ExportClient() {
       }),
     enabled: inactiveMedicationsQuery.data !== undefined,
   });
-  const doseLogs = doseLogsQuery.data ?? [];
+  const doseLogs = (doseLogsQuery.data ?? []).filter((log) => isMedicationSelected(log.medication_id));
 
   const sideEffectsQuery = useQuery({
     queryKey: ["export-side-effects", startDate, endDate, allMedicationIds],
     queryFn: () => getSideEffectsInRange(startDate, endDate, allMedicationIds),
     enabled: inactiveMedicationsQuery.data !== undefined,
   });
-  const sideEffects = sideEffectsQuery.data ?? [];
+  const sideEffects = (sideEffectsQuery.data ?? []).filter((se) =>
+    isMedicationSelected(se.medication_id),
+  );
 
   // A separate, uncapped query — doseLogs above is capped at
   // HISTORY_CAP for the display table, but adherence must reflect the
@@ -134,7 +158,9 @@ export function ExportClient() {
     queryFn: () => getDoseLogStatusesInRange(startDate, endDate, allMedicationIds),
     enabled: inactiveMedicationsQuery.data !== undefined,
   });
-  const adherenceStatuses = adherenceStatusesQuery.data ?? [];
+  const adherenceStatuses = (adherenceStatusesQuery.data ?? []).filter((l) =>
+    isMedicationSelected(l.medication_id),
+  );
 
   // Dose change history is per-medication (not date-range scoped, per
   // spec) — fetched via the same getDoseHistory() the medication detail
@@ -155,7 +181,7 @@ export function ExportClient() {
           entry.type === "dose_change",
       ),
     }))
-    .filter((group) => group.changes.length > 0);
+    .filter((group) => group.changes.length > 0 && isMedicationSelected(group.medication.id));
 
   const allergiesQuery = useQuery({
     queryKey: ["export-allergies", activeProfileId],
@@ -165,8 +191,8 @@ export function ExportClient() {
   const allergies = allergiesQuery.data ?? [];
 
   const adherenceEligibleMeds = useMemo(
-    () => medications.filter((m) => !m.as_needed && m.adherence_enabled),
-    [medications],
+    () => selectedMedications.filter((m) => !m.as_needed && m.adherence_enabled),
+    [selectedMedications],
   );
   const eligibleIds = useMemo(
     () => new Set(adherenceEligibleMeds.map((m) => m.id)),
@@ -180,8 +206,14 @@ export function ExportClient() {
     percent: computeAdherence(adherenceStatuses.filter((l) => l.medication_id === med.id)),
   }));
 
-  const painTrackedMeds = useMemo(() => medications.filter(medicationTracksPain), [medications]);
-  const moodTrackedMeds = useMemo(() => medications.filter(medicationTracksMood), [medications]);
+  const painTrackedMeds = useMemo(
+    () => (includePain ? selectedMedications.filter(medicationTracksPain) : []),
+    [includePain, selectedMedications],
+  );
+  const moodTrackedMeds = useMemo(
+    () => (includeMood ? selectedMedications.filter(medicationTracksMood) : []),
+    [includeMood, selectedMedications],
+  );
 
   const painTrendQueries = useQueries({
     queries: painTrackedMeds.map((med) => ({
@@ -208,28 +240,119 @@ export function ExportClient() {
     painTrendQueries.some((q) => q.isLoading) ||
     moodTrendQueries.some((q) => q.isLoading);
 
+  async function handleDownloadPdf() {
+    setIsGeneratingPdf(true);
+    try {
+      const [{ pdf }, { DoctorVisitReportPdf }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("./DoctorVisitReportPdf"),
+      ]);
+      const blob = await pdf(
+        <DoctorVisitReportPdf
+          data={{
+            patientEmail: user?.email ?? "",
+            startDate,
+            endDate,
+            generatedAt,
+            medications: selectedMedications,
+            doseChangeGroups,
+            doseLogs,
+            historyCapped: doseLogs.length === HISTORY_CAP,
+            historyCap: HISTORY_CAP,
+            sideEffects,
+            allergies,
+            overallAdherence,
+            perMedicationAdherence,
+            painTrends: painTrackedMeds.map((medication, i) => ({
+              medication,
+              points: groupDailyAverages(painTrendQueries[i]?.data ?? []),
+            })),
+            moodTrends: moodTrackedMeds.map((medication, i) => ({
+              medication,
+              points: groupDailyAverages(moodTrendQueries[i]?.data ?? []),
+            })),
+          }}
+        />,
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `RxTracker-Doctor-Visit-Report-${startDate}-to-${endDate}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div data-no-print className="flex flex-wrap items-end gap-3">
-        <Field label="From">
-          <input
-            type="date"
-            className={inputClass}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-        </Field>
-        <Field label="To">
-          <input
-            type="date"
-            className={inputClass}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-        </Field>
-        <Button type="button" onClick={() => window.print()} disabled={isLoading}>
-          Print / Save as PDF
-        </Button>
+      <div data-no-print className="flex flex-col gap-4 rounded-card border border-brand-border bg-brand-card p-4 shadow-card">
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="From">
+            <input
+              type="date"
+              className={inputClass}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </Field>
+          <Field label="To">
+            <input
+              type="date"
+              className={inputClass}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </Field>
+          <label className="flex items-center gap-2 pb-2 text-sm text-brand-text">
+            <Checkbox checked={includePain} onCheckedChange={(v) => setIncludePain(v === true)} />
+            Include Pain Tracking
+          </label>
+          <label className="flex items-center gap-2 pb-2 text-sm text-brand-text">
+            <Checkbox checked={includeMood} onCheckedChange={(v) => setIncludeMood(v === true)} />
+            Include Mood & Wellbeing
+          </label>
+          <Button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={isLoading || isGeneratingPdf}
+            className="ml-auto"
+          >
+            {isGeneratingPdf ? "Generating PDF…" : "Download PDF Report"}
+          </Button>
+        </div>
+
+        {allMedications.length > 0 && (
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-sm font-medium text-brand-text">Medications to include</span>
+              <div className="flex gap-3 text-xs text-brand-blue">
+                <button type="button" onClick={() => setExcludedMedicationIds(new Set())}>
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExcludedMedicationIds(new Set(allMedicationIds))}
+                >
+                  Select none
+                </button>
+              </div>
+            </div>
+            <div className="flex max-h-40 flex-wrap gap-x-4 gap-y-1.5 overflow-y-auto">
+              {allMedications.map((med) => (
+                <label key={med.id} className="flex items-center gap-2 text-sm text-brand-text">
+                  <Checkbox
+                    checked={isMedicationSelected(med.id)}
+                    onCheckedChange={() => toggleMedication(med.id)}
+                  />
+                  {med.name}
+                  {!med.active && <span className="text-xs text-brand-text-muted">(inactive)</span>}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-8 rounded-card border border-brand-border bg-brand-card p-6 shadow-card print:border-none print:p-0 print:shadow-none">
@@ -249,8 +372,8 @@ export function ExportClient() {
             {/* 1. Active medications */}
             <section data-report-section>
               <h2 className="mb-3 text-lg font-bold text-brand-navy">Active medications</h2>
-              {medications.length === 0 ? (
-                <p className="text-sm text-brand-text-muted">No active medications.</p>
+              {selectedMedications.length === 0 ? (
+                <p className="text-sm text-brand-text-muted">No medications selected for this report.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[720px] border-collapse text-sm">
@@ -266,7 +389,7 @@ export function ExportClient() {
                       </tr>
                     </thead>
                     <tbody>
-                      {medications.map((med) => (
+                      {selectedMedications.map((med) => (
                         <tr key={med.id} className="border-b border-brand-border align-top">
                           <td className="py-1.5 pr-3 font-medium text-brand-text">{med.name}</td>
                           <td className="py-1.5 pr-3 text-brand-text-muted">{med.dose || "—"}</td>
