@@ -18,7 +18,7 @@ interface DayDetailDialogProps {
 export function DayDetailDialog({ day, onClose, onEditSlot }: DayDetailDialogProps) {
   return (
     <Dialog open={day !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-lg">
         {day && (
           <>
             <DialogHeader>
