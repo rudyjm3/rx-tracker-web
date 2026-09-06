@@ -821,7 +821,8 @@ create or replace function log_refill(
   p_medication_id uuid,
   p_amount numeric,
   p_pills_on_hand numeric default null,
-  p_note text default ''
+  p_note text default '',
+  p_refill_date date default current_date
 )
 returns void
 language plpgsql
@@ -841,7 +842,7 @@ begin
     medication_id, refill_date, amount, pills_on_hand, note, entry_type
   )
   values (
-    p_medication_id, current_date, p_amount, v_resolved, coalesce(p_note, ''), 'refill'
+    p_medication_id, coalesce(p_refill_date, current_date), p_amount, v_resolved, coalesce(p_note, ''), 'refill'
   );
 
   update medications
@@ -851,7 +852,7 @@ begin
 end;
 $$;
 
-grant execute on function log_refill(uuid, numeric, numeric, text) to authenticated;
+grant execute on function log_refill(uuid, numeric, numeric, text, date) to authenticated;
 
 -- Records a manual "correct current quantity to X" entry — the stored
 -- amount is the delta (X minus current_quantity under the lock) so the
