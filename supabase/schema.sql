@@ -570,6 +570,73 @@ create index if not exists idx_user_notifications_medication_id on user_notifica
 create index if not exists idx_user_notifications_user_id on user_notifications(user_id);
 
 -- ─────────────────────────────────────────
+-- PRESCRIBED DOSE UPDATE RPC
+-- Keeps the medication dose update and its audit row in the same
+-- transaction so a partial client-side failure can't change the dose
+-- without recording history.
+-- ─────────────────────────────────────────
+create or replace function update_prescribed_dose(
+  p_medication_id uuid,
+  p_dose_amount numeric,
+  p_dose_unit text,
+  p_comment text default ''
+)
+returns boolean
+language plpgsql
+as $$
+declare
+  v_existing medications%rowtype;
+  v_old_dose_unit text;
+  v_new_dose_unit text;
+begin
+  select *
+    into v_existing
+    from medications
+   where id = p_medication_id
+   for update;
+
+  if not found then
+    raise exception 'Medication not found';
+  end if;
+
+  v_old_dose_unit := coalesce(trim(v_existing.dose_unit), '');
+  v_new_dose_unit := coalesce(trim(p_dose_unit), '');
+
+  if v_existing.dose_amount is not distinct from p_dose_amount
+     and v_old_dose_unit = v_new_dose_unit then
+    return false;
+  end if;
+
+  update medications
+     set dose = concat_ws(' ', p_dose_amount, nullif(v_new_dose_unit, ''), nullif(dose_form, '')),
+         dose_amount = p_dose_amount,
+         dose_unit = nullif(v_new_dose_unit, ''),
+         updated_at = now()
+   where id = p_medication_id;
+
+  insert into medication_dose_changes (
+    medication_id,
+    old_dose_amount,
+    old_dose_unit,
+    new_dose_amount,
+    new_dose_unit,
+    comment
+  ) values (
+    p_medication_id,
+    v_existing.dose_amount,
+    v_old_dose_unit,
+    p_dose_amount,
+    v_new_dose_unit,
+    coalesce(p_comment, '')
+  );
+
+  return true;
+end;
+$$;
+
+grant execute on function update_prescribed_dose(uuid, numeric, text, text) to authenticated;
+
+-- ─────────────────────────────────────────
 -- DOSE RECORDING RPC
 -- Take/Skip run through this single RPC rather than a client-side
 -- read-then-write, so two concurrent calls for the same slot

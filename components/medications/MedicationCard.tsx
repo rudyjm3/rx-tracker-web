@@ -25,7 +25,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
-import { daysUntilRunout, to12h } from "@/lib/utils";
+import { daysUntilRunout, to12h, type GroupDoseOverride } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import { RefillModal } from "./RefillModal";
 import { RefillHistoryModal } from "./RefillHistoryModal";
@@ -54,8 +54,8 @@ function scheduleSummary(med: Medication): string {
     .join(", ");
 }
 
-function runoutSummary(med: Medication): string | null {
-  const daysLeft = daysUntilRunout(med);
+function runoutSummary(med: Medication, groupDoseOverrides: GroupDoseOverride[]): string | null {
+  const daysLeft = daysUntilRunout(med, groupDoseOverrides);
   if (daysLeft == null) return null;
   const runout = new Date();
   runout.setDate(runout.getDate() + daysLeft);
@@ -79,7 +79,12 @@ type ModalKind =
   | "resume"
   | null;
 
-export function MedicationCard({ medication }: { medication: Medication }) {
+interface MedicationCardProps {
+  medication: Medication;
+  groupDoseOverrides?: GroupDoseOverride[];
+}
+
+export function MedicationCard({ medication, groupDoseOverrides = [] }: MedicationCardProps) {
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -106,7 +111,7 @@ export function MedicationCard({ medication }: { medication: Medication }) {
     : fillPct <= 50
       ? "bg-status-warning"
       : "bg-status-success";
-  const runoutText = runoutSummary(medication);
+  const runoutText = runoutSummary(medication, groupDoseOverrides);
   const openDetails = (event: MouseEvent | KeyboardEvent) => {
     event.preventDefault();
     event.stopPropagation();

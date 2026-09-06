@@ -275,48 +275,14 @@ export async function updatePrescribedDose(
   reason = "",
 ): Promise<boolean> {
   const supabase = createClient();
-
-  const { data: existing, error: fetchError } = await supabase
-    .from("medications")
-    .select("dose_amount, dose_unit, dose_form")
-    .eq("id", id)
-    .single();
-  if (fetchError) throw fetchError;
-
-  const oldDoseAmount = normalizeDoseAmount(existing.dose_amount);
-  const newDoseAmount = normalizeDoseAmount(doseAmount);
-  const oldDoseUnit = normalizeDoseUnit(existing.dose_unit);
-  const newDoseUnit = normalizeDoseUnit(doseUnit);
-  const doseChanged = oldDoseAmount !== newDoseAmount || oldDoseUnit !== newDoseUnit;
-  if (!doseChanged) return false;
-
-  const { error } = await supabase
-    .from("medications")
-    .update({
-      dose: formatDose({
-        dose_amount: newDoseAmount,
-        dose_unit: newDoseUnit || null,
-        dose_form: existing.dose_form,
-      }),
-      dose_amount: newDoseAmount,
-      dose_unit: newDoseUnit || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const { data, error } = await supabase.rpc("update_prescribed_dose", {
+    p_medication_id: id,
+    p_dose_amount: normalizeDoseAmount(doseAmount),
+    p_dose_unit: normalizeDoseUnit(doseUnit),
+    p_comment: reason,
+  });
   if (error) throw error;
-
-  const { error: doseChangeError } = await supabase
-    .from("medication_dose_changes")
-    .insert({
-      medication_id: id,
-      old_dose_amount: oldDoseAmount,
-      old_dose_unit: oldDoseUnit,
-      new_dose_amount: newDoseAmount,
-      new_dose_unit: newDoseUnit,
-      comment: reason,
-    });
-  if (doseChangeError) throw doseChangeError;
-  return true;
+  return data === true;
 }
 
 export async function deactivateMedication(
