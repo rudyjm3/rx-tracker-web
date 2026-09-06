@@ -164,7 +164,13 @@ function EditLevelLogForm({
           </Field>
         )}
 
-        <LevelGrid value={level} onChange={setLevel} label={`${metricLabel} level`} hint={hint} />
+        <LevelGrid
+          value={level}
+          onChange={setLevel}
+          label={`${metricLabel} level`}
+          hint={hint}
+          metric={metric}
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Date">

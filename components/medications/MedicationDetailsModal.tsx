@@ -117,7 +117,10 @@ export function MedicationDetailsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="wide">
         <DialogHeader>
-          <DialogTitle>{medication.name}</DialogTitle>
+          <DialogTitle>
+            {medication.name}{" "}
+            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+          </DialogTitle>
         </DialogHeader>
 
         {productImageUrl && (

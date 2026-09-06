@@ -89,12 +89,14 @@ export function DoseEntryForm({
           onChange={setPainLevel}
           label="Pain level"
           hint="(1 = minimal — 10 = severe)"
+          metric="pain"
         />
       )}
       {trackMood && (
         <LevelGrid
           value={moodLevel}
           onChange={setMoodLevel}
+          metric="mood"
           label="Mood level"
           hint="(1 = very low — 10 = excellent)"
         />

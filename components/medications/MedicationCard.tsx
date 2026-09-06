@@ -38,6 +38,14 @@ import { ResumeModal } from "./ResumeModal";
 import { UpdatePrescribedDoseModal } from "./UpdatePrescribedDoseModal";
 import { MedicationDetailsModal } from "./MedicationDetailsModal";
 
+function formatMedDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function scheduleSummary(med: Medication): string {
   if (med.as_needed) return "As needed";
   if (med.schedule_mode === "interval") {
@@ -256,6 +264,10 @@ export function MedicationCard({ medication, groupDoseOverrides = [] }: Medicati
 
       {expanded && (
         <div className={cn("mt-3 border-t border-brand-border pt-3")}>
+          <p className="mb-2 text-xs text-brand-text-muted">
+            Started: {formatMedDate(medication.start_date ?? medication.created_at)}
+            {medication.end_date && <> &middot; Ended: {formatMedDate(medication.end_date)}</>}
+          </p>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-text-muted">
             Dose history
           </p>
