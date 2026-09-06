@@ -58,6 +58,8 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentDraftIdRef = useRef<string | undefined>(draftId);
   const draftCreatePromiseRef = useRef<Promise<string> | null>(null);
+  const stepRef = useRef(1);
+  const furthestStepRef = useRef(1);
 
   const form = useForm<MedicationFormValues>({
     resolver: zodResolver(medicationFormSchema),
@@ -107,6 +109,8 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
     }
     if (mode === "create" && draftQuery.data) {
       form.reset(draftQuery.data.formData);
+      stepRef.current = draftQuery.data.currentStep;
+      furthestStepRef.current = draftQuery.data.furthestStep;
       setStep(draftQuery.data.currentStep);
       setFurthestStep(draftQuery.data.furthestStep);
       hasHydrated.current = true;
@@ -126,7 +130,7 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       id: draftIdToSave,
       formData: form.getValues(),
       currentStep: stepToSave,
-      furthestStep: Math.max(furthestStep, stepToSave),
+      furthestStep: Math.max(furthestStepRef.current, stepToSave),
       profileId: activeProfileId,
     });
 
@@ -147,7 +151,7 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   async function persistDraft(explicitStep?: number) {
     if (mode !== "create") return;
     try {
-      await doSaveDraft(explicitStep ?? step);
+      await doSaveDraft(explicitStep ?? stepRef.current);
     } catch {
       // Best-effort autosave — not worth interrupting the user over a
       // transient failure; the guaranteed save on step change will retry.
@@ -158,7 +162,7 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
     if (mode !== "create") return;
     setSavingDraft(true);
     try {
-      await doSaveDraft(step);
+      await doSaveDraft(stepRef.current);
       toast.success("Draft saved");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't save draft");
@@ -201,13 +205,20 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
     const valid = await form.trigger(STEP_FIELDS[step]);
     if (!valid) return;
     const nextStep = Math.min(step + 1, STEP_LABELS.length);
+    const nextFurthestStep = Math.max(furthestStepRef.current, nextStep);
+    stepRef.current = nextStep;
+    furthestStepRef.current = nextFurthestStep;
     setStep(nextStep);
-    setFurthestStep((f) => Math.max(f, nextStep));
+    setFurthestStep(nextFurthestStep);
     await persistDraft(nextStep);
   }
 
   function handleBack() {
-    setStep((s) => Math.max(1, s - 1));
+    setStep((s) => {
+      const previousStep = Math.max(1, s - 1);
+      stepRef.current = previousStep;
+      return previousStep;
+    });
   }
 
   async function onSubmit(values: MedicationFormValues) {
