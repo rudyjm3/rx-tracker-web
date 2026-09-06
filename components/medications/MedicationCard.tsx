@@ -301,11 +301,13 @@ export function MedicationCard({ medication, groupDoseOverrides = [] }: Medicati
           medication={medication}
         />
       )}
-      <NotesModal
-        open={openModal === "notes"}
-        onOpenChange={(open) => setOpenModal(open ? "notes" : null)}
-        medication={medication}
-      />
+      {openModal === "notes" && (
+        <NotesModal
+          open
+          onOpenChange={(open) => setOpenModal(open ? "notes" : null)}
+          medication={medication}
+        />
+      )}
       <SideEffectModal
         open={openModal === "sideEffects"}
         onOpenChange={(open) => setOpenModal(open ? "sideEffects" : null)}
