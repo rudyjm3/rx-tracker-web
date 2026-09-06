@@ -82,17 +82,8 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 
 ---
 
-### 2. Dashboard Today's Schedule — Inline Actions
-**Live:**
-- Each scheduled dose row has **Take / Skip / Snooze** buttons inline
-- Immediate action without opening modal
-
-**Rebuild:**
-- Schedule rows are read-only status pills
-- No inline actions
-- User must open medication card or separate modal to log dose
-
-**Priority:** HIGH — Core UX for daily medication adherence
+### 2. Dashboard Today's Schedule — Inline Actions ✅ RESOLVED
+**Status (2026-09-06):** Confirmed already implemented and working — `components/dashboard/DoseRow.tsx` renders inline **Take / Skip / Snooze** buttons for any pending slot (verified live in browser: buttons render, no console errors). This finding in the original audit was stale/incorrect. No further work needed.
 
 ---
 
@@ -229,8 +220,8 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 ## 🎯 RECOMMENDED PRIORITIES
 
 ### P0 (Critical for launch parity)
-1. **Export / Doctor Visit Report** — Full PDF generator with date range, Pain/Mood toggles, med selector
-2. **Dashboard inline actions** — Take/Skip/Snooze on Today's Schedule rows
+1. ✅ **Export / Doctor Visit Report** — Full PDF generator with date range, Pain/Mood toggles, med selector — DONE on `feature/export-report-and-dashboard-actions`
+2. ✅ **Dashboard inline actions** — Take/Skip/Snooze on Today's Schedule rows — already implemented, confirmed 2026-09-06
 
 ### P1 (Important for feature parity)
 3. **Settings timezone/grace/snooze** — Time zone selector, grace period, default snooze
