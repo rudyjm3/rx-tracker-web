@@ -49,7 +49,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         <div className="relative z-10 max-w-[440px]">
           <div className="flex items-center gap-3">
             <Image
-              src="/images/auth/logo-round.png"
+              src="/icons/icon-512.png"
               alt=""
               width={56}
               height={56}
@@ -120,7 +120,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         <div className="w-full max-w-[420px] rounded-card bg-brand-card p-7 shadow-card md:max-w-[520px] md:rounded-hero md:p-10">
           <div className="mb-7 flex flex-col items-center gap-3 md:hidden">
             <Image
-              src="/images/auth/logo-round.png"
+              src="/icons/icon-512.png"
               alt=""
               width={58}
               height={58}
