@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { KeyboardEvent, MouseEvent } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -95,9 +95,16 @@ type ModalKind =
 interface MedicationCardProps {
   medication: Medication;
   groupDoseOverrides?: GroupDoseOverride[];
+  dragHandle?: ReactNode;
+  isDragging?: boolean;
 }
 
-export function MedicationCard({ medication, groupDoseOverrides = [] }: MedicationCardProps) {
+export function MedicationCard({
+  medication,
+  groupDoseOverrides = [],
+  dragHandle,
+  isDragging,
+}: MedicationCardProps) {
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -132,7 +139,14 @@ export function MedicationCard({ medication, groupDoseOverrides = [] }: Medicati
   };
 
   return (
-    <div className="rounded-card border border-brand-border bg-brand-card p-4 shadow-card">
+    <div
+      className={cn(
+        "flex items-stretch gap-1 rounded-card border border-brand-border bg-brand-card p-4 shadow-card",
+        isDragging && "opacity-60",
+      )}
+    >
+      {dragHandle}
+      <div className="flex flex-1 flex-col">
       <div className="flex items-start justify-between gap-2">
         <button
           type="button"
@@ -279,6 +293,7 @@ export function MedicationCard({ medication, groupDoseOverrides = [] }: Medicati
           <DoseHistoryPanel medicationId={medication.id} />
         </div>
       )}
+      </div>
 
       <LogPastDoseModal
         open={openModal === "logDose"}
