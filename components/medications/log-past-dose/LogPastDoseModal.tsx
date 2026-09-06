@@ -173,7 +173,10 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent size="wide">
         <DialogHeader>
-          <DialogTitle>Log dose — {medication.name}</DialogTitle>
+          <DialogTitle>
+            Log dose — {medication.name}{" "}
+            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+          </DialogTitle>
         </DialogHeader>
 
         {!entryStep ? (

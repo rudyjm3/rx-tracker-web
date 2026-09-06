@@ -80,7 +80,10 @@ export function SideEffectModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Side effects — {medication.name}</DialogTitle>
+          <DialogTitle>
+            Side effects — {medication.name}{" "}
+            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="mb-4 flex flex-col gap-3">

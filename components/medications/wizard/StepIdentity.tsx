@@ -14,7 +14,7 @@ export function StepIdentity() {
     formState: { errors },
   } = useFormContext<MedicationFormValues>();
 
-  // Hidden by default per spec ("+ Add End Date" / "+ Add Notes"), but
+  // Hidden by default per spec ("+ Add End Date" / "+ Add Instructions / notes"), but
   // start pre-revealed when hydrating a value that's already set (edit
   // mode, or a draft resumed mid-fill) so existing data isn't hidden
   // behind a collapsed toggle.
@@ -108,7 +108,7 @@ export function StepIdentity() {
           onClick={() => setShowNotes(true)}
           className="self-start text-sm font-medium text-brand-deep-blue hover:underline"
         >
-          + Add Notes
+          + Add Instructions / notes
         </button>
       )}
     </div>

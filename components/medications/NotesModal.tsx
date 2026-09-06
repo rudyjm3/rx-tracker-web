@@ -116,9 +116,9 @@ export function NotesModal({ open, onOpenChange, medication }: NotesModalProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="wide" className="max-w-3xl p-0">
         <DialogHeader className="mb-0 border-b border-brand-border px-6 py-5">
-          <DialogTitle className="flex items-center gap-3 text-2xl">
-            <span>{medication.name}</span>
-            <span className="text-base font-bold text-brand-text-muted">{medication.dose}</span>
+          <DialogTitle>
+            {medication.name}{" "}
+            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
           </DialogTitle>
         </DialogHeader>
 

@@ -6,13 +6,11 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
-import { inputClass } from "@/components/ui/Field";
-import { cn } from "@/lib/cn";
+import { Field, inputClass } from "@/components/ui/Field";
 import { updatePrescribedDose } from "@/lib/medications";
 import type { Medication } from "@/lib/types/medications";
 
@@ -74,68 +72,61 @@ export function UpdatePrescribedDoseModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="wide" className="max-w-5xl p-0">
-        <DialogHeader className="mb-0 border-b border-brand-border px-6 py-5">
-          <DialogTitle className="text-2xl">Update Prescribed Dose</DialogTitle>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            Update prescribed dose — {medication.name}{" "}
+            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+          </DialogTitle>
+          <p className="text-sm text-brand-text-muted">
+            Current dose: {formatDoseAmount(medication.dose_amount)} {medication.dose_unit}
+          </p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-6 px-5 py-6">
-            <div>
-              <p className="font-bold text-brand-text">{medication.name}</p>
-              <p className="mt-2 text-brand-text-muted">
-                Current dose: {formatDoseAmount(medication.dose_amount)} {medication.dose_unit}
-              </p>
-            </div>
-
-            <label className="flex flex-col gap-2 text-sm font-bold text-brand-text-muted">
-              New dose amount
-              <div className="grid grid-cols-[1fr_8rem] gap-2">
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  required
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className={cn(inputClass, "h-12 bg-brand-blue/10 text-base font-bold text-brand-text")}
-                />
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className={cn(inputClass, "h-12 bg-brand-blue/10 text-base font-bold text-brand-text")}
-                >
-                  {doseUnits.map((doseUnit) => (
-                    <option key={doseUnit} value={doseUnit}>
-                      {doseUnit}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-bold text-brand-text-muted">
-              <span>
-                Reason <span className="font-normal">(optional)</span>
-              </span>
-              <textarea
-                rows={4}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Doctor increased dose at last visit"
-                className={cn(inputClass, "resize-none bg-brand-blue/10 text-base font-semibold")}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <Field label="New dose amount">
+            <div className="grid grid-cols-[1fr_8rem] gap-2">
+              <input
+                type="number"
+                step="any"
+                min="0"
+                required
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className={inputClass}
               />
-            </label>
-          </div>
+              <select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className={inputClass}
+              >
+                {doseUnits.map((doseUnit) => (
+                  <option key={doseUnit} value={doseUnit}>
+                    {doseUnit}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </Field>
 
-          <DialogFooter className="mt-0 border-t border-brand-border px-6 py-4">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          <Field label="Reason (optional)">
+            <textarea
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Doctor increased dose at last visit"
+              className={inputClass + " resize-none"}
+            />
+          </Field>
+
+          <div className="mt-2 flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="compact" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" size="compact" disabled={mutation.isPending}>
               {mutation.isPending ? "Saving…" : "Save dose change"}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
