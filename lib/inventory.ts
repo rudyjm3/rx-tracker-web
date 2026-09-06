@@ -15,6 +15,7 @@ export async function logRefill(
   amount: number,
   pillsOnHand: number | null,
   note = "",
+  refillDate?: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.rpc("log_refill", {
@@ -22,6 +23,7 @@ export async function logRefill(
     p_amount: amount,
     p_pills_on_hand: pillsOnHand,
     p_note: note,
+    p_refill_date: refillDate,
   });
   if (error) throw error;
 }

@@ -115,8 +115,10 @@ export function RefillHistoryModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="wide">
         <DialogHeader>
-          <DialogTitle>Refill History</DialogTitle>
-          <p className="text-sm font-semibold text-brand-text-muted">{medication.name}</p>
+          <DialogTitle>
+            Refill History — {medication.name}{" "}
+            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+          </DialogTitle>
         </DialogHeader>
 
         {historyQuery.isLoading ? (

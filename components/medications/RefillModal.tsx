@@ -6,13 +6,13 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
-import { Field, inputClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { Field, inputClass } from "@/components/ui/Field";
 import { logRefill, adjustQuantity } from "@/lib/inventory";
+import { localDateString } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 
 interface RefillModalProps {
@@ -20,6 +20,36 @@ interface RefillModalProps {
   onOpenChange: (open: boolean) => void;
   medication: Medication;
   mode: "refill" | "adjust";
+}
+
+function UnitInput({
+  value,
+  onChange,
+  placeholder,
+  unit,
+  required,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  unit: string;
+  required?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        step="any"
+        min="0"
+        required={required}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass + " flex-1"}
+      />
+      <span className="text-sm font-medium text-brand-text-muted">{unit}</span>
+    </div>
+  );
 }
 
 export function RefillModal({
@@ -30,18 +60,16 @@ export function RefillModal({
 }: RefillModalProps) {
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
-  const [pillsOnHand, setPillsOnHand] = useState("");
+  const [pillsOnHand, setPillsOnHand] = useState(
+    medication.current_quantity == null ? "" : String(medication.current_quantity),
+  );
+  const [refillDate, setRefillDate] = useState(localDateString());
   const [note, setNote] = useState("");
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (mode === "refill") {
-        await logRefill(
-          medication.id,
-          Number(amount) || 0,
-          pillsOnHand.trim() === "" ? null : Number(pillsOnHand),
-          note,
-        );
+        await logRefill(medication.id, Number(amount) || 0, null, note, refillDate);
       } else {
         await adjustQuantity(medication.id, Number(pillsOnHand) || 0, note);
       }
@@ -51,7 +79,8 @@ export function RefillModal({
       queryClient.invalidateQueries({ queryKey: ["medications"] });
       queryClient.invalidateQueries({ queryKey: ["refill-history", medication.id] });
       setAmount("");
-      setPillsOnHand("");
+      setPillsOnHand(medication.current_quantity == null ? "" : String(medication.current_quantity));
+      setRefillDate(localDateString());
       setNote("");
       onOpenChange(false);
     },
@@ -67,14 +96,6 @@ export function RefillModal({
       toast.error("Amount added must be zero or greater");
       return;
     }
-    const pillsOnHandEntered = pillsOnHand.trim() !== "";
-    if (mode === "refill" && pillsOnHandEntered) {
-      const pillsOnHandValue = Number(pillsOnHand);
-      if (!Number.isFinite(pillsOnHandValue) || pillsOnHandValue < 0) {
-        toast.error("New total on hand must be zero or greater");
-        return;
-      }
-    }
     if (mode === "adjust") {
       const pillsOnHandValue = Number(pillsOnHand);
       if (!Number.isFinite(pillsOnHandValue) || pillsOnHandValue < 0) {
@@ -85,63 +106,83 @@ export function RefillModal({
     mutation.mutate();
   }
 
+  const title = mode === "refill" ? "Log refill" : "Adjust quantity";
+  const actionLabel = mode === "refill" ? "Log refill" : "Save adjustment";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {mode === "refill" ? "Log refill" : "Adjust quantity"} — {medication.name}
+            {title} — {medication.name}{" "}
+            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
           </DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {mode === "refill" && (
-            <Field label={`Amount added (${medication.inventory_unit})`}>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                required
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
+          {mode === "refill" ? (
+            <>
+              <Field label="Refill date">
+                <input
+                  type="date"
+                  required
+                  value={refillDate}
+                  onChange={(e) => setRefillDate(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label={`Amount added (${medication.inventory_unit})`}>
+                <UnitInput
+                  value={amount}
+                  onChange={setAmount}
+                  placeholder="e.g. 30"
+                  unit={medication.inventory_unit}
+                  required
+                />
+              </Field>
+              <Field label="Note (optional)">
+                <input
+                  type="text"
+                  value={note}
+                  placeholder="e.g. 30-day supply"
+                  onChange={(e) => setNote(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-brand-text-muted">
+                Current count: {medication.current_quantity ?? 0} {medication.inventory_unit}
+              </p>
+              <Field label={`Correct current quantity (${medication.inventory_unit})`}>
+                <UnitInput
+                  value={pillsOnHand}
+                  onChange={setPillsOnHand}
+                  unit={medication.inventory_unit}
+                  required
+                />
+              </Field>
+              <Field label="Reason (optional)">
+                <input
+                  type="text"
+                  value={note}
+                  placeholder="e.g. recount, dropped a pill"
+                  onChange={(e) => setNote(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            </>
           )}
-          <Field
-            label={
-              mode === "refill"
-                ? `New total on hand (${medication.inventory_unit}) — optional`
-                : `Correct current quantity (${medication.inventory_unit})`
-            }
-          >
-            <input
-              type="number"
-              step="any"
-              min="0"
-              required={mode === "adjust"}
-              placeholder={
-                mode === "refill"
-                  ? `Leave blank to add to current (${medication.current_quantity ?? 0})`
-                  : undefined
-              }
-              value={pillsOnHand}
-              onChange={(e) => setPillsOnHand(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Note (optional)">
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <DialogFooter>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving…" : "Save"}
+
+          <div className="mt-2 flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="compact" onClick={() => onOpenChange(false)}>
+              Cancel
             </Button>
-          </DialogFooter>
+            <Button type="submit" size="compact" disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving…" : actionLabel}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
