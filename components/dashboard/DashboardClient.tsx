@@ -414,7 +414,10 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
         </div>
 
         <div className="flex flex-col gap-6">
-          <QuickActionsPanel />
+          <QuickActionsPanel
+            medications={medicationsQuery.data ?? []}
+            activeProfileId={activeProfileId}
+          />
           <MedsOverviewPanel
             activeCount={medicationsQuery.data?.length ?? 0}
             todaysDosesCount={todaysDosesCount}

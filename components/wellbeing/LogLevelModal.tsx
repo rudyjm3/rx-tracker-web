@@ -29,6 +29,9 @@ interface LogLevelModalProps {
   medications: Medication[];
   onSubmit: (input: LogLevelSubmitInput) => void;
   renderTagPicker?: (selected: string[], onChange: (tags: string[]) => void) => ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: ReactNode;
 }
 
 function nowTime(): string {
@@ -43,8 +46,12 @@ export function LogLevelModal({
   medications,
   onSubmit,
   renderTagPicker,
+  open,
+  onOpenChange,
+  trigger,
 }: LogLevelModalProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const actualOpen = open ?? internalOpen;
   const [level, setLevel] = useState<number | null>(null);
   const [medicationId, setMedicationId] = useState<string>(INDEPENDENT);
   const [date, setDate] = useState(localDateString);
@@ -63,6 +70,12 @@ export function LogLevelModal({
     setShowComment(false);
   }
 
+  function handleModalOpenChange(nextOpen: boolean) {
+    setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+    if (!nextOpen) reset();
+  }
+
   function handleSubmit() {
     if (level === null) return;
     onSubmit({
@@ -73,7 +86,7 @@ export function LogLevelModal({
       tags,
     });
     reset();
-    setOpen(false);
+    handleModalOpenChange(false);
   }
 
   const metricLabel = metric === "pain" ? "Pain" : "Mood";
@@ -81,27 +94,25 @@ export function LogLevelModal({
     metric === "pain" ? "(1 = minimal — 10 = severe)" : "(1 = very low — 10 = excellent)";
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) reset();
-      }}
-    >
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="w-full rounded-card border border-brand-border bg-brand-card p-4 text-left shadow-card"
-        >
-          <p className="text-sm text-brand-text-muted">
-            Use this to record a {metric} level any time you want to log how you&apos;re feeling,
-            separate from a scheduled dose.
-          </p>
-          <span className="mt-2 inline-block rounded-control bg-gradient-brand px-4 py-2 text-sm font-semibold text-white">
-            Log {metric} level now
-          </span>
-        </button>
-      </DialogTrigger>
+    <Dialog open={actualOpen} onOpenChange={handleModalOpenChange}>
+      {trigger !== null && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <button
+              type="button"
+              className="w-full rounded-card border border-brand-border bg-brand-card p-4 text-left shadow-card"
+            >
+              <p className="text-sm text-brand-text-muted">
+                Use this to record a {metric} level any time you want to log how you&apos;re feeling,
+                separate from a scheduled dose.
+              </p>
+              <span className="mt-2 inline-block rounded-control bg-gradient-brand px-4 py-2 text-sm font-semibold text-white">
+                Log {metric} level now
+              </span>
+            </button>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent>
         <DialogHeader>
@@ -179,7 +190,7 @@ export function LogLevelModal({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+          <Button type="button" variant="ghost" onClick={() => handleModalOpenChange(false)}>
             Cancel
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={level === null}>
