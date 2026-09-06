@@ -87,90 +87,28 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 
 ---
 
-### 3. Settings — Timezone & Schedule Configuration
-**Live:**
-- **Time zone selector** dropdown
-- **"Use device timezone"** toggle
-- **Missed-dose grace period** setting (minutes)
-- **Default snooze duration** setting (minutes)
-
-**Rebuild:**
-- Alarm/vibration/test alarm settings present
-- Missing timezone selector
-- Missing grace period setting
-- Missing default snooze duration
-
-**Priority:** MEDIUM — Important for users traveling or wanting custom tolerances
+### 3. Settings — Timezone & Schedule Configuration ✅ RESOLVED
+**Status (2026-09-06):** Grace period and default snooze duration were already fully implemented (`GeneralSettingsPanel` in `components/settings/SettingsClient.tsx`, backed by `lib/app-settings.ts`) — the original audit missed them. Added the missing **timezone selector** + **"Use device timezone"** toggle on `feature/export-report-and-dashboard-actions`, stored via `app_settings` the same way. Verified live: toggle/select render, save persists across reload, zero console errors. (Stored as a preference, not wired into date math — the rebuild is client-rendered and already correctly follows the browser's local time; see commit for rationale.)
 
 ---
 
-### 4. Edit Medication — Full Form
-**Live:**
-- Modal with all fields:
-  - Name, Medication type, Start date
-  - Dose amount/unit/form
-  - Schedule type (Fixed times / As needed)
-  - Dose times (with "+ Add time")
-  - As needed (PRN) toggle
-  - Track dose feedback dropdown
-  - **▼ Inventory tracking** (collapsible):
-    - Starting quantity
-    - Dose reduces inventory by
-    - Low supply alert at
-  - **Instructions and Notes** (text area)
-  - **Medication group** (optional dropdown)
-  - **Save changes** button
-
-**Rebuild:**
-- ⚠️ **Edit flow not audited** — Need to verify if rebuild has full edit modal matching live
-- Known: Add Medication wizard is present; Edit should mirror
-
-**Priority:** MEDIUM — Verify and document edit flow in rebuild
+### 4. Edit Medication — Full Form ✅ RESOLVED
+**Status (2026-09-06):** Verified — edit reuses the same 4-step wizard as Add Medication (`app/medications/[id]/edit/page.tsx` → `WizardShell mode="edit"`), and has every live-site field: name, medication type, start date, dose amount/unit/form, schedule type + dose times + "+ Add time", PRN toggle, track-dose-feedback dropdown, inventory section (starting quantity, dose-reduces-inventory-by, low-supply-threshold), instructions, medication group dropdown, and a "Save changes" button on submit. Also has several fields beyond the live site (DailyMed autocomplete, end date, per-time quantity override, interval scheduling, dashboard/reminder/adherence toggles). The one nuance: "Notes" is not a field inside this form — it's a separate always-available feature (see #6 below), matching the live site's actual behavior (Instructions lives on the medication record; Notes are separate timestamped entries).
 
 ---
 
-### 5. Three-Dot Menu Actions
-**Live medication card menu:**
-- ✅ Edit
-- ✅ Log past dose
-- ❓ Log refill (modal exists but not fully tested)
-- ❓ Update prescribed dose (menu item present)
-- ✅ Refill history (working — shows monthly refill log with +/- pills and quantity after)
-- ❓ Adjust quantity (menu item present)
-- ❓ Discontinue Use (menu item present)
-
-**Rebuild:**
-- ⚠️ **Three-dot menu not audited** — Need to verify which actions exist
-- Known: Cards have chevron expand and some action buttons visible
-
-**Priority:** MEDIUM — Document which quick actions are missing
+### 5. Three-Dot Menu Actions ✅ RESOLVED
+**Status (2026-09-06):** Verified live in browser — every menu item on `MedicationCard.tsx` opens its modal correctly with zero console errors: Edit, Log Dose, Log Refill, Update prescribed dose, Refill History, Adjust Quantity, Notes/Instructions, Side Effects, Discontinue Use. The original audit's uncertainty was due to browser/modal timing during that session, not missing functionality.
 
 ---
 
-### 6. Notes / Instructions
-**Live:**
-- "View instructions / Notes" link on medication cards
-- Opens modal showing:
-  - **Instructions (from medication record):** [text]
-  - **+ Add new note** link
-- Simple, effective notes feature
-
-**Rebuild:**
-- ⚠️ **Notes feature not audited** — Need to check if notes exist
-
-**Priority:** MEDIUM
+### 6. Notes / Instructions ✅ RESOLVED
+**Status (2026-09-06):** Already implemented — `components/medications/NotesModal.tsx`, backed by the `medication_notes` table (`lib/notes.ts`), wired into `MedicationCard.tsx`'s "Notes/Instructions" menu item. Verified it opens live with no errors.
 
 ---
 
-### 7. Side Effect Logging
-**Live:**
-- "Log side effect" button on medication cards
-- (Modal did not open during test — may be timing issue or requires specific setup)
-
-**Rebuild:**
-- ⚠️ **Side effect logging not audited** — Need to verify
-
-**Priority:** MEDIUM
+### 7. Side Effect Logging ✅ RESOLVED
+**Status (2026-09-06):** Already implemented — "Side Effects" menu item on `MedicationCard.tsx` opens its modal correctly (verified live, no errors). The original audit's "modal did not open" note was a testing artifact, not a real gap.
 
 ---
 
@@ -224,17 +162,17 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 2. ✅ **Dashboard inline actions** — Take/Skip/Snooze on Today's Schedule rows — already implemented, confirmed 2026-09-06
 
 ### P1 (Important for feature parity)
-3. **Settings timezone/grace/snooze** — Time zone selector, grace period, default snooze
-4. **Edit Medication flow** — Verify full edit modal exists and matches live
+3. ✅ **Settings timezone/grace/snooze** — DONE on `feature/export-report-and-dashboard-actions` (grace/snooze already existed; timezone added)
+4. ✅ **Edit Medication flow** — Verified complete, matches/exceeds live, confirmed 2026-09-06
 
 ### P2 (Nice to have)
-5. **Three-dot menu actions** — Log refill, Update prescribed dose, Adjust quantity, Discontinue
-6. **Notes feature** — Instructions and notes modal
-7. **Calendar legend** — Color key for Taken/Skipped/Missed
-8. **Profile photo upload** — Upload and display user photo
+5. ✅ **Three-dot menu actions** — All verified working live, confirmed 2026-09-06
+6. ✅ **Notes feature** — Already implemented, confirmed 2026-09-06
+7. **Calendar legend** — Color key for Taken/Skipped/Missed — still open
+8. **Profile photo upload** — Upload and display user photo — still open
 
 ### P3 (Low priority)
-9. **Side effect logging** — If not already present
+9. ✅ **Side effect logging** — Already implemented, confirmed 2026-09-06
 
 ---
 
@@ -253,17 +191,11 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 
 ## 🔍 REMAINING AUDIT ITEMS (Not fully tested)
 
-Due to browser/modal timing issues and architectural differences, the following were **not fully audited**:
+Items 1-6 below were resolved and verified live on 2026-09-06 (see sections 2-7 above) — the original "not fully audited" status was a testing artifact (browser/modal timing during that session), not a real gap. Still genuinely open:
 
-1. **Edit Medication flow in rebuild** — Need full walkthrough
-2. **Log refill modal fields** — Modal exists in DOM but didn't visibly open
-3. **Update prescribed dose** — Menu item exists but not tested
-4. **Adjust quantity** — Menu item exists but not tested
-5. **Discontinue Use / Resume Use** — Menu items exist but not tested
-6. **Log side effect modal** — Button exists but modal didn't open during test
 7. **Notifications bell icon** — Clicked but no notifications present (may require active reminders)
 8. **Dose history / Log page** — No dedicated history page found in main nav; may be accessed via calendar or other entry point
-9. **Onboarding / first-time user flow** — Not tested (existing account used)
+9. **Onboarding / first-time user flow** — Not tested (existing account used) — note a `feature/onboarding-wizard` branch already exists, check its status before assuming this is unbuilt
 10. **Connie Zimmerman full page-by-page audit on live** — Only confirmed profile switch banner; did not go through every page as Connie
 
 ---
