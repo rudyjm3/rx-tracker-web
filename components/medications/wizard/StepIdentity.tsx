@@ -37,20 +37,33 @@ export function StepIdentity() {
           />
         </Field>
         <Field label="Unit">
-          <input
-            type="text"
-            placeholder="mg"
-            className={inputClass}
-            {...register("doseUnit")}
-          />
+          <select className={inputClass} {...register("doseUnit")}>
+            <option value="mg">mg</option>
+            <option value="mcg">mcg</option>
+            <option value="g">g</option>
+            <option value="mL">mL</option>
+            <option value="tsp">tsp</option>
+            <option value="tbsp">tbsp</option>
+            <option value="oz">oz</option>
+            <option value="IU">IU</option>
+            <option value="units">units</option>
+            <option value="drops">drops</option>
+            <option value="puffs">puffs</option>
+            <option value="patches">patches</option>
+          </select>
         </Field>
         <Field label="Form">
-          <input
-            type="text"
-            placeholder="tablet"
-            className={inputClass}
-            {...register("doseForm")}
-          />
+          <select className={inputClass} {...register("doseForm")}>
+            <option value="">-- select --</option>
+            <option value="tablet">Tablet</option>
+            <option value="capsule">Capsule</option>
+            <option value="liquid">Liquid</option>
+            <option value="inhaler">Inhaler</option>
+            <option value="injection">Injection</option>
+            <option value="patch">Patch</option>
+            <option value="drops">Drops</option>
+            <option value="other">Other</option>
+          </select>
         </Field>
       </div>
 

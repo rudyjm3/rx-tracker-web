@@ -25,7 +25,12 @@ export async function getDrafts<T = unknown>(
   profileId?: string | null,
 ): Promise<ParsedDraft<T>[]> {
   const supabase = createClient();
-  let query = supabase.from("medication_drafts").select("*");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  let query = supabase.from("medication_drafts").select("*").eq("user_id", user.id);
   query = profileId == null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
   const { data, error } = await query.order("updated_at", { ascending: false });
   if (error) throw error;
@@ -36,10 +41,16 @@ export async function getDraft<T = unknown>(
   id: string,
 ): Promise<ParsedDraft<T> | null> {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
   const { data, error } = await supabase
     .from("medication_drafts")
     .select("*")
     .eq("id", id)
+    .eq("user_id", user.id)
     .maybeSingle();
   if (error) throw error;
   return data ? parseDraft<T>(data as MedicationDraft) : null;
@@ -61,10 +72,16 @@ export async function saveDraft<T>(args: {
   };
 
   if (args.id) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not signed in");
+
     const { error } = await supabase
       .from("medication_drafts")
       .update(payload)
-      .eq("id", args.id);
+      .eq("id", args.id)
+      .eq("user_id", user.id);
     if (error) throw error;
     return args.id;
   }
@@ -85,9 +102,15 @@ export async function saveDraft<T>(args: {
 
 export async function deleteDraft(id: string): Promise<void> {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
   const { error } = await supabase
     .from("medication_drafts")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (error) throw error;
 }

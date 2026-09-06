@@ -50,13 +50,14 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   const { activeProfileId } = useActiveProfile();
   const [step, setStep] = useState(1);
   const [furthestStep, setFurthestStep] = useState(1);
-  const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(draftId);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const hasHydrated = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentDraftIdRef = useRef<string | undefined>(draftId);
+  const draftCreatePromiseRef = useRef<Promise<string> | null>(null);
 
   const form = useForm<MedicationFormValues>({
     resolver: zodResolver(medicationFormSchema),
@@ -113,14 +114,34 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   }, [mode, editQuery.data, draftQuery.data, groupMembersQuery.data, medicationId, form]);
 
   async function doSaveDraft(stepToSave: number): Promise<void> {
-    const id = await saveDraft({
-      id: currentDraftId,
+    const existingDraftId = currentDraftIdRef.current;
+
+    if (!existingDraftId && draftCreatePromiseRef.current) {
+      const id = await draftCreatePromiseRef.current;
+      currentDraftIdRef.current = id;
+    }
+
+    const draftIdToSave = currentDraftIdRef.current;
+    const savePromise = saveDraft({
+      id: draftIdToSave,
       formData: form.getValues(),
       currentStep: stepToSave,
       furthestStep: Math.max(furthestStep, stepToSave),
       profileId: activeProfileId,
     });
-    setCurrentDraftId((prev) => prev ?? id);
+
+    if (!draftIdToSave) {
+      draftCreatePromiseRef.current = savePromise;
+    }
+
+    try {
+      const id = await savePromise;
+      currentDraftIdRef.current = id;
+    } finally {
+      if (!draftIdToSave) {
+        draftCreatePromiseRef.current = null;
+      }
+    }
   }
 
   async function persistDraft(explicitStep?: number) {
@@ -149,8 +170,8 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   async function handleDiscard() {
     setDiscarding(true);
     try {
-      if (mode === "create" && currentDraftId) {
-        await deleteDraft(currentDraftId);
+      if (mode === "create" && currentDraftIdRef.current) {
+        await deleteDraft(currentDraftIdRef.current);
       }
       router.push("/medications");
     } catch (err) {
@@ -201,7 +222,7 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
           scheduleTimes,
         );
         await setMedicationGroup(created.id, values.groupId || null);
-        if (currentDraftId) await deleteDraft(currentDraftId);
+        if (currentDraftIdRef.current) await deleteDraft(currentDraftIdRef.current);
         toast.success("Medication added");
       } else {
         // Preserve the medication's existing profile assignment —
