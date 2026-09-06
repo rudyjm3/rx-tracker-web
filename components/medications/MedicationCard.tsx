@@ -123,6 +123,8 @@ export function MedicationCard({ medication }: { medication: Medication }) {
           className="flex-1 text-left"
         >
           <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-brand-navy">{medication.name}</h3>
+            <MedTypeBadge type={medication.medication_type} />
             <span
               role="button"
               tabIndex={0}
@@ -135,8 +137,6 @@ export function MedicationCard({ medication }: { medication: Medication }) {
             >
               <i className="fa-solid fa-circle-info" aria-hidden="true" />
             </span>
-            <h3 className="font-semibold text-brand-navy">{medication.name}</h3>
-            <MedTypeBadge type={medication.medication_type} />
             {isLowSupply && (
               <span className="rounded-full bg-status-warning/10 px-2 py-0.5 text-xs font-medium text-status-warning">
                 Low supply
