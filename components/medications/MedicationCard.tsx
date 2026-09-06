@@ -113,7 +113,7 @@ export function MedicationCard({ medication }: { medication: Medication }) {
         <button
           type="button"
           onClick={() => setOpenModal("details")}
-          className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-brand-text-muted hover:bg-brand-bg hover:text-brand-deep-blue"
+          className="ml-5 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-brand-text-muted hover:bg-brand-bg hover:text-brand-deep-blue"
           aria-label={`View ${medication.name} details`}
         >
           <i className="fa-solid fa-circle-info" aria-hidden="true" />
