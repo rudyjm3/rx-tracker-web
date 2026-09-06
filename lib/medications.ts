@@ -93,6 +93,24 @@ export async function getInactiveMedications(
   return data as Medication[];
 }
 
+/**
+ * Persists a new card order after a drag-and-drop reorder. Takes the
+ * medication ids in their new top-to-bottom order and writes sequential
+ * sort_order values — the same column getActiveMedications() already
+ * orders by, so no other read path needs to change.
+ */
+export async function reorderMedications(orderedIds: string[]): Promise<void> {
+  const supabase = createClient();
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from("medications").update({ sort_order: index }).eq("id", id),
+    ),
+  ).then((results) => {
+    const failed = results.find((r) => r.error);
+    if (failed?.error) throw failed.error;
+  });
+}
+
 export async function getMedication(id: string): Promise<Medication> {
   const supabase = createClient();
   const { data, error } = await supabase
