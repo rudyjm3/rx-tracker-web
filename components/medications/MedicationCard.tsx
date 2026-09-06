@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -106,18 +107,15 @@ export function MedicationCard({ medication }: { medication: Medication }) {
       ? "bg-status-warning"
       : "bg-status-success";
   const runoutText = runoutSummary(medication);
+  const openDetails = (event: MouseEvent | KeyboardEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setOpenModal("details");
+  };
 
   return (
     <div className="rounded-card border border-brand-border bg-brand-card p-4 shadow-card">
-      <div className="flex items-start justify-between gap-2 pl-5">
-        <button
-          type="button"
-          onClick={() => setOpenModal("details")}
-          className="mt-[2px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-brand-text-muted hover:bg-brand-bg hover:text-brand-deep-blue"
-          aria-label={`View ${medication.name} details`}
-        >
-          <i className="fa-solid fa-circle-info" aria-hidden="true" />
-        </button>
+      <div className="flex items-start justify-between gap-2">
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
@@ -125,6 +123,18 @@ export function MedicationCard({ medication }: { medication: Medication }) {
           className="flex-1 text-left"
         >
           <div className="flex items-center gap-2">
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={openDetails}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") openDetails(event);
+              }}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-brand-text-muted hover:bg-brand-bg hover:text-brand-deep-blue"
+              aria-label={`View ${medication.name} details`}
+            >
+              <i className="fa-solid fa-circle-info" aria-hidden="true" />
+            </span>
             <h3 className="font-semibold text-brand-navy">{medication.name}</h3>
             <MedTypeBadge type={medication.medication_type} />
             {isLowSupply && (
