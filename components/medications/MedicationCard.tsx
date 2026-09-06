@@ -273,18 +273,22 @@ export function MedicationCard({ medication, groupDoseOverrides = [] }: Medicati
         onOpenChange={(open) => setOpenModal(open ? "details" : null)}
         medication={medication}
       />
-      <RefillModal
-        open={openModal === "refill"}
-        onOpenChange={(open) => setOpenModal(open ? "refill" : null)}
-        medication={medication}
-        mode="refill"
-      />
-      <RefillModal
-        open={openModal === "adjust"}
-        onOpenChange={(open) => setOpenModal(open ? "adjust" : null)}
-        medication={medication}
-        mode="adjust"
-      />
+      {openModal === "refill" && (
+        <RefillModal
+          open
+          onOpenChange={(open) => setOpenModal(open ? "refill" : null)}
+          medication={medication}
+          mode="refill"
+        />
+      )}
+      {openModal === "adjust" && (
+        <RefillModal
+          open
+          onOpenChange={(open) => setOpenModal(open ? "adjust" : null)}
+          medication={medication}
+          mode="adjust"
+        />
+      )}
       <RefillHistoryModal
         open={openModal === "refillHistory"}
         onOpenChange={(open) => setOpenModal(open ? "refillHistory" : null)}
