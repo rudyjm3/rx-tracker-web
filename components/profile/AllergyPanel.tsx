@@ -124,6 +124,11 @@ export function AllergyPanel({ profileId }: AllergyPanelProps) {
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
           {editing !== null && (
+            <DialogHeader>
+              <DialogTitle>{editing === "new" ? "Add allergy" : "Edit allergy"}</DialogTitle>
+            </DialogHeader>
+          )}
+          {editing !== null && (
             <AllergyForm
               key={editing === "new" ? "new" : editing.id}
               profileId={profileId}
@@ -190,10 +195,6 @@ function AllergyForm({ profileId, existing, catalog, onSaved, onCancel }: Allerg
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>{existing ? "Edit allergy" : "Add allergy"}</DialogTitle>
-      </DialogHeader>
-
       <div className="flex flex-col gap-4">
         <Field label="Allergy">
           <select

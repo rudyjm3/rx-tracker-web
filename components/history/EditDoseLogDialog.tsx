@@ -51,6 +51,12 @@ export function EditDoseLogDialog({
     <Dialog open={log !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         {log && medication && (
+          <DialogHeader>
+            <DialogTitle>Edit dose entry</DialogTitle>
+            <p className="text-sm text-brand-text-muted">{medication.name}</p>
+          </DialogHeader>
+        )}
+        {log && medication && (
           <EditDoseLogForm
             key={log.id}
             log={log}
@@ -159,11 +165,6 @@ function EditDoseLogForm({ log, medication, onSaved, onDeleted, onCancel }: Edit
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Edit dose entry</DialogTitle>
-        <p className="text-sm text-brand-text-muted">{medication.name}</p>
-      </DialogHeader>
-
       <div className="flex flex-col gap-4">
         <Field label="Status">
           <select
@@ -196,12 +197,14 @@ function EditDoseLogForm({ log, medication, onSaved, onDeleted, onCancel }: Edit
             onChange={setPainLevel}
             label="Pain level"
             hint="(1 = minimal — 10 = severe)"
+            metric="pain"
           />
         )}
         {status === "taken" && trackMood && (
           <LevelGrid
             value={moodLevel}
             onChange={setMoodLevel}
+            metric="mood"
             label="Mood level"
             hint="(1 = very low — 10 = excellent)"
           />

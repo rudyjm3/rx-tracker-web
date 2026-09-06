@@ -92,6 +92,7 @@ export function FeedbackDialog({
               onChange={setPainLevel}
               label="Pain level"
               hint="(1 = minimal — 10 = severe)"
+              metric="pain"
             />
           )}
           {trackMood && (
@@ -100,6 +101,7 @@ export function FeedbackDialog({
               onChange={setMoodLevel}
               label="Mood level"
               hint="(1 = very low — 10 = excellent)"
+              metric="mood"
             />
           )}
           <label className="flex flex-col gap-1 text-sm text-brand-text">

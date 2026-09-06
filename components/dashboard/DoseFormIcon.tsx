@@ -1,42 +1,43 @@
-import { Droplet, FlaskConical, Pill, Syringe, Wind } from "lucide-react";
+import Image from "next/image";
 
-// Stand-in for the brand's illustrated dose-form graphics (med-pill.png,
-// med-capsule.png, etc. from the original app's asset set), which aren't
-// available in this repo. Swap for the real illustrations once copied in.
+// Same illustrated dose-form graphics as the original app's asset set
+// (assets/images/med-*.png), copied into public/images/dose-forms.
+const DOSE_FORM_IMAGE_MAP: Record<string, string> = {
+  tablet: "med-pill.png",
+  capsule: "med-capsule.png",
+  liquid: "med-bottle.png",
+  inhaler: "med-inhaler.png",
+  injection: "med-injection.png",
+  patch: "med-patch.png",
+  drops: "med-drop.png",
+};
+
 export function DoseFormIcon({
   doseForm,
-  size = 44,
+  size = 84,
 }: {
   doseForm: string | null | undefined;
   size?: number;
 }) {
-  const iconProps = { size: size * 0.55, className: "text-brand-deep-blue" };
-  let Icon = Pill;
-  switch (doseForm) {
-    case "liquid":
-      Icon = FlaskConical;
-      break;
-    case "inhaler":
-      Icon = Wind;
-      break;
-    case "injection":
-      Icon = Syringe;
-      break;
-    case "drops":
-      Icon = Droplet;
-      break;
-    case "patch":
-    case "capsule":
-    case "tablet":
-    default:
-      Icon = Pill;
-  }
+  const image = DOSE_FORM_IMAGE_MAP[doseForm ?? ""] ?? "med-pill.png";
   return (
     <div
-      className="flex shrink-0 items-center justify-center rounded-full bg-white shadow-card"
-      style={{ width: size, height: size }}
+      className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full"
+      style={{
+        width: size,
+        height: size,
+        background: "rgba(255, 255, 255, 0.12)",
+        border: "3px solid rgba(255, 255, 255, 0.30)",
+        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.22)",
+      }}
     >
-      <Icon {...iconProps} />
+      <Image
+        src={`/images/dose-forms/${image}`}
+        alt=""
+        fill
+        className="object-cover"
+        sizes={`${size}px`}
+      />
     </div>
   );
 }

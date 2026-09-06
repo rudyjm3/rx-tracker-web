@@ -54,9 +54,15 @@ export function EditLevelLogDialog({
   onSaved,
   onDeleted,
 }: EditLevelLogDialogProps) {
+  const metricLabel = metric === "pain" ? "Pain" : "Mood";
   return (
     <Dialog open={log !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
+        {log && (
+          <DialogHeader>
+            <DialogTitle>Edit {metricLabel.toLowerCase()} log</DialogTitle>
+          </DialogHeader>
+        )}
         {log && (
           <EditLevelLogForm
             key={log.id}
@@ -142,10 +148,6 @@ function EditLevelLogForm({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Edit {metricLabel.toLowerCase()} log</DialogTitle>
-      </DialogHeader>
-
       <div className="flex flex-col gap-4">
         {medications.length > 0 && (
           <Field label="Link to a medication (optional)">
@@ -164,7 +166,13 @@ function EditLevelLogForm({
           </Field>
         )}
 
-        <LevelGrid value={level} onChange={setLevel} label={`${metricLabel} level`} hint={hint} />
+        <LevelGrid
+          value={level}
+          onChange={setLevel}
+          label={`${metricLabel} level`}
+          hint={hint}
+          metric={metric}
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Date">

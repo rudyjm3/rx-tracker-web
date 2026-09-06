@@ -115,14 +115,14 @@ export function NotesModal({ open, onOpenChange, medication }: NotesModalProps) 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="wide" className="max-w-3xl p-0">
-        <DialogHeader className="mb-0 border-b border-brand-border px-6 py-5">
+        <DialogHeader className="-mx-6 -mt-6 mb-0 border-b border-brand-border px-6 pb-3 pt-6">
           <DialogTitle>
             {medication.name}{" "}
             <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto px-6 py-5">
+        <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
           {instructions && (
             <section>
               <p className="mb-1 text-sm text-brand-text-muted">

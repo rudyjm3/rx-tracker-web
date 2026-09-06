@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/medications";
+import { getSetting, setSetting } from "@/lib/app-settings";
 import type { MoodChartScheme } from "@/lib/app-settings";
 import type {
   DoseLog,
@@ -150,7 +151,45 @@ export async function deleteStandaloneLog(id: string): Promise<void> {
 
 // ── Mood tags ────────────────────────────────────────────────────────
 
+const MOOD_TAGS_SEEDED_KEY = "mood_tags_seeded";
+
+// Same predefined tag set as the original PHP app's SchemaInstaller
+// (mirrors mood-tags-seeded one-time seeding, gated by an app_settings
+// flag so re-fetching never re-adds tags a user has since deleted).
+const PREDEFINED_MOOD_TAGS = [
+  "Annoyed", "Anxious", "Bored", "Calm", "Excited", "Grateful",
+  "Happy", "In Love", "Indifferent", "Lonely", "Productive", "Sad",
+  "Stressed", "Tired", "Angry", "Scared",
+];
+
+async function seedMoodTagsIfNeeded(): Promise<void> {
+  const seeded = await getSetting(MOOD_TAGS_SEEDED_KEY);
+  if (seeded) return;
+
+  const supabase = createClient();
+  const userId = await getCurrentUserId();
+  const results = await Promise.all(
+    PREDEFINED_MOOD_TAGS.map((name, i) =>
+      supabase
+        .from("mood_tags")
+        .insert({ user_id: userId, name, always_show: true, sort_order: i }),
+    ),
+  );
+  // Supabase resolves (rather than rejects) with an `error` on failure, so a
+  // failed insert wouldn't otherwise surface here. Unique-constraint
+  // collisions (code 23505 — the tag already exists for this user, e.g. a
+  // retry after a partial seed) are expected and fine to ignore; any other
+  // error means the tag list may be incomplete, so don't mark it seeded and
+  // let the next call retry.
+  const hasUnexpectedError = results.some(
+    ({ error }) => error && error.code !== "23505",
+  );
+  if (hasUnexpectedError) return;
+  await setSetting(MOOD_TAGS_SEEDED_KEY, "1");
+}
+
 export async function getMoodTags(): Promise<MoodTag[]> {
+  await seedMoodTagsIfNeeded();
   const supabase = createClient();
   const { data, error } = await supabase
     .from("mood_tags")

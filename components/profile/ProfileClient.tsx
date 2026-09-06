@@ -120,6 +120,9 @@ export function ProfileClient() {
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+          </DialogHeader>
           <EditProfileForm
             profile={profile}
             email={email}
@@ -222,10 +225,6 @@ function EditProfileForm({ profile, email, onSaved, onCancel }: EditProfileFormP
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Edit Profile</DialogTitle>
-      </DialogHeader>
-
       <div className="flex flex-col gap-4">
         <AvatarPicker
           currentUrl={profile?.profile_picture ?? null}
