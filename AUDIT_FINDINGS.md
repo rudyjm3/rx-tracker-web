@@ -32,7 +32,7 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 
 ### Calendar
 - ✅ **Month view calendar** — Both have grid with day summaries (T/S/M indicators)
-- ⚠️ **Legend** — Live has Taken/Skipped/Missed color legend; rebuild missing (minor gap)
+- ✅ **Legend** — `components/calendar/MonthGrid.tsx` already renders a Taken/Skipped/Missed color-key legend below the grid, using the same status-success/warning/danger colors as the Badge component. Confirmed live 2026-09-06. (Original audit finding was stale.)
 
 ### Pain Tracking
 - ✅ **Pain level logging** — Both support tracking
@@ -51,7 +51,7 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 - ✅ **Active sessions** — Both show logged-in devices
 - ✅ **Data & Privacy** — Both have privacy controls
 - ✅ **Delete Account** — Both have account deletion flow
-- ⚠️ **Profile photo upload** — Live has; rebuild missing (minor gap)
+- ✅ **Profile photo upload** — Already fully implemented: `AvatarPicker` in the Edit Profile dialog ("Choose File"), backed by Supabase Storage (`avatars` bucket, `lib/user-profile.ts`'s `uploadAvatar`/`deleteAvatarIfManaged`), `profile_picture` field on both `UserProfile` and `FamilyProfile`. Confirmed live 2026-09-06. (Original audit finding was stale — likely the test profile's own photo just hadn't been set.)
 
 ### Family Management
 - ✅ **Family profiles under one account** — Both support family member switching
@@ -132,14 +132,7 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 
 ## 🟡 MINOR GAPS
 
-### Calendar Legend
-- Live has Taken/Skipped/Missed color legend and disclaimer footer
-- Rebuild calendar lacks legend
-
-### Profile Photo
-- Live has photo upload and display
-- Rebuild profile shows "—" for display name (likely test data)
-- No photo upload visible in rebuild
+Both resolved 2026-09-06 — see Calendar and Profile / My Account sections above. The only remaining nuance: unconfirmed whether the live site's calendar has a *disclaimer footer* text below its legend (the rebuild has the legend but no separate disclaimer copy) — low priority, needs the exact live-site wording before adding.
 
 ---
 
@@ -168,11 +161,14 @@ Complete audit of live RxTracker (PHP/MySQL) vs rebuild (Next.js/Supabase) cover
 ### P2 (Nice to have)
 5. ✅ **Three-dot menu actions** — All verified working live, confirmed 2026-09-06
 6. ✅ **Notes feature** — Already implemented, confirmed 2026-09-06
-7. **Calendar legend** — Color key for Taken/Skipped/Missed — still open
-8. **Profile photo upload** — Upload and display user photo — still open
+7. ✅ **Calendar legend** — Already implemented, confirmed 2026-09-06
+8. ✅ **Profile photo upload** — Already implemented, confirmed 2026-09-06
 
 ### P3 (Low priority)
 9. ✅ **Side effect logging** — Already implemented, confirmed 2026-09-06
+
+### Everything above is now done or already-implemented-and-verified.
+Genuinely open items are only those in the "Remaining Audit Items" section below (notifications bell, dedicated history page, onboarding flow, and a full Connie Zimmerman pass on the *live* site) plus the unconfirmed calendar disclaimer-footer wording.
 
 ---
 
