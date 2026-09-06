@@ -140,6 +140,35 @@ export function daysUntilRunout(
   return Math.floor(qty / dailyUnits);
 }
 
+// "September 6, 2026" / "Aug 6, 2026" — shared by the export report's
+// PDF and its on-page summary so both read identical date strings.
+export function formatLongDate(dateStr: string): string {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function formatShortDate(dateStr: string): string {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// Whole days a medication has been in use as of `asOf` (inclusive of
+// the start date itself, so a medication started today reads "1 day").
+// Used by the export report's pain/mood-tracked medication summaries.
+export function daysOnMedication(startDate: string | null, asOf: string): number | null {
+  if (!startDate) return null;
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${asOf}T00:00:00`);
+  const diffDays = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  return Math.max(diffDays + 1, 0);
+}
+
 // Whole years between a birth date and today — falls back to a birth
 // year alone (family_profiles carries both, for members whose exact date
 // isn't known) when there's no birth date. Port of the reference PHP

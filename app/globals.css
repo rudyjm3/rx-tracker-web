@@ -18,6 +18,9 @@
   --color-status-warning: #f5a524;
   --color-status-danger: #e5484d;
 
+  /* Feedback-tracking chip (Mood) — Pain reuses status-warning */
+  --color-brand-purple: #8b5cf6;
+
   /* Radius tiers */
   --radius-control: 10px;
   --radius-card: 18px;
