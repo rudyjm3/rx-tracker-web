@@ -18,13 +18,13 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-brand-dark-navy/50 backdrop-blur-sm" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-full -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-hero bg-brand-card p-6 shadow-card focus:outline-none",
+          "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-full -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-hero bg-brand-card shadow-card focus:outline-none",
           size === "wide" ? "max-w-2xl" : "max-w-md",
           className,
         )}
         {...props}
       >
-        {children}
+        <div className="max-h-[90vh] overflow-y-auto p-6">{children}</div>
         <DialogPrimitive.Close className="absolute right-4 top-4 text-brand-text-muted hover:text-brand-text">
           <X size={18} />
           <span className="sr-only">Close</span>
