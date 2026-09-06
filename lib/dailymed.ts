@@ -31,3 +31,11 @@ export async function getMedia(setId: string): Promise<unknown | null> {
   if (!response.ok) return null;
   return response.json();
 }
+
+export async function getDrugLabel(name: string): Promise<unknown | null> {
+  const response = await fetch(
+    `/api/dailymed-proxy?mode=label&drug_name=${encodeURIComponent(name)}`,
+  );
+  if (!response.ok) return null;
+  return response.json();
+}

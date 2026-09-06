@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronsDown, MoreVertical } from "lucide-react";
+import {
+  Activity,
+  CalendarCheck,
+  CalendarPlus,
+  ChevronsDown,
+  FileText,
+  History,
+  MoreVertical,
+  Pencil,
+  Power,
+  SlidersHorizontal,
+  Syringe,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +24,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
-import { to12h } from "@/lib/utils";
+import { daysUntilRunout, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import { RefillModal } from "./RefillModal";
 import { RefillHistoryModal } from "./RefillHistoryModal";
@@ -22,6 +34,8 @@ import { DoseHistoryPanel } from "./DoseHistoryPanel";
 import { LogPastDoseModal } from "./log-past-dose/LogPastDoseModal";
 import { DiscontinueModal } from "./DiscontinueModal";
 import { ResumeModal } from "./ResumeModal";
+import { UpdatePrescribedDoseModal } from "./UpdatePrescribedDoseModal";
+import { MedicationDetailsModal } from "./MedicationDetailsModal";
 
 function scheduleSummary(med: Medication): string {
   if (med.as_needed) return "As needed";
@@ -39,13 +53,27 @@ function scheduleSummary(med: Medication): string {
     .join(", ");
 }
 
+function runoutSummary(med: Medication): string | null {
+  const daysLeft = daysUntilRunout(med);
+  if (daysLeft == null) return null;
+  const runout = new Date();
+  runout.setDate(runout.getDate() + daysLeft);
+  const runoutLabel = runout.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  return `~${daysLeft} ${daysLeft === 1 ? "day" : "days"} left · runs out ~${runoutLabel}`;
+}
+
 type ModalKind =
   | "refill"
   | "refillHistory"
   | "adjust"
+  | "doseChange"
   | "notes"
   | "sideEffects"
   | "logDose"
+  | "details"
   | "discontinue"
   | "resume"
   | null;
@@ -77,10 +105,19 @@ export function MedicationCard({ medication }: { medication: Medication }) {
     : fillPct <= 50
       ? "bg-status-warning"
       : "bg-status-success";
+  const runoutText = runoutSummary(medication);
 
   return (
     <div className="rounded-card border border-brand-border bg-brand-card p-4 shadow-card">
       <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setOpenModal("details")}
+          className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-brand-text-muted hover:bg-brand-bg hover:text-brand-deep-blue"
+          aria-label={`View ${medication.name} details`}
+        >
+          <i className="fa-solid fa-circle-info" aria-hidden="true" />
+        </button>
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
@@ -111,6 +148,7 @@ export function MedicationCard({ medication }: { medication: Medication }) {
               </div>
               <p className="mt-1 text-xs text-brand-text-muted">
                 {currentQty} / {capacity} {medication.inventory_unit}
+                {runoutText && <> | {runoutText}</>}
               </p>
             </div>
           )}
@@ -137,33 +175,47 @@ export function MedicationCard({ medication }: { medication: Medication }) {
                 <MoreVertical size={18} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="min-w-72 rounded-[2px] p-3">
               <DropdownMenuItem asChild>
-                <Link href={`/medications/${medication.id}/edit`}>Edit</Link>
+                <Link href={`/medications/${medication.id}/edit`}>
+                  <Pencil size={18} />
+                  Edit
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("logDose")}>
+                <CalendarCheck size={18} />
                 Log Dose
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("refill")}>
+                <CalendarPlus size={18} />
                 Log Refill
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setOpenModal("doseChange")}>
+                <Syringe size={18} />
+                Update prescribed dose
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("refillHistory")}>
+                <History size={18} />
                 Refill History
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("adjust")}>
+                <SlidersHorizontal size={18} />
                 Adjust Quantity
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("notes")}>
+                <FileText size={18} />
                 Notes/Instructions
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("sideEffects")}>
+                <Activity size={18} />
                 Side Effects
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-status-danger"
                 onSelect={() => setOpenModal("discontinue")}
               >
-                Discontinue
+                <Power size={18} />
+                Discontinue Use
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -201,6 +253,11 @@ export function MedicationCard({ medication }: { medication: Medication }) {
         onOpenChange={(open) => setOpenModal(open ? "logDose" : null)}
         medication={medication}
       />
+      <MedicationDetailsModal
+        open={openModal === "details"}
+        onOpenChange={(open) => setOpenModal(open ? "details" : null)}
+        medication={medication}
+      />
       <RefillModal
         open={openModal === "refill"}
         onOpenChange={(open) => setOpenModal(open ? "refill" : null)}
@@ -218,6 +275,13 @@ export function MedicationCard({ medication }: { medication: Medication }) {
         onOpenChange={(open) => setOpenModal(open ? "refillHistory" : null)}
         medication={medication}
       />
+      {openModal === "doseChange" && (
+        <UpdatePrescribedDoseModal
+          open
+          onOpenChange={(open) => setOpenModal(open ? "doseChange" : null)}
+          medication={medication}
+        />
+      )}
       <NotesModal
         open={openModal === "notes"}
         onOpenChange={(open) => setOpenModal(open ? "notes" : null)}

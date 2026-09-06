@@ -246,6 +246,11 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
           scheduleTimes,
         );
         await setMedicationGroup(medicationId as string, values.groupId || null);
+        await queryClient.invalidateQueries({
+          queryKey: ["medication", medicationId],
+          exact: true,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["group-members"] });
         toast.success("Medication updated");
       }
 
