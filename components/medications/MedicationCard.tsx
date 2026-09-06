@@ -40,7 +40,12 @@ import { MedicationDetailsModal } from "./MedicationDetailsModal";
 
 function formatMedDate(value: string | null | undefined): string {
   if (!value) return "—";
-  const date = new Date(value);
+  // Date-only fields (start_date/end_date/created_at's date portion) must be
+  // parsed in local time, not UTC — otherwise a UTC-midnight parse displays
+  // one day earlier for anyone west of UTC. Same fix pattern as calculateAge
+  // in lib/utils.ts.
+  const datePart = value.slice(0, 10);
+  const date = new Date(`${datePart}T00:00:00`);
   return Number.isNaN(date.getTime())
     ? "—"
     : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });

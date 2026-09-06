@@ -168,14 +168,23 @@ async function seedMoodTagsIfNeeded(): Promise<void> {
 
   const supabase = createClient();
   const userId = await getCurrentUserId();
-  await Promise.all(
+  const results = await Promise.all(
     PREDEFINED_MOOD_TAGS.map((name, i) =>
       supabase
         .from("mood_tags")
-        .insert({ user_id: userId, name, always_show: true, sort_order: i })
-        .then(() => undefined, () => undefined), // ignore unique-constraint collisions, same as the legacy seeder
+        .insert({ user_id: userId, name, always_show: true, sort_order: i }),
     ),
   );
+  // Supabase resolves (rather than rejects) with an `error` on failure, so a
+  // failed insert wouldn't otherwise surface here. Unique-constraint
+  // collisions (code 23505 — the tag already exists for this user, e.g. a
+  // retry after a partial seed) are expected and fine to ignore; any other
+  // error means the tag list may be incomplete, so don't mark it seeded and
+  // let the next call retry.
+  const hasUnexpectedError = results.some(
+    ({ error }) => error && error.code !== "23505",
+  );
+  if (hasUnexpectedError) return;
   await setSetting(MOOD_TAGS_SEEDED_KEY, "1");
 }
 

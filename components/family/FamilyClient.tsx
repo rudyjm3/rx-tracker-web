@@ -171,6 +171,13 @@ export function FamilyClient() {
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
           {editing !== null && (
+            <DialogHeader>
+              <DialogTitle>
+                {editing === "new" ? "Add Family Member" : `Edit ${editing.display_name}`}
+              </DialogTitle>
+            </DialogHeader>
+          )}
+          {editing !== null && (
             <FamilyMemberForm
               key={editing === "new" ? "new" : editing.id}
               existing={editing === "new" ? null : editing}
@@ -271,10 +278,6 @@ function FamilyMemberForm({ existing, onSaved, onCancel }: FamilyMemberFormProps
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>{existing ? `Edit ${existing.display_name}` : "Add Family Member"}</DialogTitle>
-      </DialogHeader>
-
       <div className="flex flex-col gap-4">
         <AvatarPicker
           currentUrl={existing?.profile_picture ?? null}
