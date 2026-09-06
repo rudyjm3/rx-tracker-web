@@ -85,16 +85,59 @@ export function dosesPerDay(
   return intervalHours ? Math.max(1, Math.round(24 / intervalHours)) : 0;
 }
 
-export function daysUntilRunout(medication: Medication): number | null {
+export interface GroupDoseOverride {
+  scheduled_time: string;
+  quantity_per_dose: number | null;
+}
+
+function doseUnitsForTime(
+  medication: Medication,
+  scheduledTime: string,
+  scheduleTimeOverride: number | null | undefined,
+  groupDoseOverrides: GroupDoseOverride[],
+): number {
+  const groupOverride = groupDoseOverrides.find(
+    (override) => override.scheduled_time.slice(0, 5) === scheduledTime.slice(0, 5),
+  );
+  return groupOverride?.quantity_per_dose ?? scheduleTimeOverride ?? medication.quantity_per_dose;
+}
+
+export function daysUntilRunout(
+  medication: Medication,
+  groupDoseOverrides: GroupDoseOverride[] = [],
+): number | null {
   const qty = medication.current_quantity ?? 0;
   if (qty <= 0) return 0;
-  const perDay = dosesPerDay(
-    medication.schedule_mode,
-    medication.medication_schedule_times?.length ?? 0,
-    medication.interval_hours,
-  );
-  if (perDay <= 0) return null;
-  return Math.floor(qty / perDay);
+
+  let dailyUnits = 0;
+  if (medication.as_needed) {
+    dailyUnits = groupDoseOverrides.reduce(
+      (total, override) => total + (override.quantity_per_dose ?? medication.quantity_per_dose),
+      0,
+    );
+  } else if (medication.schedule_mode === "fixed_times") {
+    dailyUnits = (medication.medication_schedule_times ?? []).reduce(
+      (total, scheduleTime) =>
+        total +
+        doseUnitsForTime(
+          medication,
+          scheduleTime.reminder_time,
+          scheduleTime.quantity_per_dose,
+          groupDoseOverrides,
+        ),
+      0,
+    );
+  } else {
+    dailyUnits =
+      dosesPerDay(
+        medication.schedule_mode,
+        medication.medication_schedule_times?.length ?? 0,
+        medication.interval_hours,
+      ) * medication.quantity_per_dose;
+  }
+
+  if (dailyUnits <= 0) return null;
+  return Math.floor(qty / dailyUnits);
 }
 
 // Whole years between a birth date and today — falls back to a birth

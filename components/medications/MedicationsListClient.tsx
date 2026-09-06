@@ -88,6 +88,17 @@ export function MedicationsListClient() {
     { key: "groups", label: "Groups", count: groups.length },
   ];
 
+  function groupDoseOverridesFor(medicationId: string) {
+    return groupMembers
+      .filter((member) => member.medication_id === medicationId)
+      .flatMap((member) => {
+        const group = groups.find((item) => item.id === member.group_id);
+        return group
+          ? [{ scheduled_time: group.scheduled_time, quantity_per_dose: member.quantity_per_dose }]
+          : [];
+      });
+  }
+
   function membersOf(groupId: string) {
     const memberIds = groupMembers
       .filter((m) => m.group_id === groupId)
@@ -167,7 +178,11 @@ export function MedicationsListClient() {
                     {group.name} · {to12h(group.scheduled_time.slice(0, 5))}
                   </div>
                   {members.map((med) => (
-                    <MedicationCard key={med.id} medication={med} />
+                    <MedicationCard
+                      key={med.id}
+                      medication={med}
+                      groupDoseOverrides={groupDoseOverridesFor(med.id)}
+                    />
                   ))}
                 </div>
               );

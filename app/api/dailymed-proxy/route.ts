@@ -38,6 +38,11 @@ function normalizeDrugNameSuggestions(data: unknown, drugName: string) {
   return { data: suggestions };
 }
 
+function drugLabelUrl(drugName: string) {
+  const query = encodeURIComponent(drugName);
+  return `${OPENFDA_DRUG_LABEL_BASE}?search=(openfda.brand_name:${query}+OR+openfda.generic_name:${query})&limit=1`;
+}
+
 // Never accepts a client-supplied URL or host — only structured params
 // that this route uses to build the exact upstream URL itself. That
 // makes SSRF structurally impossible rather than relying on an allowlist
@@ -73,9 +78,20 @@ export async function GET(request: Request) {
       upstreamUrl = `${DAILYMED_BASE}spls/${sid}/media.json`;
       break;
     }
+    case "label": {
+      const drugName = (searchParams.get("drug_name") ?? "").trim();
+      if (!drugName || drugName.length > 200) {
+        return NextResponse.json(
+          { error: "drug_name is required (max 200 chars)" },
+          { status: 400 },
+        );
+      }
+      upstreamUrl = drugLabelUrl(drugName);
+      break;
+    }
     default:
       return NextResponse.json(
-        { error: "mode must be 'search' or 'media'" },
+        { error: "mode must be 'search', 'media', or 'label'" },
         { status: 400 },
       );
   }

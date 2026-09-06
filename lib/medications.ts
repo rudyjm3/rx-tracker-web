@@ -268,6 +268,23 @@ export async function updateMedication(
   }
 }
 
+export async function updatePrescribedDose(
+  id: string,
+  doseAmount: number | null,
+  doseUnit: string | null,
+  reason = "",
+): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("update_prescribed_dose", {
+    p_medication_id: id,
+    p_dose_amount: normalizeDoseAmount(doseAmount),
+    p_dose_unit: normalizeDoseUnit(doseUnit),
+    p_comment: reason,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 export async function deactivateMedication(
   id: string,
   reason = "",

@@ -71,7 +71,18 @@ export function GroupCard({
             No medications in this group yet.
           </p>
         ) : (
-          members.map((med) => <MedicationCard key={med.id} medication={med} />)
+          members.map((med) => (
+            <MedicationCard
+              key={med.id}
+              medication={med}
+              groupDoseOverrides={memberOverrides
+                .filter((override) => override.medication_id === med.id)
+                .map((override) => ({
+                  scheduled_time: group.scheduled_time,
+                  quantity_per_dose: override.quantity_per_dose,
+                }))}
+            />
+          ))
         )}
       </div>
 
