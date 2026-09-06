@@ -46,6 +46,16 @@ function formatDose(input: Pick<MedicationInput, "dose_amount" | "dose_unit" | "
     .join(" ");
 }
 
+function normalizeDoseAmount(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function normalizeDoseUnit(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
 export async function getCurrentUserId() {
   const supabase = createClient();
   const {
@@ -220,18 +230,20 @@ export async function updateMedication(
     .eq("id", id);
   if (error) throw error;
 
-  const doseChanged =
-    existing.dose_amount !== (input.dose_amount ?? null) ||
-    existing.dose_unit !== (input.dose_unit ?? null);
+  const oldDoseAmount = normalizeDoseAmount(existing.dose_amount);
+  const newDoseAmount = normalizeDoseAmount(input.dose_amount);
+  const oldDoseUnit = normalizeDoseUnit(existing.dose_unit);
+  const newDoseUnit = normalizeDoseUnit(input.dose_unit);
+  const doseChanged = oldDoseAmount !== newDoseAmount || oldDoseUnit !== newDoseUnit;
   if (doseChanged) {
     const { error: doseChangeError } = await supabase
       .from("medication_dose_changes")
       .insert({
         medication_id: id,
-        old_dose_amount: existing.dose_amount,
-        old_dose_unit: existing.dose_unit ?? "",
-        new_dose_amount: input.dose_amount ?? null,
-        new_dose_unit: input.dose_unit ?? "",
+        old_dose_amount: oldDoseAmount,
+        old_dose_unit: oldDoseUnit,
+        new_dose_amount: newDoseAmount,
+        new_dose_unit: newDoseUnit,
       });
     if (doseChangeError) throw doseChangeError;
   }
