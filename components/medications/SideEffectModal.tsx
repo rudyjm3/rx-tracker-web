@@ -19,6 +19,7 @@ import {
   getSideEffects,
 } from "@/lib/side-effects";
 import type { Medication, SideEffectSeverity } from "@/lib/types/medications";
+import { SideEffectTagPicker } from "./SideEffectTagPicker";
 
 const SEVERITY_STYLES: Record<SideEffectSeverity, string> = {
   mild: "bg-status-success/10 text-status-success",
@@ -41,7 +42,8 @@ export function SideEffectModal({
   const [occurredDate, setOccurredDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
-  const [description, setDescription] = useState("");
+  const [selectedEffects, setSelectedEffects] = useState<string[]>([]);
+  const [note, setNote] = useState("");
   const [severity, setSeverity] = useState<SideEffectSeverity>("mild");
 
   const { data: sideEffects } = useQuery({
@@ -52,11 +54,21 @@ export function SideEffectModal({
 
   const addMutation = useMutation({
     mutationFn: () =>
-      addSideEffect(medication.id, { occurred_date: occurredDate, description, severity }),
+      Promise.all(
+        selectedEffects.map((description) =>
+          addSideEffect(medication.id, {
+            occurred_date: occurredDate,
+            description,
+            severity,
+            note,
+          }),
+        ),
+      ),
     onSuccess: () => {
       toast.success("Side effect logged");
       queryClient.invalidateQueries({ queryKey: ["side-effects", medication.id] });
-      setDescription("");
+      setSelectedEffects([]);
+      setNote("");
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
@@ -72,7 +84,7 @@ export function SideEffectModal({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!description.trim()) return;
+    if (selectedEffects.length === 0) return;
     addMutation.mutate();
   }
 
@@ -108,16 +120,23 @@ export function SideEffectModal({
               </select>
             </Field>
           </div>
-          <Field label="Description">
-            <input
-              type="text"
-              required
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+          <Field label="Side effects">
+            <SideEffectTagPicker selected={selectedEffects} onChange={setSelectedEffects} />
+          </Field>
+          <Field label="Notes">
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
               className={inputClass}
             />
           </Field>
-          <Button type="submit" size="compact" className="self-start" disabled={addMutation.isPending}>
+          <Button
+            type="submit"
+            size="compact"
+            className="self-start"
+            disabled={addMutation.isPending || selectedEffects.length === 0}
+          >
             {addMutation.isPending ? "Saving…" : "Add side effect"}
           </Button>
         </form>
@@ -142,6 +161,7 @@ export function SideEffectModal({
                 </span>
                 <span className="text-sm text-brand-text">{se.description}</span>
                 <p className="text-xs text-brand-text-muted">{se.occurred_date}</p>
+                {se.note && <p className="text-xs text-brand-text-muted">{se.note}</p>}
               </div>
               <button
                 type="button"
