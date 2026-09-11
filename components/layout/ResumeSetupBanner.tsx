@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ClipboardList } from "lucide-react";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getOnboardingProgress } from "@/lib/onboarding";
+import { getActiveMedications } from "@/lib/medications";
 
 // Persistent nudge for whichever profile is currently active (owner or a
 // family member) — shown wherever it's mounted (TopNav, everywhere except
@@ -21,8 +22,21 @@ export function ResumeSetupBanner() {
     enabled: !isResolving,
   });
 
-  if (isResolving || progressQuery.isLoading) return null;
-  if (progressQuery.data?.status === "completed") return null;
+  // Medications can exist for a profile without a completed
+  // profile_onboarding row (e.g. a data migration/import that calls
+  // createMedication directly instead of going through the onboarding
+  // wizard's activateOnboarding). Treat "already has medications" as done
+  // too, so the banner doesn't nudge someone to "finish" setup that's
+  // already finished.
+  const medicationsQuery = useQuery({
+    queryKey: ["active-medications", activeProfileId],
+    queryFn: () => getActiveMedications(activeProfileId),
+    enabled: !isResolving,
+  });
+
+  if (isResolving || progressQuery.isLoading || medicationsQuery.isLoading) return null;
+  const hasMedications = (medicationsQuery.data?.length ?? 0) > 0;
+  if (progressQuery.data?.status === "completed" || hasMedications) return null;
 
   const name = activeProfile?.display_name ?? "your";
 
