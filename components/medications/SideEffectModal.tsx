@@ -120,9 +120,13 @@ export function SideEffectModal({
               </select>
             </Field>
           </div>
-          <Field label="Side effects">
+          <div className="flex flex-col gap-1 text-sm text-brand-text">
+            {/* Not a <Field>: its <label> wrapper would delegate any click
+                inside this row (even on empty space) to the first button
+                found — one of the chips' remove buttons — deselecting it. */}
+            <span>Side effects</span>
             <SideEffectTagPicker selected={selectedEffects} onChange={setSelectedEffects} />
-          </Field>
+          </div>
           <Field label="Notes">
             <textarea
               value={note}
