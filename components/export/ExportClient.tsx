@@ -342,9 +342,13 @@ export function ExportClient() {
         if (prev) URL.revokeObjectURL(prev);
         return url;
       });
+      const toFilenameDate = (isoDate: string) => {
+        const [y, m, d] = isoDate.split("-");
+        return `${m}-${d}-${y}`;
+      };
       const link = document.createElement("a");
       link.href = url;
-      link.download = `RxTracker-Doctor-Visit-Report-${startDate}-to-${endDate}.pdf`;
+      link.download = `RxTracker-Doctor-Visit-Report-${toFilenameDate(startDate)}-to-${toFilenameDate(endDate)}.pdf`;
       link.click();
     } finally {
       setIsGeneratingPdf(false);

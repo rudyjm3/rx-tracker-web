@@ -18,6 +18,9 @@ function formatSchedule(med: Medication): string {
   return times.map((t) => to12h(t.reminder_time.slice(0, 5))).join(", ");
 }
 
+// Name first, badges/chips on their own row below — a long medication
+// name no longer wraps awkwardly around leading badges when it's given
+// the full row width to itself.
 function MedicationLabel({
   medication,
   suffix,
@@ -29,15 +32,15 @@ function MedicationLabel({
 }) {
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-sm font-semibold text-brand-text">
+        {medication.name}
+        {suffix ? ` ${suffix}` : ""}
+      </span>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
         <MedTypeBadge type={medication.medication_type} />
         {feedbackChipTypes(medication.feedback_type).map((t) => (
           <FeedbackChip key={t} type={t} />
         ))}
-        <span className="text-sm font-semibold text-brand-text">
-          {medication.name}
-          {suffix ? ` ${suffix}` : ""}
-        </span>
       </div>
       {annotation && <p className="mt-0.5 text-xs text-brand-text-muted">{annotation}</p>}
     </div>
@@ -112,11 +115,17 @@ function ReportTable<T>({
 
 function StatTile({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex flex-1 flex-col items-center gap-1 rounded-control bg-brand-bg px-3 py-3">
-      <span className="text-lg font-bold" style={color ? { color } : undefined}>
-        {value}
-      </span>
-      <span className="text-center text-[10px] uppercase tracking-wide text-brand-text-muted">{label}</span>
+    <div className="flex h-[90px] flex-1 flex-col overflow-hidden rounded-control bg-brand-bg">
+      <div className="flex flex-1 items-center justify-center">
+        <span className="text-xl font-bold" style={color ? { color } : undefined}>
+          {value}
+        </span>
+      </div>
+      <div className="bg-brand-border px-1 py-1.5">
+        <span className="block text-center text-[10px] uppercase tracking-wide text-brand-navy">
+          {label}
+        </span>
+      </div>
     </div>
   );
 }

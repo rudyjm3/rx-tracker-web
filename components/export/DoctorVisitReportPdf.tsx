@@ -43,8 +43,15 @@ const MED_TYPE_STYLES: Record<Medication["medication_type"], { bg: string; color
 };
 
 const styles = StyleSheet.create({
-  page: { padding: 0, fontSize: 9, color: TEXT, fontFamily: "Helvetica" },
-  body: { padding: "0 32 32 32" },
+  // Bottom padding lives on the Page (not the nested `body` View) so it's
+  // reserved on every physical page — a View's own padding only applies to
+  // the first/last fragment when its content wraps across pages, which let
+  // the last row of a long table on an interior page render underneath the
+  // fixed footer's disclaimer text instead of stopping above it. The value
+  // must clear the footer's full height (border + two lines of text,
+  // positioned at bottom:20).
+  page: { padding: 0, paddingBottom: 85, fontSize: 9, color: TEXT, fontFamily: "Helvetica" },
+  body: { padding: "0 32 0 32" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -93,13 +100,15 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: "row", gap: 10 },
   statTile: {
     flex: 1,
+    height: 90,
     backgroundColor: CARD_BG,
     borderRadius: 8,
-    padding: 10,
-    alignItems: "center",
+    overflow: "hidden",
   },
-  statLabel: { fontSize: 7, color: MUTED, textTransform: "uppercase", marginTop: 4, textAlign: "center" },
-  statValue: { fontSize: 15, fontWeight: 700 },
+  statValueWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  statLabelBar: { backgroundColor: BORDER, paddingVertical: 4 },
+  statLabel: { fontSize: 6.5, color: NAVY, textTransform: "uppercase", textAlign: "center" },
+  statValue: { fontSize: 16, fontWeight: 700 },
   chartWrap: { marginTop: 4 },
   footer: {
     position: "absolute",
@@ -134,6 +143,9 @@ function FeedbackChipsPdf({ feedbackType }: { feedbackType: FeedbackType }) {
   );
 }
 
+// Name first, badges/chips on their own row below — a long medication
+// name (e.g. a combo OTC product) no longer wraps awkwardly around
+// leading badges when it's given the full row width to itself.
 function MedicationLabel({
   medication,
   suffix,
@@ -145,13 +157,13 @@ function MedicationLabel({
 }) {
   return (
     <View>
-      <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+      <Text style={{ fontSize: 8.5, fontWeight: 700, color: TEXT }}>
+        {medication.name}
+        {suffix ? ` ${suffix}` : ""}
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", marginTop: 2 }}>
         <MedTypeBadgePdf type={medication.medication_type} />
         <FeedbackChipsPdf feedbackType={medication.feedback_type} />
-        <Text style={{ fontSize: 8.5, fontWeight: 700, color: TEXT }}>
-          {medication.name}
-          {suffix ? ` ${suffix}` : ""}
-        </Text>
       </View>
       {annotation && <Text style={{ fontSize: 7, color: MUTED, marginTop: 1 }}>{annotation}</Text>}
     </View>
@@ -200,8 +212,12 @@ function PdfTable<T>({ columns, rows, emptyLabel }: { columns: Column<T>[]; rows
 function StatTile({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <View style={styles.statTile}>
-      <Text style={[styles.statValue, { color: color ?? TEXT }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <View style={styles.statValueWrap}>
+        <Text style={[styles.statValue, { color: color ?? TEXT }]}>{value}</Text>
+      </View>
+      <View style={styles.statLabelBar}>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -232,7 +248,12 @@ function AdherenceRingPdf({ percent }: { percent: number }) {
   const center = size / 2;
   const arc = ringArcPath(center, center, radius, percent);
   return (
-    <View style={[styles.statTile, { flex: 1.3, position: "relative" }]}>
+    <View
+      style={[
+        styles.statTile,
+        { flex: 1.3, alignItems: "center", justifyContent: "center", padding: 6 },
+      ]}
+    >
       <Svg width={size} height={size}>
         <Circle cx={center} cy={center} r={radius} stroke={BORDER} strokeWidth={strokeWidth} fill="none" />
         {arc && (
@@ -252,7 +273,7 @@ function AdherenceRingPdf({ percent }: { percent: number }) {
           {`${percent}%`}
         </Text>
       </Svg>
-      <Text style={styles.statLabel}>Overall adherence</Text>
+      <Text style={[styles.statLabel, { marginTop: 3, color: MUTED }]}>Overall adherence</Text>
     </View>
   );
 }
@@ -666,17 +687,24 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
             </View>
           )}
 
-          <View style={styles.footer} fixed>
-            <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.4 }}>
-              RxTracker is a self-tracking aid and does not provide medical advice or clinical decision support. This
-              report reflects patient-logged data only and has not been independently verified. Always consult your
-              healthcare provider.
-            </Text>
-            <Text
-              style={{ fontSize: 7.5, color: MUTED, marginTop: 3 }}
-              render={({ pageNumber, totalPages }) => `Generated ${data.generatedAt} · Page ${pageNumber} of ${totalPages}`}
-            />
-          </View>
+        </View>
+
+        {/* A direct child of <Page> (not nested inside the paginated
+            `body` View above) so its "fixed" position is anchored to
+            each physical page, not to body's own per-page fragment —
+            nesting it inside body previously let it render wherever
+            body's box happened to end, overlapping the last section
+            on some pages. */}
+        <View style={styles.footer} fixed>
+          <Text style={{ fontSize: 7.5, color: MUTED, lineHeight: 1.4 }}>
+            RxTracker is a self-tracking aid and does not provide medical advice or clinical decision support. This
+            report reflects patient-logged data only and has not been independently verified. Always consult your
+            healthcare provider.
+          </Text>
+          <Text
+            style={{ fontSize: 7.5, color: MUTED, marginTop: 3 }}
+            render={({ pageNumber, totalPages }) => `Generated ${data.generatedAt} · Page ${pageNumber} of ${totalPages}`}
+          />
         </View>
       </Page>
     </Document>
