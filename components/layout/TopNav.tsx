@@ -59,11 +59,11 @@ export function TopNav() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image
-            src="/icons/logo-round.png"
+            src="/icons/icon-192.png"
             alt="RxTracker"
             width={32}
             height={32}
-            className="rounded-full"
+            className="rounded-xl"
           />
           <span className="text-lg font-bold text-brand-navy">
             RxTracker

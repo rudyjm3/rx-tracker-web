@@ -7,14 +7,19 @@ import { toast } from "sonner";
 import { HelpCircle, Smartphone, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/layout/AuthProvider";
 import {
+  browserTimezone,
   getMissedGraceMinutes,
   getMoodChartScheme,
   getSnoozeMinutes,
+  getTimezone,
+  getUseDeviceTimezone,
   MISSED_GRACE_MAX_MINUTES,
   MISSED_GRACE_MIN_MINUTES,
   setMissedGraceMinutes,
   setMoodChartScheme,
   setSnoozeMinutes,
+  setTimezone,
+  setUseDeviceTimezone,
   type MoodChartScheme,
 } from "@/lib/app-settings";
 import {
@@ -31,6 +36,22 @@ import {
 } from "@/lib/push-subscriptions";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
+
+// Intl.supportedValuesOf isn't in the TS lib.es2022 typings yet in some
+// setups, but is broadly supported at runtime (Chrome 99+, Safari 15.4+,
+// Firefox 102+) — fall back to just the browser's own zone if unavailable.
+function supportedTimezones(): string[] {
+  const supportedValuesOf = (
+    Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
+  ).supportedValuesOf;
+  try {
+    return supportedValuesOf ? supportedValuesOf("timeZone") : [browserTimezone()];
+  } catch {
+    return [browserTimezone()];
+  }
+}
+
+const TIMEZONES = supportedTimezones();
 
 export function SettingsClient() {
   const { user } = useAuth();
@@ -60,9 +81,19 @@ function GeneralSettingsPanel() {
     queryKey: ["app-settings", "snooze_minutes"],
     queryFn: getSnoozeMinutes,
   });
+  const useDeviceTimezoneQuery = useQuery({
+    queryKey: ["app-settings", "use_device_timezone"],
+    queryFn: getUseDeviceTimezone,
+  });
+  const timezoneQuery = useQuery({
+    queryKey: ["app-settings", "timezone"],
+    queryFn: getTimezone,
+  });
 
   const [graceMinutes, setGraceMinutes] = useState<number | null>(null);
   const [snoozeMinutes, setSnoozeMinutesState] = useState<number | null>(null);
+  const [useDeviceTimezone, setUseDeviceTimezoneState] = useState<boolean | null>(null);
+  const [timezone, setTimezoneState] = useState<string | null>(null);
 
   // Seed local editable state from the loaded values the first time each
   // arrives, without clobbering an in-progress edit on every background
@@ -79,21 +110,35 @@ function GeneralSettingsPanel() {
     setSeededSnooze(true);
     setSnoozeMinutesState(snoozeQuery.data);
   }
+  const [seededTimezoneToggle, setSeededTimezoneToggle] = useState(false);
+  if (!seededTimezoneToggle && useDeviceTimezoneQuery.data !== undefined) {
+    setSeededTimezoneToggle(true);
+    setUseDeviceTimezoneState(useDeviceTimezoneQuery.data);
+  }
+  const [seededTimezone, setSeededTimezone] = useState(false);
+  if (!seededTimezone && timezoneQuery.data !== undefined) {
+    setSeededTimezone(true);
+    setTimezoneState(timezoneQuery.data);
+  }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (graceMinutes !== null) await setMissedGraceMinutes(graceMinutes);
       if (snoozeMinutes !== null) await setSnoozeMinutes(snoozeMinutes);
+      if (useDeviceTimezone !== null) await setUseDeviceTimezone(useDeviceTimezone);
+      if (!useDeviceTimezone && timezone) await setTimezone(timezone);
     },
     onSuccess: () => {
       toast.success("Settings saved");
       queryClient.invalidateQueries({ queryKey: ["app-settings", "missed_grace_minutes"] });
       queryClient.invalidateQueries({ queryKey: ["app-settings", "snooze_minutes"] });
+      queryClient.invalidateQueries({ queryKey: ["app-settings", "use_device_timezone"] });
+      queryClient.invalidateQueries({ queryKey: ["app-settings", "timezone"] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Couldn't save settings"),
   });
 
-  const loading = !seededGrace || !seededSnooze;
+  const loading = !seededGrace || !seededSnooze || !seededTimezoneToggle || !seededTimezone;
   const graceInvalid =
     graceMinutes === null ||
     !Number.isInteger(graceMinutes) ||
@@ -151,6 +196,32 @@ function GeneralSettingsPanel() {
               <option value={30}>30 minutes</option>
             </select>
           </Field>
+
+          <ToggleRow
+            label="Use device timezone"
+            description="Follow this device's timezone. Turn off to fix RxTracker to a specific timezone (e.g. while traveling)."
+            checked={useDeviceTimezone ?? true}
+            onChange={(checked) => {
+              setUseDeviceTimezoneState(checked);
+              if (checked) setTimezoneState(browserTimezone());
+            }}
+          />
+          {!useDeviceTimezone && (
+            <Field label="Time zone">
+              <select
+                className={inputClass}
+                value={timezone ?? ""}
+                onChange={(e) => setTimezoneState(e.target.value)}
+              >
+                {TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
           <Button
             type="submit"
             disabled={saveMutation.isPending || graceInvalid}

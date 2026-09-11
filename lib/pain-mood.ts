@@ -255,6 +255,7 @@ export interface TrendPoint {
   source: "dose" | "standalone";
   note: string;
   tags: string[];
+  editedAt: string | null;
 }
 
 function levelColumn(metric: WellbeingMetric): "pain_level" | "mood_level" {
@@ -263,7 +264,13 @@ function levelColumn(metric: WellbeingMetric): "pain_level" | "mood_level" {
 
 type DoseLogRow = Pick<
   DoseLog,
-  "id" | "scheduled_for_date" | "scheduled_time" | "pain_level" | "mood_level" | "note"
+  | "id"
+  | "scheduled_for_date"
+  | "scheduled_time"
+  | "pain_level"
+  | "mood_level"
+  | "note"
+  | "feedback_edited_at"
 >;
 
 function mapDoseLogToPoint(row: DoseLogRow, metric: WellbeingMetric): TrendPoint {
@@ -275,6 +282,7 @@ function mapDoseLogToPoint(row: DoseLogRow, metric: WellbeingMetric): TrendPoint
     source: "dose",
     note: row.note,
     tags: [],
+    editedAt: row.feedback_edited_at,
   };
 }
 
@@ -291,6 +299,7 @@ function mapStandaloneLogToPoint(
     source: "standalone",
     note: log.note,
     tags: log.tags ? log.tags.split(",").filter(Boolean) : [],
+    editedAt: log.updated_at,
   };
 }
 
@@ -304,7 +313,7 @@ async function getDoseTrendPoints(
   const col = levelColumn(metric);
   const { data, error } = await supabase
     .from("dose_logs")
-    .select("id, scheduled_for_date, scheduled_time, pain_level, mood_level, note")
+    .select("id, scheduled_for_date, scheduled_time, pain_level, mood_level, note, feedback_edited_at")
     .eq("medication_id", medicationId)
     .not(col, "is", null)
     .gte("scheduled_for_date", startDate)
@@ -338,7 +347,7 @@ async function getDoseHistoryPoints(
   const col = levelColumn(metric);
   const { data, error } = await supabase
     .from("dose_logs")
-    .select("id, scheduled_for_date, scheduled_time, pain_level, mood_level, note")
+    .select("id, scheduled_for_date, scheduled_time, pain_level, mood_level, note, feedback_edited_at")
     .eq("medication_id", medicationId)
     .not(col, "is", null)
     .order("scheduled_for_date", { ascending: false })
@@ -423,6 +432,11 @@ export async function getHistory(
 export interface DailyAverage {
   date: string;
   level: number;
+  // True when at least one of the day's entries was a standalone log
+  // (vs. attached to a dose) — the export report renders that day's
+  // chart dot hollow to flag it, matching the reference PHP report's
+  // convention.
+  hasStandalone: boolean;
 }
 
 /**
@@ -433,14 +447,15 @@ export interface DailyAverage {
  * every individual entry.
  */
 export function groupDailyAverages(points: TrendPoint[]): DailyAverage[] {
-  const byDate = new Map<string, { sum: number; count: number }>();
+  const byDate = new Map<string, { sum: number; count: number; hasStandalone: boolean }>();
   for (const p of points) {
-    const acc = byDate.get(p.date) ?? { sum: 0, count: 0 };
+    const acc = byDate.get(p.date) ?? { sum: 0, count: 0, hasStandalone: false };
     acc.sum += p.level;
     acc.count += 1;
+    if (p.source === "standalone") acc.hasStandalone = true;
     byDate.set(p.date, acc);
   }
   return Array.from(byDate.entries())
-    .map(([date, { sum, count }]) => ({ date, level: sum / count }))
+    .map(([date, { sum, count, hasStandalone }]) => ({ date, level: sum / count, hasStandalone }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }

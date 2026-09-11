@@ -11,20 +11,33 @@ import {
   type DotItemDotProps,
 } from "recharts";
 import type { MoodChartScheme } from "@/lib/app-settings";
-import { groupDailyAverages, levelColor, type TrendPoint, type WellbeingMetric } from "@/lib/pain-mood";
+import { levelColor, type DailyAverage, type WellbeingMetric } from "@/lib/pain-mood";
 
 function renderDot(metric: WellbeingMetric, scheme: MoodChartScheme) {
   function LevelDot(props: DotItemDotProps) {
     const { cx, cy, payload, index } = props;
     if (cx == null || cy == null) return null;
-    const level = (payload as { level: number }).level;
-    return (
+    const { level, hasStandalone } = payload as { level: number; hasStandalone: boolean };
+    const color = levelColor(metric, level, scheme);
+    // A hollow dot flags a day that includes a standalone log entry
+    // (not attached to a dose) — matches the reference report's legend.
+    return hasStandalone ? (
       <circle
         key={`dot-${index}`}
         cx={cx}
         cy={cy}
         r={4}
-        fill={levelColor(metric, level, scheme)}
+        fill="#ffffff"
+        stroke={color}
+        strokeWidth={2}
+      />
+    ) : (
+      <circle
+        key={`dot-${index}`}
+        cx={cx}
+        cy={cy}
+        r={4}
+        fill={color}
         stroke="#ffffff"
         strokeWidth={1.5}
       />
@@ -35,7 +48,7 @@ function renderDot(metric: WellbeingMetric, scheme: MoodChartScheme) {
 
 interface ReportTrendChartProps {
   metric: WellbeingMetric;
-  points: TrendPoint[];
+  dailyAverages: DailyAverage[];
   moodChartScheme?: MoodChartScheme;
 }
 
@@ -43,14 +56,16 @@ interface ReportTrendChartProps {
  * A static daily-average line chart for the export report — no range
  * tabs, no day drill-down (unlike TrendChart, which is interactive for
  * the pain-tracking/mood-wellbeing pages); the report's own date range
- * already scopes `points`, and a printed page has no click handlers.
+ * already scopes the data, and a printed page has no click handlers.
+ * Takes already-grouped daily averages (via groupDailyAverages) rather
+ * than raw TrendPoints, since the caller computes that once and shares
+ * it with the generated PDF's own chart.
  */
 export function ReportTrendChart({
   metric,
-  points,
+  dailyAverages,
   moodChartScheme = "classic",
 }: ReportTrendChartProps) {
-  const dailyAverages = groupDailyAverages(points);
   const metricLabel = metric === "pain" ? "Pain" : "Mood";
 
   if (dailyAverages.length === 0) {

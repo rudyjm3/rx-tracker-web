@@ -7,12 +7,22 @@ import type { CalendarDayMarker } from "@/lib/dose-logs";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// Only the day-cell background is driven by its "worst status" color —
+// the day number itself stays neutral, and each T/S/M count below is
+// colored individually (see COUNT_CLASSES) rather than inheriting one
+// color for the whole cell.
 const COLOR_CLASSES: Record<CalendarDayColor, string> = {
   future: "bg-brand-bg text-brand-text-muted",
-  missed: "bg-status-danger/10 text-status-danger",
-  skipped: "bg-status-warning/10 text-status-warning",
-  taken: "bg-status-success/10 text-status-success",
+  missed: "bg-status-danger/10 text-brand-text",
+  skipped: "bg-status-warning/10 text-brand-text",
+  taken: "bg-status-success/10 text-brand-text",
   empty: "bg-brand-card text-brand-text-muted",
+};
+
+const COUNT_CLASSES = {
+  taken: "text-status-success",
+  skipped: "text-status-warning",
+  missed: "text-status-danger",
 };
 
 interface MonthGridProps {
@@ -88,7 +98,7 @@ export function MonthGrid({
               disabled={!clickable}
               onClick={() => onSelectDay(dateStr)}
               className={cn(
-                "flex aspect-square flex-col items-center justify-center gap-0.5 rounded-control text-sm transition disabled:cursor-default",
+                "flex min-h-14 flex-col items-start justify-start gap-0.5 rounded-control p-1.5 text-sm transition disabled:cursor-default sm:min-h-16",
                 COLOR_CLASSES[color],
                 isToday && "ring-2 ring-brand-blue",
                 clickable && "cursor-pointer hover:opacity-80",
@@ -96,10 +106,16 @@ export function MonthGrid({
             >
               <span className="font-semibold">{day}</span>
               {hasMarkerCounts && (
-                <span className="flex gap-1 text-[10px] font-medium">
-                  {marker!.taken > 0 && <span>{marker!.taken}T</span>}
-                  {marker!.skipped > 0 && <span>{marker!.skipped}S</span>}
-                  {marker!.missed > 0 && <span>{marker!.missed}M</span>}
+                <span className="flex flex-wrap gap-x-1.5 text-[10px] font-medium">
+                  {marker!.taken > 0 && (
+                    <span className={COUNT_CLASSES.taken}>{marker!.taken}T</span>
+                  )}
+                  {marker!.skipped > 0 && (
+                    <span className={COUNT_CLASSES.skipped}>{marker!.skipped}S</span>
+                  )}
+                  {marker!.missed > 0 && (
+                    <span className={COUNT_CLASSES.missed}>{marker!.missed}M</span>
+                  )}
                 </span>
               )}
             </button>

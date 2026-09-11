@@ -290,6 +290,19 @@ create table if not exists mood_tags (
 );
 
 -- ─────────────────────────────────────────
+-- SIDE EFFECT TAGS
+-- ─────────────────────────────────────────
+create table if not exists side_effect_tags (
+  id          uuid primary key default uuid_generate_v4(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  always_show boolean not null default true,
+  sort_order  int not null default 0,
+  created_at  timestamptz default now(),
+  unique (user_id, name)
+);
+
+-- ─────────────────────────────────────────
 -- ALLERGY CATALOG + PROFILE ALLERGIES
 -- ─────────────────────────────────────────
 create table if not exists allergy_catalog (
@@ -429,6 +442,7 @@ alter table medication_notes           enable row level security;
 alter table medication_drafts          enable row level security;
 alter table standalone_pain_mood_logs  enable row level security;
 alter table mood_tags                  enable row level security;
+alter table side_effect_tags           enable row level security;
 alter table allergy_catalog            enable row level security;
 alter table profile_allergies          enable row level security;
 alter table app_settings               enable row level security;
@@ -481,6 +495,8 @@ create policy "own pain mood logs"
   on standalone_pain_mood_logs for all using ((select auth.uid()) = user_id);
 create policy "own mood tags"
   on mood_tags for all using ((select auth.uid()) = user_id);
+create policy "own side effect tags"
+  on side_effect_tags for all using ((select auth.uid()) = user_id);
 create policy "read allergy catalog"
   on allergy_catalog for select using (owner_user_id is null or owner_user_id = (select auth.uid()));
 -- Split into the three write actions (not "for all", which would

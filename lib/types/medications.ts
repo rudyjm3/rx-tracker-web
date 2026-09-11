@@ -185,3 +185,12 @@ export interface MoodTag {
   sort_order: number;
   created_at: string;
 }
+
+export interface SideEffectTag {
+  id: string;
+  user_id: string;
+  name: string;
+  always_show: boolean;
+  sort_order: number;
+  created_at: string;
+}

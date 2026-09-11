@@ -85,6 +85,46 @@ export async function setSnoozeMinutes(minutes: number): Promise<void> {
   await setSetting("snooze_minutes", String(minutes));
 }
 
+// Timezone is stored for parity with the reference app's Settings page
+// and for potential future server-side use (e.g. if push notifications
+// move off-device) — the rebuild is fully client-rendered, so schedule
+// generation and date math already correctly use the browser's local
+// time regardless of this setting; see lib/utils.ts.
+export function browserTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+export async function getUseDeviceTimezone(): Promise<boolean> {
+  const raw = await getSetting("use_device_timezone");
+  return raw !== "false";
+}
+
+export async function setUseDeviceTimezone(useDevice: boolean): Promise<void> {
+  await setSetting("use_device_timezone", String(useDevice));
+}
+
+export async function getTimezone(): Promise<string> {
+  const raw = await getSetting("timezone");
+  if (raw && isValidTimezone(raw)) return raw;
+  return browserTimezone();
+}
+
+export async function setTimezone(timezone: string): Promise<void> {
+  if (!isValidTimezone(timezone)) {
+    throw new Error("Unrecognized time zone.");
+  }
+  await setSetting("timezone", timezone);
+}
+
+function isValidTimezone(timezone: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getMoodChartScheme(): Promise<MoodChartScheme> {
   const raw = await getSetting("mood_chart_scheme");
   return MOOD_CHART_SCHEMES.includes(raw as MoodChartScheme)
