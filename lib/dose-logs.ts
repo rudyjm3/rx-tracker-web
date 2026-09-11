@@ -362,3 +362,30 @@ export async function getDoseLogStatusesInRange(
   if (error) throw error;
   return data as { medication_id: string; status: DoseLogStatus }[];
 }
+
+/**
+ * Newest-first missed/skipped dose_logs for a date range, with no row
+ * cap — the export report's missed-dose detail list must reflect the
+ * full selected range, not just whichever rows happen to fit under
+ * getDoseLogHistory's display-table cap.
+ */
+export async function getMissedDoseLogsInRange(
+  startDate: string,
+  endDate: string,
+  medicationIds?: string[],
+): Promise<CalendarLogRow[]> {
+  if (medicationIds && medicationIds.length === 0) return [];
+  const supabase = createClient();
+  let query = supabase
+    .from("dose_logs")
+    .select("*, medications(name, dose)")
+    .in("status", ["missed", "skipped"])
+    .gte("scheduled_for_date", startDate)
+    .lte("scheduled_for_date", endDate)
+    .order("scheduled_for_date", { ascending: false })
+    .order("scheduled_time", { ascending: false });
+  if (medicationIds) query = query.in("medication_id", medicationIds);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as CalendarLogRow[];
+}

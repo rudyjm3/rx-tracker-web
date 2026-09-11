@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/Switch";
 import { computeAdherence } from "@/lib/adherence";
 import { getProfileAllergies } from "@/lib/allergies";
 import { getMoodChartScheme } from "@/lib/app-settings";
-import { getDoseLogHistory, getDoseLogStatusesInRange } from "@/lib/dose-logs";
+import { getDoseLogStatusesInRange, getMissedDoseLogsInRange } from "@/lib/dose-logs";
 import {
   getActiveMedications,
   getDoseHistory,
@@ -33,7 +33,6 @@ import type { MedicationStatusEvent, StatusEventType } from "@/lib/types/medicat
 import type { DoctorVisitReportData, TrendNoteEntry } from "./DoctorVisitReportPdf";
 import { ReportSummary } from "./ReportSummary";
 
-const HISTORY_CAP = 500;
 const MISSED_DOSE_DISPLAY_CAP = 25;
 
 function defaultStartDate(): string {
@@ -132,23 +131,9 @@ export function ExportClient() {
   }
   const isMedicationSelected = (id: string) => !excludedMedicationIds.has(id);
   const selectedMedications = useMemo(
-    () => medications.filter((m) => !excludedMedicationIds.has(m.id)),
-    [medications, excludedMedicationIds],
+    () => allMedications.filter((m) => !excludedMedicationIds.has(m.id)),
+    [allMedications, excludedMedicationIds],
   );
-
-  const doseLogsQuery = useQuery({
-    queryKey: ["export-dose-logs", startDate, endDate, allMedicationIds],
-    queryFn: () =>
-      getDoseLogHistory({
-        startDate,
-        endDate,
-        medicationIds: allMedicationIds,
-        limit: HISTORY_CAP,
-        offset: 0,
-      }),
-    enabled: inactiveMedicationsQuery.data !== undefined,
-  });
-  const doseLogs = (doseLogsQuery.data ?? []).filter((log) => isMedicationSelected(log.medication_id));
 
   const sideEffectsQuery = useQuery({
     queryKey: ["export-side-effects", startDate, endDate, allMedicationIds],
@@ -159,10 +144,8 @@ export function ExportClient() {
     isMedicationSelected(se.medication_id),
   );
 
-  // A separate, uncapped query — doseLogs above is capped at
-  // HISTORY_CAP for the display table, but adherence must reflect the
-  // full selected range, not just whichever rows happen to fit under
-  // that cap.
+  // Uncapped — adherence must reflect the full selected range, not just
+  // whichever rows happen to fit under a display-table row cap.
   const adherenceStatusesQuery = useQuery({
     queryKey: ["export-adherence-statuses", startDate, endDate, allMedicationIds],
     queryFn: () => getDoseLogStatusesInRange(startDate, endDate, allMedicationIds),
@@ -195,7 +178,7 @@ export function ExportClient() {
     .flatMap((group) => group.changes.map((change) => ({ ...change, medication: group.medication })))
     .sort((a, b) => b.at.localeCompare(a.at));
 
-  const currentMedications = selectedMedications.map((medication) => {
+  const currentMedications = selectedMedications.filter((m) => m.active).map((medication) => {
     const entries = doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [];
     const resumed = latestStatusEvent(entries, "resumed");
     return {
@@ -243,9 +226,14 @@ export function ExportClient() {
     })
     .filter((r) => r.percent !== overallAdherence);
 
-  const missedDoseDetailAll = [...doseLogs]
-    .filter((l) => l.status !== "taken")
-    .sort((a, b) => `${b.scheduled_for_date}T${b.scheduled_time}`.localeCompare(`${a.scheduled_for_date}T${a.scheduled_time}`));
+  const missedDoseLogsQuery = useQuery({
+    queryKey: ["export-missed-dose-logs", startDate, endDate, allMedicationIds],
+    queryFn: () => getMissedDoseLogsInRange(startDate, endDate, allMedicationIds),
+    enabled: inactiveMedicationsQuery.data !== undefined,
+  });
+  const missedDoseDetailAll = (missedDoseLogsQuery.data ?? []).filter((l) =>
+    isMedicationSelected(l.medication_id),
+  );
   const missedDoseDetail = missedDoseDetailAll.slice(0, MISSED_DOSE_DISPLAY_CAP);
 
   const painTrackedMeds = useMemo(
@@ -297,7 +285,7 @@ export function ExportClient() {
     isResolving ||
     medicationsQuery.isLoading ||
     inactiveMedicationsQuery.isLoading ||
-    doseLogsQuery.isLoading ||
+    missedDoseLogsQuery.isLoading ||
     sideEffectsQuery.isLoading ||
     adherenceStatusesQuery.isLoading ||
     allergiesQuery.isLoading ||

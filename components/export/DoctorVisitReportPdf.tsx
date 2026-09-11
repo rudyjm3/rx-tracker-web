@@ -15,7 +15,7 @@ import {
 import type { MoodChartScheme } from "@/lib/app-settings";
 import type { CalendarLogRow } from "@/lib/dose-logs";
 import type { DoseHistoryEntry } from "@/lib/medications";
-import { levelColor, type DailyAverage } from "@/lib/pain-mood";
+import { levelColor, type DailyAverage, type WellbeingMetric } from "@/lib/pain-mood";
 import type { SideEffectRow } from "@/lib/side-effects";
 import type { ProfileAllergyWithName } from "@/lib/types/profile";
 import { formatLongDate, formatShortDate, to12h } from "@/lib/utils";
@@ -278,6 +278,20 @@ function AdherenceRingPdf({ percent }: { percent: number }) {
   );
 }
 
+// levelColor() returns `var(--color-status-*)` CSS custom properties
+// for the "classic" bands, which resolve fine in the HTML preview but
+// have no meaning to react-pdf's SVG renderer — map those back to this
+// file's own hex constants before handing a color to a PDF primitive.
+const CSS_VAR_TO_PDF_COLOR: Record<string, string> = {
+  "var(--color-status-success)": SUCCESS,
+  "var(--color-status-warning)": WARNING,
+  "var(--color-status-danger)": DANGER,
+};
+function levelColorPdf(metric: WellbeingMetric, level: number, scheme?: MoodChartScheme): string {
+  const color = levelColor(metric, level, scheme);
+  return CSS_VAR_TO_PDF_COLOR[color] ?? color;
+}
+
 // A compact chart built from react-pdf's SVG primitives — react-pdf
 // can't render the app's Recharts components, so trend data is drawn
 // directly as a scaled polyline. Dot fill mirrors the reference
@@ -332,7 +346,7 @@ function TrendChartPdf({
         })}
         <Polyline points={polylinePoints} stroke={lineColor} strokeWidth={1.5} fill="none" />
         {coords.map((c) => {
-          const color = levelColor(metric, c.p.level, moodChartScheme);
+          const color = levelColorPdf(metric, c.p.level, moodChartScheme);
           return c.p.hasStandalone ? (
             <Circle key={c.p.date} cx={c.x} cy={c.y} r={3} fill="#ffffff" stroke={color} strokeWidth={1.5} />
           ) : (
@@ -367,10 +381,10 @@ function PatientNotes({ notes }: { notes: TrendNoteEntry[] }) {
   }
   const dates = Array.from(byDate.keys()).sort();
   return (
-    <View style={{ marginTop: 8 }} wrap={false}>
+    <View style={{ marginTop: 8 }}>
       <Text style={{ fontSize: 8.5, fontWeight: 700, color: TEXT, marginBottom: 3 }}>Patient notes:</Text>
       {dates.map((date) => (
-        <View key={date} style={{ marginBottom: 4 }}>
+        <View key={date} style={{ marginBottom: 4 }} wrap={false}>
           <Text style={{ fontSize: 8, fontWeight: 700, color: NAVY, marginBottom: 1 }}>
             {formatLongDate(date)}
           </Text>
@@ -649,12 +663,14 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                   ? (points.reduce((sum, p) => sum + p.level, 0) / points.length).toFixed(1)
                   : "—";
                 return (
-                  <View key={medication.id} style={{ marginBottom: 14 }} wrap={false}>
-                    <MedicationLabel medication={medication} />
-                    <Text style={[styles.tdMuted, { marginTop: 4 }]}>
-                      {`Reporting period: ${formatShortDate(data.startDate)} – ${formatShortDate(data.endDate)}  |  Avg pain: ${avg}/10  |  Days logged: ${points.length}`}
-                    </Text>
-                    <TrendChartPdf points={points} metric="pain" />
+                  <View key={medication.id} style={{ marginBottom: 14 }}>
+                    <View wrap={false}>
+                      <MedicationLabel medication={medication} />
+                      <Text style={[styles.tdMuted, { marginTop: 4 }]}>
+                        {`Reporting period: ${formatShortDate(data.startDate)} – ${formatShortDate(data.endDate)}  |  Avg pain: ${avg}/10  |  Days logged: ${points.length}`}
+                      </Text>
+                      <TrendChartPdf points={points} metric="pain" />
+                    </View>
                     <PatientNotes notes={notes} />
                   </View>
                 );
@@ -674,12 +690,14 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                   ? (points.reduce((sum, p) => sum + p.level, 0) / points.length).toFixed(1)
                   : "—";
                 return (
-                  <View key={medication.id} style={{ marginBottom: 14 }} wrap={false}>
-                    <MedicationLabel medication={medication} />
-                    <Text style={[styles.tdMuted, { marginTop: 4 }]}>
-                      {`Reporting period: ${formatShortDate(data.startDate)} – ${formatShortDate(data.endDate)}  |  Avg mood: ${avg}/10  |  Days logged: ${points.length}`}
-                    </Text>
-                    <TrendChartPdf points={points} metric="mood" moodChartScheme={data.moodChartScheme} />
+                  <View key={medication.id} style={{ marginBottom: 14 }}>
+                    <View wrap={false}>
+                      <MedicationLabel medication={medication} />
+                      <Text style={[styles.tdMuted, { marginTop: 4 }]}>
+                        {`Reporting period: ${formatShortDate(data.startDate)} – ${formatShortDate(data.endDate)}  |  Avg mood: ${avg}/10  |  Days logged: ${points.length}`}
+                      </Text>
+                      <TrendChartPdf points={points} metric="mood" moodChartScheme={data.moodChartScheme} />
+                    </View>
                     <PatientNotes notes={notes} />
                   </View>
                 );
