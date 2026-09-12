@@ -137,6 +137,7 @@ export async function updateStandaloneLog(
       mood_level: input.moodLevel ?? null,
       note: input.note ?? "",
       tags: input.tags ?? "",
+      updated_at: new Date().toISOString(),
       ...(input.loggedAt ? { logged_at: input.loggedAt } : {}),
     })
     .eq("id", id);
