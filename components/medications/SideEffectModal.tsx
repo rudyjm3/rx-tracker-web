@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { Field, inputClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
@@ -93,8 +94,7 @@ export function SideEffectModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Side effects — {medication.name}{" "}
-            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+            Side effects — <MedicationNameWithDose medication={medication} />
           </DialogTitle>
         </DialogHeader>
 

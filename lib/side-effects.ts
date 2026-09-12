@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import type { SideEffect, SideEffectSeverity } from "@/lib/types/medications";
 
-export type SideEffectRow = SideEffect & { medications: { name: string; dose: string | null } };
+export type SideEffectRow = SideEffect & {
+  medications: { name: string; dose: string | null; dose_amount: number | null; dose_unit: string | null };
+};
 
 /**
  * All of the user's side effects (across every medication, RLS-scoped
@@ -17,7 +19,7 @@ export async function getSideEffectsInRange(
   const supabase = createClient();
   let query = supabase
     .from("side_effects")
-    .select("*, medications(name, dose)")
+    .select("*, medications(name, dose, dose_amount, dose_unit)")
     .gte("occurred_date", startDate)
     .lte("occurred_date", endDate);
   if (medicationIds) query = query.in("medication_id", medicationIds);

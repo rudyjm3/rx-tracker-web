@@ -48,13 +48,7 @@ export function MedicationSelector({
               : "border-brand-border bg-white text-brand-text hover:bg-brand-bg",
           )}
         >
-          <MedicationNameWithDose
-            medication={med}
-            doseClassName={cn(
-              "text-xs font-semibold",
-              selectedId === med.id ? "text-white/80" : "text-brand-text-muted",
-            )}
-          />
+          <MedicationNameWithDose medication={med} />
         </button>
       ))}
     </div>

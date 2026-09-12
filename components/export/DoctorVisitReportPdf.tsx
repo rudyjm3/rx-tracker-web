@@ -14,7 +14,7 @@ import {
 } from "@react-pdf/renderer";
 import type { MoodChartScheme } from "@/lib/app-settings";
 import type { CalendarLogRow } from "@/lib/dose-logs";
-import { formatMedicationNameDose } from "@/lib/medication-label";
+import { formatPrescribedDose, type MedicationLabelInput } from "@/lib/medication-label";
 import type { DoseHistoryEntry } from "@/lib/medications";
 import { levelColor, type DailyAverage, type WellbeingMetric } from "@/lib/pain-mood";
 import type { SideEffectRow } from "@/lib/side-effects";
@@ -79,6 +79,8 @@ const styles = StyleSheet.create({
   th: { fontSize: 7.5, fontWeight: 700, color: MUTED, textTransform: "uppercase" },
   td: { fontSize: 8.5, color: TEXT },
   tdMuted: { fontSize: 8.5, color: MUTED },
+  medName: { fontSize: 8.5, fontWeight: 700, color: TEXT },
+  medDose: { fontSize: 7.5, fontWeight: 700, color: "#6b7280" },
   medBadge: {
     fontSize: 7,
     fontWeight: 700,
@@ -144,6 +146,16 @@ function FeedbackChipsPdf({ feedbackType }: { feedbackType: FeedbackType }) {
   );
 }
 
+function MedicationNameWithDosePdf({ medication }: { medication: MedicationLabelInput }) {
+  const dose = formatPrescribedDose(medication);
+  return (
+    <Text style={styles.medName}>
+      {medication.name}
+      {dose ? <Text style={styles.medDose}> {dose}</Text> : null}
+    </Text>
+  );
+}
+
 // Name first, badges/chips on their own row below — a long medication
 // name (e.g. a combo OTC product) no longer wraps awkwardly around
 // leading badges when it's given the full row width to itself.
@@ -151,7 +163,7 @@ function MedicationLabel({
   medication,
   suffix: _suffix,
   annotation,
-  includeDose = true,
+  includeDose: _includeDose,
 }: {
   medication: Medication;
   suffix?: string;
@@ -159,12 +171,11 @@ function MedicationLabel({
   includeDose?: boolean;
 }) {
   void _suffix;
+  void _includeDose;
 
   return (
     <View>
-      <Text style={{ fontSize: 8.5, fontWeight: 700, color: TEXT }}>
-        {includeDose ? formatMedicationNameDose(medication) : medication.name}
-      </Text>
+      <MedicationNameWithDosePdf medication={medication} />
       <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", marginTop: 2 }}>
         <MedTypeBadgePdf type={medication.medication_type} />
         <FeedbackChipsPdf feedbackType={medication.feedback_type} />
@@ -559,7 +570,11 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
             <PdfTable
               columns={[
                 { header: "Date", flex: 1, render: (se: SideEffectRow) => formatShortDate(se.occurred_date) },
-                { header: "Medication", flex: 1.4, render: (se: SideEffectRow) => formatMedicationNameDose(se.medications) },
+                {
+                  header: "Medication",
+                  flex: 1.4,
+                  render: (se: SideEffectRow) => <MedicationNameWithDosePdf medication={se.medications} />,
+                },
                 { header: "Severity", flex: 1, render: (se: SideEffectRow) => se.severity },
                 { header: "Side Effect", flex: 1.6, render: (se: SideEffectRow) => se.description },
                 { header: "Notes", flex: 1.6, render: (se: SideEffectRow) => se.note },
@@ -606,7 +621,11 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                   flex: 1,
                   render: (r: DoctorVisitReportData["doseChanges"][number]) => formatShortDate(r.at.slice(0, 10)),
                 },
-                { header: "Medication", flex: 1.4, render: (r) => formatMedicationNameDose(r.medication) },
+                {
+                  header: "Medication",
+                  flex: 1.4,
+                  render: (r) => <MedicationNameWithDosePdf medication={r.medication} />,
+                },
                 {
                   header: "Change",
                   flex: 1,
@@ -634,7 +653,11 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
             <PdfTable
               columns={[
                 { header: "Date", flex: 1, render: (l: CalendarLogRow) => formatShortDate(l.scheduled_for_date) },
-                { header: "Medication", flex: 1.6, render: (l: CalendarLogRow) => formatMedicationNameDose(l.medications) },
+                {
+                  header: "Medication",
+                  flex: 1.6,
+                  render: (l: CalendarLogRow) => <MedicationNameWithDosePdf medication={l.medications} />,
+                },
                 { header: "Scheduled Time", flex: 1, render: (l: CalendarLogRow) => to12h(l.scheduled_time.slice(0, 5)) },
                 {
                   header: "Status",

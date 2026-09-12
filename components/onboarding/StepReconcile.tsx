@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { to12h } from "@/lib/utils";
 import { useOnboarding } from "./OnboardingContext";
 import { buildTodayReconcileSlots } from "./reconcile";
@@ -74,7 +75,15 @@ export function StepReconcile() {
                   key={`${slot.draftId}-${slot.scheduledTime}`}
                   className="flex items-center justify-between"
                 >
-                  <span className="text-sm text-brand-text">{slot.medicationName}</span>
+                  <span className="text-sm text-brand-text">
+                    <MedicationNameWithDose
+                      medication={{
+                        name: slot.medicationName,
+                        dose_amount: slot.doseAmount,
+                        dose_unit: slot.doseUnit,
+                      }}
+                    />
+                  </span>
                   <div className="flex gap-2">
                     <button
                       type="button"

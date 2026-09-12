@@ -158,7 +158,6 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
             Log dose -{" "}
             <MedicationNameWithDose
               medication={medication}
-              doseClassName="text-sm font-bold text-brand-text-muted"
             />
           </DialogTitle>
         </DialogHeader>

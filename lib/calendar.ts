@@ -205,7 +205,9 @@ export interface CalendarDaySlot {
 export interface CalendarDayMedicationSummary {
   medicationId: string;
   name: string;
-  dose: string;
+  dose: string | null;
+  dose_amount: number | null;
+  dose_unit: string | null;
   total: number;
   taken: number;
   late: number;
@@ -256,6 +258,8 @@ export function buildDayDetails(
         medicationId: log.medication_id,
         name: log.medications.name,
         dose: log.medications.dose,
+        dose_amount: log.medications.dose_amount,
+        dose_unit: log.medications.dose_unit,
         total: 0,
         taken: 0,
         late: 0,

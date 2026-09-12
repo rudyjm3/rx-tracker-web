@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { LevelGrid } from "@/components/ui/LevelGrid";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import type { DoseFeedback } from "@/lib/dose-logs";
 import type { DaySlot } from "@/lib/schedule";
 
@@ -77,7 +78,9 @@ export function FeedbackDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>How are you feeling?</DialogTitle>
-          <p className="text-sm text-brand-text-muted">{slot.medicationName}</p>
+          <p className="text-sm text-brand-text-muted">
+            <MedicationNameWithDose medication={slot.medication} />
+          </p>
           {queueTotal != null && queueTotal > 1 && (
             <p className="mt-1 text-xs font-medium text-brand-deep-blue">
               {queuePosition ?? 1} of {queueTotal}

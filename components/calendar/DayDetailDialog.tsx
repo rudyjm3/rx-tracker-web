@@ -41,7 +41,6 @@ export function DayDetailDialog({ day, onClose, onEditSlot }: DayDetailDialogPro
                       <MedicationNameWithDose
                         medication={med}
                         className="font-semibold text-brand-text"
-                        doseClassName="text-sm font-semibold text-brand-text-muted"
                       />
                     </div>
                     <p className="mt-1 text-xs text-brand-text-muted">

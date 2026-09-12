@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,10 +94,11 @@ export function AlarmOverlay({
 
           {event.kind === "single" ? (
             <>
-              <h2 className="mt-2 text-2xl font-bold">{event.slot.medicationName}</h2>
+              <h2 className="mt-2 text-2xl font-bold">
+                <MedicationNameWithDose medication={event.slot.medication} />
+              </h2>
               <div className="mt-1 flex items-center justify-center gap-2 text-white/85">
                 <MedTypeBadge type={event.slot.medication.medication_type} />
-                {event.slot.dose && <span>{event.slot.dose}</span>}
               </div>
             </>
           ) : (
@@ -115,10 +117,11 @@ export function AlarmOverlay({
                 className="flex items-center justify-between gap-2 border-b border-white/15 py-2 last:border-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{m.medicationName}</p>
+                  <p className="truncate font-medium">
+                    <MedicationNameWithDose medication={m.medication} />
+                  </p>
                   <p className="text-xs text-white/70">
                     {to12h(m.scheduledTime)}
-                    {m.dose && ` · ${m.dose}`}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">

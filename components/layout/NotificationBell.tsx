@@ -9,6 +9,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getActiveMedications } from "@/lib/medications";
 
@@ -70,7 +71,7 @@ export function NotificationBell() {
           alerts.map(({ medication, severity }) => (
             <DropdownMenuItem key={medication.id} asChild>
               <a href={`/medications`} className="flex flex-col items-start gap-0.5">
-                <span className="font-medium text-brand-text">{medication.name}</span>
+                <MedicationNameWithDose medication={medication} className="font-medium text-brand-text" />
                 <span className="text-xs text-status-danger">
                   {SEVERITY_LABEL[severity]} — {medication.current_quantity} {medication.inventory_unit} left
                 </span>

@@ -159,9 +159,9 @@ export function MedicationCard({
             <h3 className="font-semibold text-brand-navy">
               <MedicationNameWithDose
                 medication={medication}
-                doseClassName="text-sm font-semibold text-brand-text-muted"
               />
             </h3>
+            <MedTypeBadge type={medication.medication_type} />
             <span
               role="button"
               tabIndex={0}
@@ -174,7 +174,6 @@ export function MedicationCard({
             >
               <i className="fa-solid fa-circle-info" aria-hidden="true" />
             </span>
-            <MedTypeBadge type={medication.medication_type} />
             {isLowSupply && (
               <span className="rounded-full bg-status-warning/10 px-2 py-0.5 text-xs font-medium text-status-warning">
                 Low supply

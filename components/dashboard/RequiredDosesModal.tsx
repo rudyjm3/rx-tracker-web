@@ -2,6 +2,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
 import { Badge } from "@/components/ui/Badge";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { formatClockTime, to12h } from "@/lib/utils";
 import type { DaySlot } from "@/lib/schedule";
 
@@ -48,7 +49,7 @@ export function RequiredDosesModal({ open, onClose, slots }: RequiredDosesModalP
                 open
               >
                 <summary className="cursor-pointer font-medium text-brand-text">
-                  {medSlots[0].medicationName}
+                  <MedicationNameWithDose medication={medSlots[0].medication} />
                 </summary>
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {medSlots.map((slot) => {

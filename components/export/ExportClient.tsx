@@ -8,6 +8,7 @@ import { useAuth } from "@/components/layout/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { Switch } from "@/components/ui/Switch";
 import { computeAdherence } from "@/lib/adherence";
 import { getProfileAllergies } from "@/lib/allergies";
@@ -18,6 +19,7 @@ import {
   getActiveMedications,
   getDoseHistory,
   getInactiveMedications,
+  getStatusEvents,
   type DoseHistoryEntry,
 } from "@/lib/medications";
 import {
@@ -42,7 +44,7 @@ function defaultStartDate(): string {
   return localDateString(d);
 }
 
-function latestStatusEvent(
+function latestStatusEntry(
   entries: DoseHistoryEntry[],
   event: StatusEventType,
 ): MedicationStatusEvent | null {
@@ -52,6 +54,16 @@ function latestStatusEvent(
   );
   if (matches.length === 0) return null;
   return matches.reduce((latest, cur) => (cur.at > latest.at ? cur : latest)).data;
+}
+
+function latestMedicationStatusEvent(
+  events: MedicationStatusEvent[],
+  medicationId: string,
+  event: StatusEventType,
+): MedicationStatusEvent | null {
+  const matches = events.filter((item) => item.medication_id === medicationId && item.event === event);
+  if (matches.length === 0) return null;
+  return matches.reduce((latest, cur) => (cur.event_at > latest.event_at ? cur : latest));
 }
 
 export function ExportClient() {
@@ -179,9 +191,17 @@ export function ExportClient() {
     .flatMap((group) => group.changes.map((change) => ({ ...change, medication: group.medication })))
     .sort((a, b) => b.at.localeCompare(a.at));
 
+  const statusEventsQuery = useQuery({
+    queryKey: ["export-status-events", allMedicationIds],
+    queryFn: () => getStatusEvents(allMedicationIds),
+    enabled: inactiveMedicationsQuery.data !== undefined,
+  });
+  const statusEvents = statusEventsQuery.data ?? [];
+
   const currentMedications = selectedMedications.filter((m) => m.active).map((medication) => {
-    const entries = doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [];
-    const resumed = latestStatusEvent(entries, "resumed");
+    const resumed =
+      latestMedicationStatusEvent(statusEvents, medication.id, "resumed") ??
+      latestStatusEntry(doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [], "resumed");
     return {
       medication,
       resumedOn: resumed ? formatLongDate(resumed.event_at.slice(0, 10)) : null,
@@ -190,8 +210,13 @@ export function ExportClient() {
   const discontinuedMedications = allMedications
     .filter((m) => !m.active && isMedicationSelected(m.id))
     .map((medication) => {
-      const entries = doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [];
-      return { medication, event: latestStatusEvent(entries, "discontinued") };
+      const event =
+        latestMedicationStatusEvent(statusEvents, medication.id, "discontinued") ??
+        latestStatusEntry(
+          doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [],
+          "discontinued",
+        );
+      return { medication, event };
     });
 
   const allergiesQuery = useQuery({
@@ -275,17 +300,18 @@ export function ExportClient() {
 
   const painTrends = painTrackedMeds.map((medication, i) => {
     const raw = painTrendQueries[i]?.data ?? [];
-    return { medication, points: groupDailyAverages(raw), notes: buildNotes(medication.name, raw) };
+    return { medication, points: groupDailyAverages(raw), notes: buildNotes(formatMedicationNameDose(medication), raw) };
   });
   const moodTrends = moodTrackedMeds.map((medication, i) => {
     const raw = moodTrendQueries[i]?.data ?? [];
-    return { medication, points: groupDailyAverages(raw), notes: buildNotes(medication.name, raw) };
+    return { medication, points: groupDailyAverages(raw), notes: buildNotes(formatMedicationNameDose(medication), raw) };
   });
 
   const isLoading =
     isResolving ||
     medicationsQuery.isLoading ||
     inactiveMedicationsQuery.isLoading ||
+    statusEventsQuery.isLoading ||
     missedDoseLogsQuery.isLoading ||
     sideEffectsQuery.isLoading ||
     adherenceStatusesQuery.isLoading ||
@@ -399,9 +425,7 @@ export function ExportClient() {
                     key={med.id}
                     className="flex items-center justify-between rounded-control bg-brand-bg px-3 py-2 text-sm"
                   >
-                    <span className="font-semibold text-brand-text">
-                      {formatMedicationNameDose(med)}
-                    </span>
+                    <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
                       {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
                     </span>
@@ -424,9 +448,7 @@ export function ExportClient() {
                     key={med.id}
                     className="flex items-center justify-between rounded-control bg-brand-bg px-3 py-2 text-sm"
                   >
-                    <span className="font-semibold text-brand-text">
-                      {formatMedicationNameDose(med)}
-                    </span>
+                    <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
                       {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
                     </span>
@@ -460,7 +482,7 @@ export function ExportClient() {
                     checked={isMedicationSelected(med.id)}
                     onCheckedChange={() => toggleMedication(med.id)}
                   />
-                  {formatMedicationNameDose(med)}
+                  <MedicationNameWithDose medication={med} />
                   {!med.active && <span className="text-xs text-brand-text-muted">(inactive)</span>}
                 </label>
               ))}

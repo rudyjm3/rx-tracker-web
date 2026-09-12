@@ -230,7 +230,7 @@ export interface CalendarDayMarker {
 }
 
 export type CalendarLogRow = DoseLog & {
-  medications: { name: string; dose: string };
+  medications: { name: string; dose: string | null; dose_amount: number | null; dose_unit: string | null };
 };
 
 /**
@@ -278,7 +278,7 @@ export async function getCalendarLogs(
   const supabase = createClient();
   let query = supabase
     .from("dose_logs")
-    .select("*, medications(name, dose)")
+    .select("*, medications(name, dose, dose_amount, dose_unit)")
     .gte("scheduled_for_date", monthStart)
     .lte("scheduled_for_date", monthEnd);
   if (medicationIds) query = query.in("medication_id", medicationIds);
@@ -323,7 +323,7 @@ export async function getDoseLogHistory(
   const offset = filter.offset ?? 0;
   let query = supabase
     .from("dose_logs")
-    .select("*, medications(name, dose)")
+    .select("*, medications(name, dose, dose_amount, dose_unit)")
     .order("scheduled_for_date", { ascending: false })
     .order("scheduled_time", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -378,7 +378,7 @@ export async function getMissedDoseLogsInRange(
   const supabase = createClient();
   let query = supabase
     .from("dose_logs")
-    .select("*, medications(name, dose)")
+    .select("*, medications(name, dose, dose_amount, dose_unit)")
     .in("status", ["missed", "skipped"])
     .gte("scheduled_for_date", startDate)
     .lte("scheduled_for_date", endDate)

@@ -1,4 +1,8 @@
-import { formatMedicationNameDose, type MedicationLabelInput } from "@/lib/medication-label";
+import {
+  formatMedicationNameDose,
+  formatPrescribedDose,
+  type MedicationLabelInput,
+} from "@/lib/medication-label";
 
 interface MedicationNameWithDoseProps {
   medication: MedicationLabelInput;
@@ -7,13 +11,15 @@ interface MedicationNameWithDoseProps {
   doseClassName?: string;
 }
 
+const DEFAULT_DOSE_CLASS_NAME = "text-[0.875em] font-bold text-[#6b7280]";
+
 export function MedicationNameWithDose({
   medication,
   className,
   nameClassName,
   doseClassName,
 }: MedicationNameWithDoseProps) {
-  const dose = medication.dose?.trim();
+  const dose = formatPrescribedDose(medication);
   if (!dose) {
     return <span className={nameClassName ?? className}>{medication.name}</span>;
   }
@@ -21,7 +27,7 @@ export function MedicationNameWithDose({
   return (
     <span className={className} title={formatMedicationNameDose(medication)}>
       <span className={nameClassName}>{medication.name}</span>{" "}
-      <span className={doseClassName ?? "text-brand-text-muted"}>{dose}</span>
+      <span className={doseClassName ?? DEFAULT_DOSE_CLASS_NAME}>{dose}</span>
     </span>
   );
 }
