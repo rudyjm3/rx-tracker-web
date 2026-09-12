@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Button } from "@/components/ui/Button";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
 import { daysUntilRunout, to12h, type GroupDoseOverride } from "@/lib/utils";
@@ -155,7 +156,12 @@ export function MedicationCard({
           className="flex-1 text-left"
         >
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-brand-navy">{medication.name}</h3>
+            <h3 className="font-semibold text-brand-navy">
+              <MedicationNameWithDose
+                medication={medication}
+                doseClassName="text-sm font-semibold text-brand-text-muted"
+              />
+            </h3>
             <span
               role="button"
               tabIndex={0}
@@ -175,9 +181,6 @@ export function MedicationCard({
               </span>
             )}
           </div>
-          {medication.dose && (
-            <p className="text-sm text-brand-text-muted">{medication.dose}</p>
-          )}
           <p className="text-sm text-brand-text-muted">{scheduleSummary(medication)}</p>
 
           {showInventoryBar && (

@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
 import { FeedbackChip, feedbackChipTypes } from "@/components/ui/FeedbackChip";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import { formatLongDate, formatShortDate, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import type { DoctorVisitReportData, TrendNoteEntry } from "./DoctorVisitReportPdf";
@@ -23,18 +24,21 @@ function formatSchedule(med: Medication): string {
 // the full row width to itself.
 function MedicationLabel({
   medication,
-  suffix,
+  suffix: _suffix,
   annotation,
+  includeDose = true,
 }: {
   medication: Medication;
   suffix?: string;
   annotation?: string | null;
+  includeDose?: boolean;
 }) {
+  void _suffix;
+
   return (
     <div>
       <span className="text-sm font-semibold text-brand-text">
-        {medication.name}
-        {suffix ? ` ${suffix}` : ""}
+        {includeDose ? formatMedicationNameDose(medication) : medication.name}
       </span>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
         <MedTypeBadge type={medication.medication_type} />
@@ -274,6 +278,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
               render: (r) => (
                 <MedicationLabel
                   medication={r.medication}
+                  includeDose={false}
                   annotation={r.resumedOn ? `(Resumed use on ${r.resumedOn})` : null}
                 />
               ),
@@ -299,7 +304,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
           rowKey={(se) => se.id}
           columns={[
             { header: "Date", render: (se) => formatShortDate(se.occurred_date) },
-            { header: "Medication", render: (se) => se.medications.name },
+            { header: "Medication", render: (se) => formatMedicationNameDose(se.medications) },
             { header: "Severity", render: (se) => se.severity },
             { header: "Side Effect", render: (se) => se.description },
             { header: "Notes", render: (se) => se.note || "—" },
@@ -316,7 +321,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
         <ReportTable
           rowKey={(r) => r.medication.id}
           columns={[
-            { header: "Medication", render: (r) => <MedicationLabel medication={r.medication} /> },
+            { header: "Medication", render: (r) => <MedicationLabel medication={r.medication} includeDose={false} /> },
             { header: "Dose", render: (r) => r.medication.dose },
             { header: "Reason", render: (r) => r.event?.reason || "—" },
             { header: "Notes", render: (r) => r.event?.comment || "—" },
@@ -335,7 +340,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
           rowKey={(r) => r.data.id}
           columns={[
             { header: "Date", render: (r) => formatShortDate(r.at.slice(0, 10)) },
-            { header: "Medication", render: (r) => r.medication.name },
+            { header: "Medication", render: (r) => formatMedicationNameDose(r.medication) },
             {
               header: "Change",
               render: (r) => {
@@ -364,7 +369,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
           rowKey={(l) => l.id}
           columns={[
             { header: "Date", render: (l) => formatShortDate(l.scheduled_for_date) },
-            { header: "Medication", render: (l) => `${l.medications.name} – ${l.medications.dose}` },
+            { header: "Medication", render: (l) => formatMedicationNameDose(l.medications) },
             { header: "Scheduled Time", render: (l) => to12h(l.scheduled_time.slice(0, 5)) },
             { header: "Status", render: (l) => <Badge variant={l.status} /> },
           ]}

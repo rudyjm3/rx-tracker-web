@@ -11,15 +11,15 @@ import {
   YAxis,
   type DotItemDotProps,
 } from "recharts";
-import { cn } from "@/lib/cn";
-import { localDateString, minutesToTime, timeToMinutes, to12h } from "@/lib/utils";
 import type { MoodChartScheme } from "@/lib/app-settings";
+import { cn } from "@/lib/cn";
 import {
   groupDailyAverages,
   levelColor,
   type TrendPoint,
   type WellbeingMetric,
 } from "@/lib/pain-mood";
+import { localDateString, minutesToTime, timeToMinutes, to12h } from "@/lib/utils";
 
 export const RANGE_OPTIONS = [
   { label: "Today", days: 0 as const },
@@ -29,11 +29,6 @@ export const RANGE_OPTIONS = [
 ];
 export type RangeDays = (typeof RANGE_OPTIONS)[number]["days"];
 
-// Shared by any caller that fetches a trend for a given range — the
-// page-level orchestrator (WellbeingClient) and the per-medication
-// GraphModal both need the same "today"/"7d"/"30d"/"90d" -> {start, end}
-// mapping, so it lives once here alongside the RangeDays type it's
-// keyed on.
 export function rangeDatesForDays(
   rangeDays: RangeDays,
   today: string,
@@ -99,10 +94,17 @@ export function TrendChart({
 
   const hasData = showingDay ? dayPoints.length > 0 : dailyAverages.length > 0;
   const metricLabel = metric === "pain" ? "Pain" : "Mood";
+  const showingDayLabel = showingDay
+    ? new Date(`${showingDay}T00:00:00`).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Date range">
+      <div className="pain-graph-range-tabs flex flex-wrap gap-2" role="group" aria-label="Date range">
         {RANGE_OPTIONS.map((opt) => (
           <button
             key={opt.days}
@@ -124,13 +126,16 @@ export function TrendChart({
       </div>
 
       {rangeDays > 0 && drillDate && (
-        <button
-          type="button"
-          onClick={() => setDrillDate(null)}
-          className="self-start text-sm text-brand-deep-blue hover:underline"
-        >
-          ← Back to trend
-        </button>
+        <div className="mood-graph-day-banner flex items-center justify-between gap-3 text-sm">
+          <span className="font-semibold text-brand-text">Showing {showingDayLabel}</span>
+          <button
+            type="button"
+            onClick={() => setDrillDate(null)}
+            className="font-semibold text-brand-deep-blue hover:underline"
+          >
+            &larr; Back to trend
+          </button>
+        </div>
       )}
 
       {!hasData ? (
@@ -173,9 +178,7 @@ export function TrendChart({
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-brand-border)" />
             <XAxis dataKey="date" tickFormatter={(d: string) => d.slice(5)} />
             <YAxis domain={[1, 10]} ticks={[1, 3, 5, 7, 10]} />
-            <Tooltip
-              formatter={(value) => [`${Number(value).toFixed(1)}/10`, metricLabel]}
-            />
+            <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}/10`, metricLabel]} />
             <Line
               type="monotone"
               dataKey="level"

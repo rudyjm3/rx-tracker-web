@@ -3,16 +3,18 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/Button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
-import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
-import { getGroupMembers, getGroups } from "@/lib/medications";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { getTodayLogs, recordDoseAtTime } from "@/lib/dose-logs";
+import { formatMedicationNameDose } from "@/lib/medication-label";
+import { getGroupMembers, getGroups } from "@/lib/medications";
 import { generateDaySlots, type DaySlot } from "@/lib/schedule";
 import { localDateString, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
@@ -24,25 +26,10 @@ interface LogPastDoseModalProps {
   medication: Medication;
 }
 
-// Already resolved — not offered in the picker, matching the
-// "already logged" pattern in components/dashboard/DoseRow.tsx. A
-// "missed" slot stays pickable (it already has a dose_logs row, but
-// isn't done being logged — that's exactly the Missed Dose Modal case:
-// correcting it to "taken").
 function isTerminal(status: DaySlot["status"]): boolean {
   return status === "taken" || status === "skipped";
 }
 
-/**
- * Consolidates the spec's Slot Picker / Missed Dose / Log Past Dose /
- * Free Log modals into one flow: pick a date + a scheduled slot (or a
- * free/custom time when none fit), then a shared "actual time taken +
- * pain/mood + notes" sub-form (DoseEntryForm) to save it. Reached from
- * the medication card's action menu — replaces the old ad-hoc
- * LogDoseModal, which this is a strict superset of (that modal's
- * "today, custom time" case is exactly what an ungrouped as-needed
- * medication falls straight into here, with no picker step in between).
- */
 export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDoseModalProps) {
   const queryClient = useQueryClient();
   const today = localDateString();
@@ -53,30 +40,18 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
     enabled: open,
   });
 
-  // An ungrouped as-needed medication never gets a scheduled slot for
-  // any date — generateDaySlots only ever gives an as_needed medication
-  // a slot when it's bundled into a group (see lib/schedule.ts). For
-  // those, the date/slot-picker step would always be empty, so skip
-  // straight to a free-time entry for today, matching the old
-  // LogDoseModal this replaces.
   const isGrouped = (groupMembersQuery.data ?? []).some(
     (m) => m.medication_id === medication.id,
   );
-  const neverScheduled = medication.as_needed && !isGrouped;
+  const neverScheduled = medication.as_needed && groupMembersQuery.isSuccess && !isGrouped;
+  const resolvingPrnGrouping = medication.as_needed && groupMembersQuery.isPending;
+  const groupMembershipError = medication.as_needed && groupMembersQuery.isError;
 
   const [date, setDate] = useState(today);
   const [slot, setSlot] = useState<DaySlot | null>(null);
-  // Whether we're on the "actual time taken" sub-form step, vs the
-  // date + slot-list picker step. Combined with neverScheduled (rather
-  // than seeded from it in an effect) so a medication whose grouping
-  // hasn't loaded yet still lands on the picker first and jumps to the
-  // form the moment neverScheduled resolves true, with no synchronous
-  // setState-in-effect needed.
   const [entryStepChosen, setEntryStepChosen] = useState(false);
   const entryStep = entryStepChosen || neverScheduled;
 
-  // Reset step state at the moment the dialog opens rather than in an
-  // effect — mirrors the old LogDoseModal's onOpenChange-driven reset.
   function handleOpenChange(next: boolean) {
     if (next) {
       setDate(today);
@@ -89,16 +64,18 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
   const groupsQuery = useQuery({
     queryKey: ["groups", medication.profile_id],
     queryFn: () => getGroups(medication.profile_id),
-    enabled: open && !neverScheduled,
+    enabled: open && !neverScheduled && !groupMembershipError,
   });
   const logsQuery = useQuery({
     queryKey: ["dose-logs", date],
     queryFn: () => getTodayLogs(date),
-    enabled: open && !neverScheduled,
+    enabled: open && !neverScheduled && !groupMembershipError,
   });
 
   const slots = useMemo<DaySlot[]>(() => {
-    if (neverScheduled || !logsQuery.data) return [];
+    if (resolvingPrnGrouping || neverScheduled || groupMembershipError || !logsQuery.data) {
+      return [];
+    }
     return generateDaySlots(
       date,
       [medication],
@@ -107,10 +84,19 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
       logsQuery.data,
       [],
     );
-  }, [neverScheduled, date, medication, groupsQuery.data, groupMembersQuery.data, logsQuery.data]);
+  }, [
+    resolvingPrnGrouping,
+    neverScheduled,
+    groupMembershipError,
+    date,
+    medication,
+    groupsQuery.data,
+    groupMembersQuery.data,
+    logsQuery.data,
+  ]);
 
   const pickableSlots = slots.filter((s) => !isTerminal(s.status));
-  const loadingSlots = groupsQuery.isLoading || logsQuery.isLoading;
+  const loadingSlots = resolvingPrnGrouping || groupsQuery.isLoading || logsQuery.isLoading;
 
   const mutation = useMutation({
     mutationFn: ({
@@ -123,10 +109,9 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
       takenAtIso: string;
       feedback?: DoseEntrySaveInput["feedback"];
       quantityPerDose: number;
-    }) =>
-      recordDoseAtTime(medication, date, scheduledTime, takenAtIso, quantityPerDose, feedback),
+    }) => recordDoseAtTime(medication, date, scheduledTime, takenAtIso, quantityPerDose, feedback),
     onSuccess: () => {
-      toast.success(`${medication.name} logged`);
+      toast.success(`${formatMedicationNameDose(medication)} logged`);
       queryClient.invalidateQueries({ queryKey: ["dose-logs"] });
       queryClient.invalidateQueries({ queryKey: ["medications"] });
       queryClient.invalidateQueries({ queryKey: ["today-history"] });
@@ -139,10 +124,6 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
   });
 
   function handleSave(input: DoseEntrySaveInput) {
-    // A picked slot keeps its own scheduled_time as the row's identity
-    // (so it lines up with that slot on the dashboard/calendar) — only
-    // a free-time entry uses the entered time as both the schedule key
-    // and the actual time taken, same as the old ad-hoc LogDoseModal.
     const scheduledTime = slot ? slot.scheduledTime : input.time;
     const takenAtIso = new Date(`${date}T${input.time}:00`).toISOString();
     mutation.mutate({
@@ -164,7 +145,7 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
     day: "numeric",
   });
   const contextLabel = slot
-    ? `${dateLabel} · scheduled for ${to12h(slot.scheduledTime)}`
+    ? `${dateLabel} - scheduled for ${to12h(slot.scheduledTime)}`
     : neverScheduled
       ? undefined
       : dateLabel;
@@ -174,8 +155,11 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
       <DialogContent size="wide">
         <DialogHeader>
           <DialogTitle>
-            Log dose — {medication.name}{" "}
-            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+            Log dose -{" "}
+            <MedicationNameWithDose
+              medication={medication}
+              doseClassName="text-sm font-bold text-brand-text-muted"
+            />
           </DialogTitle>
         </DialogHeader>
 
@@ -194,8 +178,23 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
               />
             </Field>
 
-            {loadingSlots ? (
-              <p className="text-sm text-brand-text-muted">Loading slots…</p>
+            {groupMembershipError ? (
+              <div className="rounded-control border border-status-danger/30 bg-status-danger/10 p-3">
+                <p className="text-sm text-status-danger">
+                  Couldn&apos;t load medication groups. Try again before logging this as-needed dose.
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="compact"
+                  className="mt-3"
+                  onClick={() => groupMembersQuery.refetch()}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : loadingSlots ? (
+              <p className="text-sm text-brand-text-muted">Loading slots...</p>
             ) : pickableSlots.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {pickableSlots.map((s) => (

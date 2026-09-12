@@ -7,9 +7,11 @@ import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { getDoseLogHistory, type CalendarLogRow } from "@/lib/dose-logs";
 import { getActiveMedications, getInactiveMedications } from "@/lib/medications";
 import { getMissedGraceMinutes } from "@/lib/app-settings";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import { formatLate, isLate, localDateString, minutesLate, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import { EditDoseLogDialog, type EditableDoseLog } from "./EditDoseLogDialog";
@@ -77,7 +79,7 @@ export function HistoryClient() {
             <option value={ALL_MEDICATIONS}>All medications</option>
             {allMedications.map((med) => (
               <option key={med.id} value={med.id}>
-                {med.name}
+                {formatMedicationNameDose(med)}
                 {!med.active ? " (inactive)" : ""}
               </option>
             ))}
@@ -210,10 +212,11 @@ function HistoryList({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-brand-text">{row.medications.name}</span>
-                    {row.medications.dose && (
-                      <span className="text-sm text-brand-text-muted">{row.medications.dose}</span>
-                    )}
+                    <MedicationNameWithDose
+                      medication={row.medications}
+                      className="font-medium text-brand-text"
+                      doseClassName="text-sm font-semibold text-brand-text-muted"
+                    />
                   </div>
                   <p className="text-sm text-brand-text-muted">
                     {row.scheduled_for_date} · {to12h(row.scheduled_time.slice(0, 5))}

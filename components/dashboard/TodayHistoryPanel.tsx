@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ArrowUpDown } from "lucide-react";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { getDoseLogHistory, type CalendarLogRow } from "@/lib/dose-logs";
 import { getInactiveMedications } from "@/lib/medications";
@@ -130,10 +131,11 @@ export function TodayHistoryPanel({
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-brand-text">{row.medications.name}</span>
-                      {row.medications.dose && (
-                        <span className="text-sm text-brand-text-muted">{row.medications.dose}</span>
-                      )}
+                      <MedicationNameWithDose
+                        medication={row.medications}
+                        className="font-medium text-brand-text"
+                        doseClassName="text-sm font-semibold text-brand-text-muted"
+                      />
                     </div>
                     {(row.pain_level !== null || row.mood_level !== null) && (
                       <div className="mt-1 flex flex-wrap items-center gap-2">
