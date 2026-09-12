@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { getRefillHistory } from "@/lib/inventory";
 import type { Medication, MedicationRefill } from "@/lib/types/medications";
 
@@ -116,8 +117,7 @@ export function RefillHistoryModal({
       <DialogContent size="wide">
         <DialogHeader>
           <DialogTitle>
-            Refill History — {medication.name}{" "}
-            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+            Refill History — <MedicationNameWithDose medication={medication} />
           </DialogTitle>
         </DialogHeader>
 

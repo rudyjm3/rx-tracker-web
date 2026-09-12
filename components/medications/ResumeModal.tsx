@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { cn } from "@/lib/cn";
 import { activateMedication } from "@/lib/medications";
 import type { Medication } from "@/lib/types/medications";
@@ -59,7 +60,9 @@ export function ResumeModal({ open, onOpenChange, medication }: ResumeModalProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Resume — {medication.name}</DialogTitle>
+          <DialogTitle>
+            Resume — <MedicationNameWithDose medication={medication} />
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">

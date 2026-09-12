@@ -5,6 +5,8 @@ import { timeToMinutes } from "@/lib/utils";
 export interface ReconcileSlot {
   draftId: string;
   medicationName: string;
+  doseAmount: number | null;
+  doseUnit: string | null;
   scheduledTime: string; // "HH:MM"
   quantityPerDose: number;
 }
@@ -57,6 +59,8 @@ export function buildTodayReconcileSlots(
       slots.push({
         draftId: draft.id,
         medicationName: values.name || "Medication",
+        doseAmount: Number(values.doseAmount) || null,
+        doseUnit: values.doseUnit || null,
         scheduledTime: time,
         quantityPerDose,
       });

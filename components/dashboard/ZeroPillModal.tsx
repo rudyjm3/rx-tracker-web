@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { RefillModal } from "@/components/medications/RefillModal";
 import { adjustQuantity } from "@/lib/inventory";
 import type { DaySlot } from "@/lib/schedule";
@@ -59,7 +60,7 @@ export function ZeroPillModal({ slot, onClose, onTakeAnyway, onCancelDose }: Zer
           <DialogHeader>
             <DialogTitle>Out of {medication.inventory_unit}</DialogTitle>
             <p className="text-sm text-brand-text-muted">
-              {medication.name} shows 0 {medication.inventory_unit} on hand.
+              <MedicationNameWithDose medication={medication} /> shows 0 {medication.inventory_unit} on hand.
             </p>
           </DialogHeader>
 

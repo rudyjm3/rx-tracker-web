@@ -7,8 +7,8 @@ import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Button } from "@/components/ui/Button";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { getMoodChartScheme } from "@/lib/app-settings";
-import { formatMedicationNameDose } from "@/lib/medication-label";
 import { getActiveMedications } from "@/lib/medications";
+import type { Medication } from "@/lib/types/medications";
 import {
   createStandaloneLog,
   getHistory,
@@ -44,7 +44,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
   // Which medication's (or Independent's) dedicated graph modal is open,
   // if any — separate from selectedMedicationId, which drives the
   // page-level trend section/history below rather than the modal.
-  const [graphTarget, setGraphTarget] = useState<{ id: string | null; name: string } | null>(
+  const [graphTarget, setGraphTarget] = useState<{ id: string | null; medication: Medication } | null>(
     null,
   );
 
@@ -139,10 +139,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-brand-text">
-                    <MedicationNameWithDose
-                      medication={med}
-                      doseClassName="text-xs font-semibold text-brand-text-muted"
-                    />
+                    <MedicationNameWithDose medication={med} />
                   </p>
                 </div>
                 <Button
@@ -150,7 +147,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
                   variant="secondary"
                   size="compact"
                   className="shrink-0"
-                  onClick={() => setGraphTarget({ id: med.id, name: formatMedicationNameDose(med) })}
+                  onClick={() => setGraphTarget({ id: med.id, medication: med })}
                 >
                   View {metric} graph
                 </Button>
@@ -184,7 +181,7 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
       <GraphModal
         metric={metric}
         medicationId={graphTarget?.id ?? null}
-        medicationName={graphTarget?.name ?? ""}
+        medication={graphTarget?.medication ?? null}
         open={graphTarget !== null}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setGraphTarget(null);

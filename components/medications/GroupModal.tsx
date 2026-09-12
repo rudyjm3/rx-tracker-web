@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { createGroup, updateGroup, type GroupMemberInput } from "@/lib/medications";
-import { formatMedicationNameDose } from "@/lib/medication-label";
 import type { Medication, MedicationGroup } from "@/lib/types/medications";
 
 interface GroupModalProps {
@@ -114,12 +114,6 @@ export function GroupModal({
     mutation.mutate();
   }
 
-  function medicationDoseLabel(med: Medication) {
-    if (med.dose.trim()) return med.dose;
-    if (med.dose_amount == null) return "";
-    return `${med.dose_amount}${med.dose_unit ?? ""}`;
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -150,8 +144,6 @@ export function GroupModal({
             <span className="text-sm text-brand-text">Members</span>
             <div className="flex max-h-48 flex-col gap-2 overflow-auto">
               {availableMedications.map((med) => {
-                const doseLabel = medicationDoseLabel(med);
-
                 return (
                   <div key={med.id} className="flex items-center gap-2">
                     <input
@@ -160,7 +152,7 @@ export function GroupModal({
                       onChange={() => toggleMedication(med.id)}
                     />
                     <span className="flex-1 text-sm text-brand-text">
-                      {formatMedicationNameDose({ name: med.name, dose: doseLabel })}
+                      <MedicationNameWithDose medication={med} />
                     </span>
                     {med.id in selected && (
                       <input

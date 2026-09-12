@@ -5,7 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import type { MoodChartScheme } from "@/lib/app-settings";
+import type { MedicationLabelInput } from "@/lib/medication-label";
 import { getTrend, type WellbeingMetric } from "@/lib/pain-mood";
 import { localDateString } from "@/lib/utils";
 import { rangeDatesForDays, TrendChart, type RangeDays } from "./TrendChart";
@@ -14,7 +16,7 @@ interface GraphModalProps {
   metric: WellbeingMetric;
   // null = the "Independent" (no medication) bucket.
   medicationId: string | null;
-  medicationName: string;
+  medication: MedicationLabelInput | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   profileId?: string | null;
@@ -30,7 +32,7 @@ interface GraphModalProps {
 export function GraphModal({
   metric,
   medicationId,
-  medicationName,
+  medication,
   open,
   onOpenChange,
   profileId,
@@ -53,7 +55,7 @@ export function GraphModal({
       <DialogContent size="wide">
         <DialogHeader className="flex flex-row items-center justify-between gap-3 pr-8">
           <DialogTitle>
-            {metricLabel} graph — {medicationName}
+            {metricLabel} graph — {medication ? <MedicationNameWithDose medication={medication} /> : "Independent"}
           </DialogTitle>
           {/* data-no-print: an action control, not report content — same
               convention ExportClient uses for its own print button. The

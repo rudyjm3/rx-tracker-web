@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import type { Medication } from "@/lib/types/medications";
 
 export function LowSupplyBanner({ medications }: { medications: Medication[] }) {
@@ -18,7 +19,7 @@ export function LowSupplyBanner({ medications }: { medications: Medication[] }) 
         <span className="font-medium">Low supply: </span>
         {lowSupply.map((m, i) => (
           <span key={m.id}>
-            {m.name} ({m.current_quantity} {m.inventory_unit} left)
+            <MedicationNameWithDose medication={m} /> ({m.current_quantity} {m.inventory_unit} left)
             {i < lowSupply.length - 1 ? ", " : ""}
           </span>
         ))}

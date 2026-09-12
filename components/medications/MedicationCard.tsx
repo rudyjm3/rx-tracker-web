@@ -159,7 +159,6 @@ export function MedicationCard({
             <h3 className="font-semibold text-brand-navy">
               <MedicationNameWithDose
                 medication={medication}
-                doseClassName="text-sm font-semibold text-brand-text-muted"
               />
             </h3>
             <span

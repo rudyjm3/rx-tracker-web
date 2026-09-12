@@ -134,7 +134,6 @@ export function TodayHistoryPanel({
                       <MedicationNameWithDose
                         medication={row.medications}
                         className="font-medium text-brand-text"
-                        doseClassName="text-sm font-semibold text-brand-text-muted"
                       />
                     </div>
                     {(row.pain_level !== null || row.mood_level !== null) && (

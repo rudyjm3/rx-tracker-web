@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +54,9 @@ export function EditDoseLogDialog({
         {log && medication && (
           <DialogHeader>
             <DialogTitle>Edit dose entry</DialogTitle>
-            <p className="text-sm text-brand-text-muted">{medication.name}</p>
+            <p className="text-sm text-brand-text-muted">
+              <MedicationNameWithDose medication={medication} />
+            </p>
           </DialogHeader>
         )}
         {log && medication && (

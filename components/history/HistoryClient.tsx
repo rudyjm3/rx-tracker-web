@@ -215,7 +215,6 @@ function HistoryList({
                     <MedicationNameWithDose
                       medication={row.medications}
                       className="font-medium text-brand-text"
-                      doseClassName="text-sm font-semibold text-brand-text-muted"
                     />
                   </div>
                   <p className="text-sm text-brand-text-muted">

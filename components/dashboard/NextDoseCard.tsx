@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Clock } from "lucide-react";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { to12h } from "@/lib/utils";
 import type { NextDoseEvent } from "@/lib/schedule";
 import { DoseFormIcon } from "./DoseFormIcon";
@@ -50,11 +51,10 @@ export function NextDoseCard({ events }: NextDoseCardProps) {
             {next.kind === "single" ? (
               <>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-bold text-white">{next.slot.medicationName}</h2>
+                  <h2 className="text-lg font-bold text-white">
+                    <MedicationNameWithDose medication={next.slot.medication} />
+                  </h2>
                   <MedTypeBadge type={next.slot.medication.medication_type} />
-                </div>
-                <div className="mt-1.5">
-                  <DoseBadge dose={next.slot.dose} />
                 </div>
               </>
             ) : (
@@ -74,9 +74,8 @@ export function NextDoseCard({ events }: NextDoseCardProps) {
                   <ul className="mt-2 flex flex-col gap-1.5">
                     {next.members.map((m) => (
                       <li key={m.medicationId} className="flex items-center gap-2 text-sm text-white/90">
-                        <span className="font-medium">{m.medicationName}</span>
+                        <MedicationNameWithDose medication={m.medication} className="font-medium" />
                         <MedTypeBadge type={m.medication.medication_type} />
-                        {m.dose && <span className="text-white/70">{m.dose}</span>}
                       </li>
                     ))}
                   </ul>
@@ -95,12 +94,14 @@ export function NextDoseCard({ events }: NextDoseCardProps) {
           <div className="mt-1.5 flex items-center justify-between gap-3 text-sm text-white/90">
             <div className="flex min-w-0 items-center gap-2">
               <span className="font-medium">{to12h(hhmm(upcoming.time))}</span>
-              <span className="truncate">
-                {upcoming.kind === "single" ? upcoming.slot.medicationName : upcoming.groupName}
-              </span>
+              {upcoming.kind === "single" ? (
+                <MedicationNameWithDose medication={upcoming.slot.medication} className="truncate" />
+              ) : (
+                <span className="truncate">{upcoming.groupName}</span>
+              )}
             </div>
             <DoseBadge
-              dose={upcoming.kind === "single" ? upcoming.slot.dose : (upcoming.members[0]?.dose ?? "")}
+              dose={upcoming.kind === "single" ? "" : (upcoming.members[0]?.dose ?? "")}
             />
           </div>
         </div>

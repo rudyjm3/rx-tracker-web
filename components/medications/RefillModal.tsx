@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { logRefill, adjustQuantity } from "@/lib/inventory";
 import { localDateString } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
@@ -114,8 +115,7 @@ export function RefillModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {title} — {medication.name}{" "}
-            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+            {title} — <MedicationNameWithDose medication={medication} />
           </DialogTitle>
         </DialogHeader>
 

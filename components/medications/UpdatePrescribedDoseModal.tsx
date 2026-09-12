@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { updatePrescribedDose } from "@/lib/medications";
 import type { Medication } from "@/lib/types/medications";
 
@@ -75,8 +76,7 @@ export function UpdatePrescribedDoseModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Update prescribed dose — {medication.name}{" "}
-            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+            Update prescribed dose — <MedicationNameWithDose medication={medication} />
           </DialogTitle>
           <p className="text-sm text-brand-text-muted">
             Current dose: {formatDoseAmount(medication.dose_amount)} {medication.dose_unit}

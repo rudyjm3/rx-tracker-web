@@ -97,7 +97,6 @@ export function LevelHistoryList({
                       <MedicationNameWithDose
                         medication={selectedMedication}
                         className="font-bold text-brand-text"
-                        doseClassName="text-sm font-bold text-brand-text-muted"
                       />
                     ) : (
                       <span className="rounded-full bg-brand-bg px-2 py-0.5 text-xs font-bold uppercase text-brand-deep-blue">

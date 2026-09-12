@@ -8,6 +8,7 @@ import { useAuth } from "@/components/layout/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { Switch } from "@/components/ui/Switch";
 import { computeAdherence } from "@/lib/adherence";
 import { getProfileAllergies } from "@/lib/allergies";
@@ -299,11 +300,11 @@ export function ExportClient() {
 
   const painTrends = painTrackedMeds.map((medication, i) => {
     const raw = painTrendQueries[i]?.data ?? [];
-    return { medication, points: groupDailyAverages(raw), notes: buildNotes(medication.name, raw) };
+    return { medication, points: groupDailyAverages(raw), notes: buildNotes(formatMedicationNameDose(medication), raw) };
   });
   const moodTrends = moodTrackedMeds.map((medication, i) => {
     const raw = moodTrendQueries[i]?.data ?? [];
-    return { medication, points: groupDailyAverages(raw), notes: buildNotes(medication.name, raw) };
+    return { medication, points: groupDailyAverages(raw), notes: buildNotes(formatMedicationNameDose(medication), raw) };
   });
 
   const isLoading =
@@ -424,9 +425,7 @@ export function ExportClient() {
                     key={med.id}
                     className="flex items-center justify-between rounded-control bg-brand-bg px-3 py-2 text-sm"
                   >
-                    <span className="font-semibold text-brand-text">
-                      {formatMedicationNameDose(med)}
-                    </span>
+                    <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
                       {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
                     </span>
@@ -449,9 +448,7 @@ export function ExportClient() {
                     key={med.id}
                     className="flex items-center justify-between rounded-control bg-brand-bg px-3 py-2 text-sm"
                   >
-                    <span className="font-semibold text-brand-text">
-                      {formatMedicationNameDose(med)}
-                    </span>
+                    <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
                       {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
                     </span>
@@ -485,7 +482,7 @@ export function ExportClient() {
                     checked={isMedicationSelected(med.id)}
                     onCheckedChange={() => toggleMedication(med.id)}
                   />
-                  {formatMedicationNameDose(med)}
+                  <MedicationNameWithDose medication={med} />
                   {!med.active && <span className="text-xs text-brand-text-muted">(inactive)</span>}
                 </label>
               ))}

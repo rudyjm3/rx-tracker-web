@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,8 +118,7 @@ export function NotesModal({ open, onOpenChange, medication }: NotesModalProps) 
       <DialogContent size="wide" className="max-w-3xl p-0">
         <DialogHeader className="-mx-6 -mt-6 mb-0 border-b border-brand-border px-6 pb-3 pt-6">
           <DialogTitle>
-            {medication.name}{" "}
-            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+            <MedicationNameWithDose medication={medication} />
           </DialogTitle>
         </DialogHeader>
 

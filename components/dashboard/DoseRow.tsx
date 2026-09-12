@@ -3,6 +3,7 @@
 import { Clock, Layers } from "lucide-react";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { Button } from "@/components/ui/Button";
 import {
   DropdownMenu,
@@ -58,11 +59,10 @@ export function DoseRow({
           {slot.isPrn && <span>(PRN)</span>}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-2">
-          <span className="font-medium text-brand-text">{slot.medicationName}</span>
+          <MedicationNameWithDose medication={slot.medication} className="font-medium text-brand-text" />
           <MedTypeBadge type={slot.medication.medication_type} />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-brand-text-muted">
-          {slot.dose && <span>{slot.dose}</span>}
           {slot.groupName && (
             <span className="inline-flex items-center gap-1 rounded-full bg-brand-bg px-2 py-0.5 text-xs text-brand-text-muted">
               <Layers size={11} />

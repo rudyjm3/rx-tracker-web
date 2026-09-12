@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { getDrugLabel, getMedia } from "@/lib/dailymed";
 import type { Medication } from "@/lib/types/medications";
 
@@ -118,8 +119,7 @@ export function MedicationDetailsModal({
       <DialogContent size="wide">
         <DialogHeader>
           <DialogTitle>
-            {medication.name}{" "}
-            <span className="text-sm font-bold text-brand-text-muted">{medication.dose}</span>
+            <MedicationNameWithDose medication={medication} />
           </DialogTitle>
         </DialogHeader>
 
