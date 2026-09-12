@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/Switch";
 import { computeAdherence } from "@/lib/adherence";
 import { getProfileAllergies } from "@/lib/allergies";
 import { getMoodChartScheme } from "@/lib/app-settings";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import { getDoseLogStatusesInRange, getMissedDoseLogsInRange } from "@/lib/dose-logs";
 import {
   getActiveMedications,
@@ -398,7 +399,9 @@ export function ExportClient() {
                     key={med.id}
                     className="flex items-center justify-between rounded-control bg-brand-bg px-3 py-2 text-sm"
                   >
-                    <span className="font-semibold text-brand-text">{med.name}</span>
+                    <span className="font-semibold text-brand-text">
+                      {formatMedicationNameDose(med)}
+                    </span>
                     <span className="text-brand-text-muted">
                       {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
                     </span>
@@ -421,7 +424,9 @@ export function ExportClient() {
                     key={med.id}
                     className="flex items-center justify-between rounded-control bg-brand-bg px-3 py-2 text-sm"
                   >
-                    <span className="font-semibold text-brand-text">{med.name}</span>
+                    <span className="font-semibold text-brand-text">
+                      {formatMedicationNameDose(med)}
+                    </span>
                     <span className="text-brand-text-muted">
                       {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
                     </span>
@@ -455,7 +460,7 @@ export function ExportClient() {
                     checked={isMedicationSelected(med.id)}
                     onCheckedChange={() => toggleMedication(med.id)}
                   />
-                  {med.name}
+                  {formatMedicationNameDose(med)}
                   {!med.active && <span className="text-xs text-brand-text-muted">(inactive)</span>}
                 </label>
               ))}

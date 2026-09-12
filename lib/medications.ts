@@ -397,7 +397,7 @@ export async function getGroups(profileId?: string | null): Promise<MedicationGr
   const supabase = createClient();
   let query = supabase.from("medication_groups").select("*").eq("active", true);
   query = profileId == null ? query.is("profile_id", null) : query.eq("profile_id", profileId);
-  const { data, error } = await query.order("sort_order");
+  const { data, error } = await query.order("scheduled_time");
   if (error) throw error;
   return data as MedicationGroup[];
 }

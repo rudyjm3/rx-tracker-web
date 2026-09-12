@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
 import { LevelGrid } from "@/components/ui/LevelGrid";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import { localDateString } from "@/lib/utils";
 import type { WellbeingMetric } from "@/lib/pain-mood";
 import type { Medication } from "@/lib/types/medications";
@@ -130,7 +131,7 @@ export function LogLevelModal({
                 <option value={INDEPENDENT}>No medication — log independently</option>
                 {medications.map((med) => (
                   <option key={med.id} value={med.id}>
-                    {med.name}
+                    {formatMedicationNameDose(med)}
                   </option>
                 ))}
               </select>

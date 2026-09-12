@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
 import type { CalendarDayDetail, CalendarDaySlot } from "@/lib/calendar";
 
@@ -37,10 +38,11 @@ export function DayDetailDialog({ day, onClose, onEditSlot }: DayDetailDialogPro
                 {day.medications.map((med) => (
                   <li key={med.medicationId} className="rounded-card border border-brand-border p-3">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-semibold text-brand-text">{med.name}</span>
-                      {med.dose && (
-                        <span className="text-sm text-brand-text-muted">{med.dose}</span>
-                      )}
+                      <MedicationNameWithDose
+                        medication={med}
+                        className="font-semibold text-brand-text"
+                        doseClassName="text-sm font-semibold text-brand-text-muted"
+                      />
                     </div>
                     <p className="mt-1 text-xs text-brand-text-muted">
                       Total doses {med.total} — Taken: {med.taken} / Late: {med.late} — Skipped:{" "}

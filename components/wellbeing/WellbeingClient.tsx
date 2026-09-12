@@ -5,7 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { Button } from "@/components/ui/Button";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { getMoodChartScheme } from "@/lib/app-settings";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import { getActiveMedications } from "@/lib/medications";
 import {
   createStandaloneLog,
@@ -136,15 +138,19 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
                 className="flex items-center justify-between gap-3 rounded-card border border-brand-border bg-brand-card p-3"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-brand-text">{med.name}</p>
-                  {med.dose && <p className="text-xs text-brand-text-muted">{med.dose}</p>}
+                  <p className="truncate font-medium text-brand-text">
+                    <MedicationNameWithDose
+                      medication={med}
+                      doseClassName="text-xs font-semibold text-brand-text-muted"
+                    />
+                  </p>
                 </div>
                 <Button
                   type="button"
                   variant="secondary"
                   size="compact"
                   className="shrink-0"
-                  onClick={() => setGraphTarget({ id: med.id, name: med.name })}
+                  onClick={() => setGraphTarget({ id: med.id, name: formatMedicationNameDose(med) })}
                 >
                   View {metric} graph
                 </Button>
@@ -187,28 +193,23 @@ export function WellbeingClient({ metric, title, renderTagPicker }: WellbeingCli
         moodChartScheme={moodSchemeQuery.data}
       />
 
-      <div>
-        <h2 className="mb-3 text-lg font-bold text-brand-navy">
-          {metric === "pain" ? "Pain" : "Mood"} log history
-        </h2>
-        <LevelHistoryList
-          metric={metric}
-          points={historyQuery.data ?? []}
-          medicationId={selectedMedicationId}
-          medications={trackedMedications}
-          renderTagPicker={renderTagPicker}
-          onSaved={() => {
-            toast.success(`${metric === "pain" ? "Pain" : "Mood"} log updated`);
-            queryClient.invalidateQueries({ queryKey: ["wellbeing-trend", metric] });
-            queryClient.invalidateQueries({ queryKey: ["wellbeing-history", metric] });
-          }}
-          onDeleted={() => {
-            toast.success(`${metric === "pain" ? "Pain" : "Mood"} log deleted`);
-            queryClient.invalidateQueries({ queryKey: ["wellbeing-trend", metric] });
-            queryClient.invalidateQueries({ queryKey: ["wellbeing-history", metric] });
-          }}
-        />
-      </div>
+      <LevelHistoryList
+        metric={metric}
+        points={historyQuery.data ?? []}
+        medicationId={selectedMedicationId}
+        medications={trackedMedications}
+        renderTagPicker={renderTagPicker}
+        onSaved={() => {
+          toast.success(`${metric === "pain" ? "Pain" : "Mood"} log updated`);
+          queryClient.invalidateQueries({ queryKey: ["wellbeing-trend", metric] });
+          queryClient.invalidateQueries({ queryKey: ["wellbeing-history", metric] });
+        }}
+        onDeleted={() => {
+          toast.success(`${metric === "pain" ? "Pain" : "Mood"} log deleted`);
+          queryClient.invalidateQueries({ queryKey: ["wellbeing-trend", metric] });
+          queryClient.invalidateQueries({ queryKey: ["wellbeing-history", metric] });
+        }}
+      />
     </div>
   );
 }

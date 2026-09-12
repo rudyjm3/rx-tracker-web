@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import type { Medication } from "@/lib/types/medications";
 
 interface MedicationSelectorProps {
@@ -47,8 +48,13 @@ export function MedicationSelector({
               : "border-brand-border bg-white text-brand-text hover:bg-brand-bg",
           )}
         >
-          {med.name}
-          {med.dose && <span className="block text-xs font-normal opacity-80">{med.dose}</span>}
+          <MedicationNameWithDose
+            medication={med}
+            doseClassName={cn(
+              "text-xs font-semibold",
+              selectedId === med.id ? "text-white/80" : "text-brand-text-muted",
+            )}
+          />
         </button>
       ))}
     </div>

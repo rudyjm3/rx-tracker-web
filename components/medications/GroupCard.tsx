@@ -39,17 +39,17 @@ export function GroupCard({
   });
 
   return (
-    <div className="rounded-hero border border-brand-border bg-brand-bg p-4">
+    <div className="rounded-hero border border-brand-border bg-gradient-brand p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="font-bold text-brand-navy">{group.name}</h2>
-          <p className="text-sm text-brand-text-muted">{to12h(group.scheduled_time.slice(0, 5))}</p>
+          <h2 className="font-bold text-[#f9f9f9]">{group.name}</h2>
+          <p className="text-sm font-semibold text-[#333]">{to12h(group.scheduled_time.slice(0, 5))}</p>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-brand-text-muted hover:text-brand-deep-blue"
+            className="text-[#d4d4d4] hover:text-brand-deep-blue"
             aria-label="Edit group"
           >
             <Pencil size={16} />
@@ -57,7 +57,7 @@ export function GroupCard({
           <button
             type="button"
             onClick={() => deleteMutation.mutate()}
-            className="text-brand-text-muted hover:text-status-danger"
+            className="text-[#d4d4d4] hover:text-status-danger"
             aria-label="Delete group"
           >
             <Trash2 size={16} />
@@ -67,7 +67,7 @@ export function GroupCard({
 
       <div className="flex flex-col gap-2">
         {members.length === 0 ? (
-          <p className="text-sm text-brand-text-muted">
+          <p className="text-sm text-[#f9f9f9]">
             No medications in this group yet.
           </p>
         ) : (

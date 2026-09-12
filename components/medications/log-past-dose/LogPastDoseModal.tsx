@@ -14,6 +14,7 @@ import { Field, inputClass } from "@/components/ui/Field";
 import { getGroupMembers, getGroups } from "@/lib/medications";
 import { getTodayLogs, recordDoseAtTime } from "@/lib/dose-logs";
 import { generateDaySlots, type DaySlot } from "@/lib/schedule";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import { localDateString, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import { DoseEntryForm, type DoseEntrySaveInput } from "./DoseEntryForm";
@@ -62,7 +63,9 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
   const isGrouped = (groupMembersQuery.data ?? []).some(
     (m) => m.medication_id === medication.id,
   );
-  const neverScheduled = medication.as_needed && !isGrouped;
+  const groupMembershipLoaded = groupMembersQuery.data !== undefined;
+  const neverScheduled = medication.as_needed && groupMembershipLoaded && !isGrouped;
+  const resolvingPrnGrouping = medication.as_needed && !groupMembershipLoaded;
 
   const [date, setDate] = useState(today);
   const [slot, setSlot] = useState<DaySlot | null>(null);
@@ -98,7 +101,7 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
   });
 
   const slots = useMemo<DaySlot[]>(() => {
-    if (neverScheduled || !logsQuery.data) return [];
+    if (resolvingPrnGrouping || neverScheduled || !logsQuery.data) return [];
     return generateDaySlots(
       date,
       [medication],
@@ -107,10 +110,18 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
       logsQuery.data,
       [],
     );
-  }, [neverScheduled, date, medication, groupsQuery.data, groupMembersQuery.data, logsQuery.data]);
+  }, [
+    resolvingPrnGrouping,
+    neverScheduled,
+    date,
+    medication,
+    groupsQuery.data,
+    groupMembersQuery.data,
+    logsQuery.data,
+  ]);
 
   const pickableSlots = slots.filter((s) => !isTerminal(s.status));
-  const loadingSlots = groupsQuery.isLoading || logsQuery.isLoading;
+  const loadingSlots = resolvingPrnGrouping || groupsQuery.isLoading || logsQuery.isLoading;
 
   const mutation = useMutation({
     mutationFn: ({
@@ -126,7 +137,7 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
     }) =>
       recordDoseAtTime(medication, date, scheduledTime, takenAtIso, quantityPerDose, feedback),
     onSuccess: () => {
-      toast.success(`${medication.name} logged`);
+      toast.success(`${formatMedicationNameDose(medication)} logged`);
       queryClient.invalidateQueries({ queryKey: ["dose-logs"] });
       queryClient.invalidateQueries({ queryKey: ["medications"] });
       queryClient.invalidateQueries({ queryKey: ["today-history"] });

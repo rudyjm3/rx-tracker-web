@@ -14,6 +14,7 @@ import {
 } from "@react-pdf/renderer";
 import type { MoodChartScheme } from "@/lib/app-settings";
 import type { CalendarLogRow } from "@/lib/dose-logs";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import type { DoseHistoryEntry } from "@/lib/medications";
 import { levelColor, type DailyAverage, type WellbeingMetric } from "@/lib/pain-mood";
 import type { SideEffectRow } from "@/lib/side-effects";
@@ -148,18 +149,21 @@ function FeedbackChipsPdf({ feedbackType }: { feedbackType: FeedbackType }) {
 // leading badges when it's given the full row width to itself.
 function MedicationLabel({
   medication,
-  suffix,
+  suffix: _suffix,
   annotation,
+  includeDose = true,
 }: {
   medication: Medication;
   suffix?: string;
   annotation?: string | null;
+  includeDose?: boolean;
 }) {
+  void _suffix;
+
   return (
     <View>
       <Text style={{ fontSize: 8.5, fontWeight: 700, color: TEXT }}>
-        {medication.name}
-        {suffix ? ` ${suffix}` : ""}
+        {includeDose ? formatMedicationNameDose(medication) : medication.name}
       </Text>
       <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", marginTop: 2 }}>
         <MedTypeBadgePdf type={medication.medication_type} />
@@ -534,6 +538,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                   render: (r: DoctorVisitReportData["currentMedications"][number]) => (
                     <MedicationLabel
                       medication={r.medication}
+                      includeDose={false}
                       annotation={r.resumedOn ? `(Resumed use on ${r.resumedOn})` : null}
                     />
                   ),
@@ -554,7 +559,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
             <PdfTable
               columns={[
                 { header: "Date", flex: 1, render: (se: SideEffectRow) => formatShortDate(se.occurred_date) },
-                { header: "Medication", flex: 1.4, render: (se: SideEffectRow) => se.medications.name },
+                { header: "Medication", flex: 1.4, render: (se: SideEffectRow) => formatMedicationNameDose(se.medications) },
                 { header: "Severity", flex: 1, render: (se: SideEffectRow) => se.severity },
                 { header: "Side Effect", flex: 1.6, render: (se: SideEffectRow) => se.description },
                 { header: "Notes", flex: 1.6, render: (se: SideEffectRow) => se.note },
@@ -575,7 +580,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                   header: "Medication",
                   flex: 2,
                   render: (r: DoctorVisitReportData["discontinuedMedications"][number]) => (
-                    <MedicationLabel medication={r.medication} />
+                    <MedicationLabel medication={r.medication} includeDose={false} />
                   ),
                 },
                 { header: "Dose", flex: 0.8, render: (r) => r.medication.dose },
@@ -601,7 +606,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                   flex: 1,
                   render: (r: DoctorVisitReportData["doseChanges"][number]) => formatShortDate(r.at.slice(0, 10)),
                 },
-                { header: "Medication", flex: 1.4, render: (r) => r.medication.name },
+                { header: "Medication", flex: 1.4, render: (r) => formatMedicationNameDose(r.medication) },
                 {
                   header: "Change",
                   flex: 1,
@@ -629,7 +634,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
             <PdfTable
               columns={[
                 { header: "Date", flex: 1, render: (l: CalendarLogRow) => formatShortDate(l.scheduled_for_date) },
-                { header: "Medication", flex: 1.6, render: (l: CalendarLogRow) => `${l.medications.name} – ${l.medications.dose}` },
+                { header: "Medication", flex: 1.6, render: (l: CalendarLogRow) => formatMedicationNameDose(l.medications) },
                 { header: "Scheduled Time", flex: 1, render: (l: CalendarLogRow) => to12h(l.scheduled_time.slice(0, 5)) },
                 {
                   header: "Status",

@@ -14,6 +14,7 @@ import {
 import { Field, inputClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { createGroup, updateGroup, type GroupMemberInput } from "@/lib/medications";
+import { formatMedicationNameDose } from "@/lib/medication-label";
 import type { Medication, MedicationGroup } from "@/lib/types/medications";
 
 interface GroupModalProps {
@@ -113,6 +114,12 @@ export function GroupModal({
     mutation.mutate();
   }
 
+  function medicationDoseLabel(med: Medication) {
+    if (med.dose.trim()) return med.dose;
+    if (med.dose_amount == null) return "";
+    return `${med.dose_amount}${med.dose_unit ?? ""}`;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -142,28 +149,34 @@ export function GroupModal({
           <div className="flex flex-col gap-2">
             <span className="text-sm text-brand-text">Members</span>
             <div className="flex max-h-48 flex-col gap-2 overflow-auto">
-              {availableMedications.map((med) => (
-                <div key={med.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={med.id in selected}
-                    onChange={() => toggleMedication(med.id)}
-                  />
-                  <span className="flex-1 text-sm text-brand-text">{med.name}</span>
-                  {med.id in selected && (
+              {availableMedications.map((med) => {
+                const doseLabel = medicationDoseLabel(med);
+
+                return (
+                  <div key={med.id} className="flex items-center gap-2">
                     <input
-                      type="number"
-                      step="any"
-                      placeholder="Qty override"
-                      value={selected[med.id]}
-                      onChange={(e) =>
-                        setSelected((prev) => ({ ...prev, [med.id]: e.target.value }))
-                      }
-                      className={inputClass + " w-32"}
+                      type="checkbox"
+                      checked={med.id in selected}
+                      onChange={() => toggleMedication(med.id)}
                     />
-                  )}
-                </div>
-              ))}
+                    <span className="flex-1 text-sm text-brand-text">
+                      {formatMedicationNameDose({ name: med.name, dose: doseLabel })}
+                    </span>
+                    {med.id in selected && (
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="Qty override"
+                        value={selected[med.id]}
+                        onChange={(e) =>
+                          setSelected((prev) => ({ ...prev, [med.id]: e.target.value }))
+                        }
+                        className={inputClass + " w-32"}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
