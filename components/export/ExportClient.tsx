@@ -18,6 +18,7 @@ import {
   getActiveMedications,
   getDoseHistory,
   getInactiveMedications,
+  getStatusEvents,
   type DoseHistoryEntry,
 } from "@/lib/medications";
 import {
@@ -42,7 +43,7 @@ function defaultStartDate(): string {
   return localDateString(d);
 }
 
-function latestStatusEvent(
+function latestStatusEntry(
   entries: DoseHistoryEntry[],
   event: StatusEventType,
 ): MedicationStatusEvent | null {
@@ -52,6 +53,16 @@ function latestStatusEvent(
   );
   if (matches.length === 0) return null;
   return matches.reduce((latest, cur) => (cur.at > latest.at ? cur : latest)).data;
+}
+
+function latestMedicationStatusEvent(
+  events: MedicationStatusEvent[],
+  medicationId: string,
+  event: StatusEventType,
+): MedicationStatusEvent | null {
+  const matches = events.filter((item) => item.medication_id === medicationId && item.event === event);
+  if (matches.length === 0) return null;
+  return matches.reduce((latest, cur) => (cur.event_at > latest.event_at ? cur : latest));
 }
 
 export function ExportClient() {
@@ -179,9 +190,17 @@ export function ExportClient() {
     .flatMap((group) => group.changes.map((change) => ({ ...change, medication: group.medication })))
     .sort((a, b) => b.at.localeCompare(a.at));
 
+  const statusEventsQuery = useQuery({
+    queryKey: ["export-status-events", allMedicationIds],
+    queryFn: () => getStatusEvents(allMedicationIds),
+    enabled: inactiveMedicationsQuery.data !== undefined,
+  });
+  const statusEvents = statusEventsQuery.data ?? [];
+
   const currentMedications = selectedMedications.filter((m) => m.active).map((medication) => {
-    const entries = doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [];
-    const resumed = latestStatusEvent(entries, "resumed");
+    const resumed =
+      latestMedicationStatusEvent(statusEvents, medication.id, "resumed") ??
+      latestStatusEntry(doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [], "resumed");
     return {
       medication,
       resumedOn: resumed ? formatLongDate(resumed.event_at.slice(0, 10)) : null,
@@ -190,8 +209,13 @@ export function ExportClient() {
   const discontinuedMedications = allMedications
     .filter((m) => !m.active && isMedicationSelected(m.id))
     .map((medication) => {
-      const entries = doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [];
-      return { medication, event: latestStatusEvent(entries, "discontinued") };
+      const event =
+        latestMedicationStatusEvent(statusEvents, medication.id, "discontinued") ??
+        latestStatusEntry(
+          doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [],
+          "discontinued",
+        );
+      return { medication, event };
     });
 
   const allergiesQuery = useQuery({
@@ -286,6 +310,7 @@ export function ExportClient() {
     isResolving ||
     medicationsQuery.isLoading ||
     inactiveMedicationsQuery.isLoading ||
+    statusEventsQuery.isLoading ||
     missedDoseLogsQuery.isLoading ||
     sideEffectsQuery.isLoading ||
     adherenceStatusesQuery.isLoading ||
