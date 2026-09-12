@@ -7,7 +7,7 @@ export interface MedicationLabelInput {
 
 export function formatPrescribedDose(medication: MedicationLabelInput): string {
   if (medication.dose_amount != null) {
-    return `${medication.dose_amount}${medication.dose_unit ?? ""}`.trim();
+    return [medication.dose_amount, medication.dose_unit].filter((part) => part != null && part !== "").join(" ");
   }
   return medication.dose?.trim() ?? "";
 }

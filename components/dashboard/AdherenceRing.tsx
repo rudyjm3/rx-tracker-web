@@ -2,12 +2,12 @@
 
 export function AdherenceRing({
   percent,
-  size = 96,
+  size = 148,
 }: {
   percent: number;
   size?: number;
 }) {
-  const strokeWidth = 8;
+  const strokeWidth = 12;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - percent / 100);
@@ -25,7 +25,7 @@ export function AdherenceRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(255,255,255,0.25)"
+          stroke="rgba(167, 205, 240, 0.42)"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -33,7 +33,7 @@ export function AdherenceRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="white"
+          stroke="rgba(196, 225, 250, 0.95)"
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -42,10 +42,7 @@ export function AdherenceRing({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-        <span className="text-xl font-bold">{percent}%</span>
-        <span className="text-[10px] uppercase tracking-wide text-white/80">
-          Today
-        </span>
+        <span className="text-3xl font-extrabold">{percent}%</span>
       </div>
     </div>
   );

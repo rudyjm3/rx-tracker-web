@@ -10,11 +10,11 @@ interface HeroPanelProps {
 
 export function HeroPanel({ events, adherenceStats }: HeroPanelProps) {
   return (
-    <div className="rounded-hero bg-gradient-brand-hero p-6 shadow-card sm:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
+    <section className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#18d0dc_0%,#0a8ac8_38%,#0754a8_68%,#071d3d_100%)] px-5 py-8 shadow-[0_22px_60px_rgba(7,29,61,0.24)] sm:px-12 sm:py-12">
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-stretch">
         <NextDoseCard events={events} />
         <AdherenceCard stats={adherenceStats} />
       </div>
-    </div>
+    </section>
   );
 }

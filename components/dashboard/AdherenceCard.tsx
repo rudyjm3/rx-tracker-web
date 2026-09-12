@@ -6,13 +6,15 @@ import { AdherenceRing } from "./AdherenceRing";
 
 export function AdherenceCard({ stats }: { stats: AdherenceStats }) {
   return (
-    <div className="flex flex-1 flex-col items-center gap-3 rounded-card bg-white/10 p-5 text-center backdrop-blur-md sm:min-w-[220px] sm:flex-none">
-      <p className="flex items-center gap-1.5 self-start text-xs uppercase tracking-wide text-white/70">
-        <CalendarCheck size={13} />
+    <div className="flex min-h-[330px] flex-col justify-center rounded-[28px] border border-white/20 bg-white/10 px-6 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_18px_45px_rgba(7,29,61,0.20)] backdrop-blur-md">
+      <p className="flex items-center gap-2 self-start text-xs font-extrabold uppercase tracking-[0.16em] text-white/70">
+        <CalendarCheck size={15} />
         Today&apos;s adherence
       </p>
-      <AdherenceRing percent={stats.percent} />
-      <div className="text-xs text-white/85">
+      <div className="flex flex-1 items-center justify-center">
+        <AdherenceRing percent={stats.percent} size={148} />
+      </div>
+      <div className="mx-auto w-fit text-left text-base leading-8 text-white/90">
         <p>
           Required doses taken: {stats.requiredTaken} of {stats.requiredTotal}
         </p>
@@ -21,7 +23,7 @@ export function AdherenceCard({ stats }: { stats: AdherenceStats }) {
             On time: {stats.onTime} · Late: {stats.late} · Skipped: {stats.skipped}
           </p>
         )}
-        <p className="mt-0.5">Missed required doses today: {stats.missed}</p>
+        <p>Missed required doses today: {stats.missed}</p>
       </div>
     </div>
   );
