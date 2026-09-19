@@ -218,14 +218,18 @@ export interface NextDoseSingleEvent {
 export type NextDoseEvent = NextDoseGroupEvent | NextDoseSingleEvent;
 
 /**
- * Collapses a list of (already-pending-filtered) slots into chronological
- * "dose events" for the hero card: consecutive slots sharing a group and a
- * due time collapse into one group event, everything else is its own
- * single event. Powers both the Next Dose card (events[0]) and the
- * Upcoming row (the first event after it with a later due time).
+ * Collapses a list of slots into chronological "dose events": consecutive
+ * slots sharing a group and a due time collapse into one group event,
+ * everything else is its own single event. Originally written for the
+ * hero card's Next Dose/Upcoming rows, which only ever pass
+ * pending-filtered slots (events[0] is "next dose", the first event after
+ * it with a later due time is "upcoming") — but the collapsing itself
+ * doesn't care about status, so ScheduleList also uses it, unfiltered, to
+ * group a mix of taken/skipped/missed/pending members under one card in
+ * Today's Schedule.
  */
-export function buildDoseEvents(pendingSlots: DaySlot[], date: string): NextDoseEvent[] {
-  const sorted = [...pendingSlots].sort(
+export function buildDoseEvents(slots: DaySlot[], date: string): NextDoseEvent[] {
+  const sorted = [...slots].sort(
     (a, b) => slotDueTime(a, date) - slotDueTime(b, date),
   );
   const events: NextDoseEvent[] = [];

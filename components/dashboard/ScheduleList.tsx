@@ -2,10 +2,13 @@
 
 import type { BadgeVariant } from "@/components/ui/Badge";
 import { isLate } from "@/lib/utils";
-import type { DaySlot } from "@/lib/schedule";
+import { buildDoseEvents, type DaySlot } from "@/lib/schedule";
 import { DoseRow } from "./DoseRow";
+import { GroupDoseCard } from "./GroupDoseCard";
 
-function badgeVariantFor(
+// Shared with GroupDoseCard, which needs the same taken/late/missed/
+// skipped/snoozed badge logic for each of its member rows.
+export function badgeVariantFor(
   slot: DaySlot,
   date: string,
   graceMinutes: number,
@@ -60,22 +63,48 @@ export function ScheduleList({
     );
   }
 
+  // Same groupId+due-time collapsing buildDoseEvents already does for the
+  // hero/alarm surfaces, just fed every slot instead of only the pending
+  // ones — so a group whose members span taken/skipped/missed/pending
+  // still renders as one card instead of one DoseRow per member.
+  const entries = buildDoseEvents(slots, date);
+
   return (
     <div className="flex flex-col gap-2">
-      {slots.map((slot) => {
-        const key = `${slot.medicationId}|${slot.scheduledTime}`;
+      {entries.map((entry) => {
+        if (entry.kind === "single") {
+          const slot = entry.slot;
+          const key = `${slot.medicationId}|${slot.scheduledTime}`;
+          return (
+            <DoseRow
+              key={key}
+              slot={slot}
+              date={date}
+              graceMinutes={graceMinutes}
+              badgeVariant={badgeVariantFor(slot, date, graceMinutes)}
+              onTake={() => onTake(slot)}
+              onSkip={() => onSkip(slot)}
+              onSnooze={(minutes) => onSnooze(slot, minutes)}
+              defaultSnoozeMinutes={defaultSnoozeMinutes}
+              disabled={pendingKey === key}
+            />
+          );
+        }
+
         return (
-          <DoseRow
-            key={key}
-            slot={slot}
+          <GroupDoseCard
+            key={`${entry.groupId}|${entry.time}`}
+            groupId={entry.groupId}
+            groupName={entry.groupName}
+            time={entry.time}
+            members={entry.members}
             date={date}
             graceMinutes={graceMinutes}
-            badgeVariant={badgeVariantFor(slot, date, graceMinutes)}
-            onTake={() => onTake(slot)}
-            onSkip={() => onSkip(slot)}
-            onSnooze={(minutes) => onSnooze(slot, minutes)}
+            onTake={onTake}
+            onSkip={onSkip}
+            onSnooze={onSnooze}
             defaultSnoozeMinutes={defaultSnoozeMinutes}
-            disabled={pendingKey === key}
+            pendingKey={pendingKey}
           />
         );
       })}
