@@ -11,6 +11,7 @@ import {
   buildDayDetails,
   monthBounds,
   type CalendarDayDetail,
+  type CalendarDayGroupSummary,
   type CalendarDaySlot,
 } from "@/lib/calendar";
 import { getCalendarLogs, getCalendarMarkers } from "@/lib/dose-logs";
@@ -24,6 +25,7 @@ import {
 import { localDateString } from "@/lib/utils";
 import { MonthGrid } from "./MonthGrid";
 import { DayDetailDialog } from "./DayDetailDialog";
+import { BulkEditDoseLogDialog, type BulkEditableDoseLog } from "./BulkEditDoseLogDialog";
 import { EditDoseLogDialog, type EditableDoseLog } from "@/components/history/EditDoseLogDialog";
 
 function currentMonth(): string {
@@ -40,6 +42,7 @@ export function CalendarClient() {
   const todayDate = localDateString();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<CalendarDaySlot | null>(null);
+  const [editingGroup, setEditingGroup] = useState<CalendarDayGroupSummary | null>(null);
 
   function navigateToMonth(nextMonth: string) {
     const params = new URLSearchParams(searchParams);
@@ -158,15 +161,16 @@ export function CalendarClient() {
     graceQuery.data,
   ]);
 
-  const dayDetails = useMemo<Record<string, CalendarDayDetail>>(() => {
-    if (!logsQuery.data) return {};
-    return buildDayDetails(logsQuery.data, graceMinutes);
-  }, [logsQuery.data, graceMinutes]);
-
   const allMedications = useMemo(
     () => [...(activeMedicationsQuery.data ?? []), ...(inactiveMedicationsQuery.data ?? [])],
     [activeMedicationsQuery.data, inactiveMedicationsQuery.data],
   );
+
+  const dayDetails = useMemo<Record<string, CalendarDayDetail>>(() => {
+    if (!logsQuery.data) return {};
+    return buildDayDetails(logsQuery.data, graceMinutes, allMedications, groupsQuery.data ?? []);
+  }, [logsQuery.data, graceMinutes, allMedications, groupsQuery.data]);
+
   const editingMedication = editingSlot
     ? (allMedications.find((m) => m.id === editingSlot.medicationId) ?? null)
     : null;
@@ -183,6 +187,32 @@ export function CalendarClient() {
           deductedQuantity: editingSlot.deductedQuantity,
         }
       : null;
+
+  // Every member's dose_logs row for the group being bulk-edited, on the
+  // selected day — one entry per medication in the group (each medication
+  // contributes at most one shared-group slot per day, since a medication
+  // belongs to at most one group and its group-owned schedule time is
+  // single-valued).
+  const editingGroupLogs: BulkEditableDoseLog[] =
+    editingGroup && selectedDate
+      ? editingGroup.medications.flatMap((med) => {
+          const medication = allMedications.find((m) => m.id === med.medicationId);
+          if (!medication) return [];
+          return med.slots.map((slot) => ({
+            logId: slot.logId,
+            medicationId: med.medicationId,
+            medicationName: med.name,
+            status: slot.status,
+            scheduledForDate: selectedDate,
+            takenAt: slot.takenAt,
+            painLevel: slot.painLevel,
+            moodLevel: slot.moodLevel,
+            deductedQuantity: slot.deductedQuantity,
+            quantityPerDose: medication.quantity_per_dose,
+            inventoryEnabled: medication.inventory_enabled,
+          }));
+        })
+      : [];
 
   function refreshCalendarData() {
     queryClient.invalidateQueries({
@@ -220,6 +250,7 @@ export function CalendarClient() {
         day={selectedDate ? (dayDetails[selectedDate] ?? null) : null}
         onClose={() => setSelectedDate(null)}
         onEditSlot={setEditingSlot}
+        onEditGroup={setEditingGroup}
       />
       <EditDoseLogDialog
         log={editingLog}
@@ -233,6 +264,16 @@ export function CalendarClient() {
         onDeleted={() => {
           toast.success("Dose entry deleted");
           setEditingSlot(null);
+          refreshCalendarData();
+        }}
+      />
+      <BulkEditDoseLogDialog
+        groupName={editingGroup?.groupName ?? null}
+        logs={editingGroupLogs}
+        onClose={() => setEditingGroup(null)}
+        onSaved={() => {
+          toast.success("Group dose entries updated");
+          setEditingGroup(null);
           refreshCalendarData();
         }}
       />
