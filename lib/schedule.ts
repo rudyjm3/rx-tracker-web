@@ -62,10 +62,17 @@ export interface DaySlot {
  * slot when grouped with scheduled medications, at the group's time —
  * an ungrouped PRN medication is logged ad hoc instead.
  *
- * Grouping is determined by matching a medication's group membership
- * (medication_group_members) against that group's scheduled_time —
- * there's no group_id column on medication_schedule_times in this
- * schema, so the match is purely on time-of-day per slot.
+ * Grouping is determined by the FK on each fixed-time medication's own
+ * medication_schedule_times row (group_id), which Postgres triggers keep
+ * in sync with medication_group_members and the group's scheduled_time —
+ * not by comparing time-of-day strings, which can drift out of sync (see
+ * supabase/migrations/20260919000000_link_group_schedule_times.sql).
+ * PRN medications have no schedule-time row of their own, so their slots
+ * are still sourced directly from group membership. Interval medications
+ * have no per-row group_id to read either (their times are computed, not
+ * stored), so a computed time is matched against a group's scheduled_time
+ * as before — a narrower, still-legitimate case since there's no stored
+ * reminder_time of the medication's own that could drift from it.
  */
 export function generateDaySlots(
   date: string,
@@ -87,6 +94,7 @@ export function generateDaySlots(
       groupsByMedication.set(member.medication_id, existing);
     }
   }
+  const groupsById = new Map(groups.map((g) => [g.id, g]));
 
   const logsByKey = new Map<string, DoseLog>();
   for (const log of doseLogs) {
@@ -106,20 +114,30 @@ export function generateDaySlots(
     if (med.end_date && date > med.end_date) continue;
 
     const medGroups = groupsByMedication.get(med.id) ?? [];
-    const times: { time: string; scheduleTimeOverride: number | null }[] = [];
+    const times: {
+      time: string;
+      scheduleTimeOverride: number | null;
+      groupId: string | null;
+    }[] = [];
 
     if (med.as_needed) {
       // PRN medications only get a dashboard slot when they're bundled
       // into a group, at that group's scheduled time — otherwise
-      // they're logged ad hoc rather than scheduled.
+      // they're logged ad hoc rather than scheduled. Group membership is
+      // known directly here (medGroups), no time matching involved.
       for (const { group } of medGroups) {
-        times.push({ time: group.scheduled_time.slice(0, 5), scheduleTimeOverride: null });
+        times.push({
+          time: group.scheduled_time.slice(0, 5),
+          scheduleTimeOverride: null,
+          groupId: group.id,
+        });
       }
     } else if (med.schedule_mode === "fixed_times") {
       for (const st of med.medication_schedule_times ?? []) {
         times.push({
           time: st.reminder_time.slice(0, 5),
           scheduleTimeOverride: st.quantity_per_dose,
+          groupId: st.group_id ?? null,
         });
       }
     } else if (med.schedule_mode === "interval" && med.interval_hours && med.first_dose_time) {
@@ -128,19 +146,29 @@ export function generateDaySlots(
       while (minutes < 24 * 60) {
         const h = String(Math.floor(minutes / 60)).padStart(2, "0");
         const m = String(minutes % 60).padStart(2, "0");
-        times.push({ time: `${h}:${m}`, scheduleTimeOverride: null });
+        const time = `${h}:${m}`;
+        // Interval times are computed, not stored, so there's no
+        // medication_schedule_times row of their own to carry a
+        // group_id — fall back to matching the group's scheduled_time.
+        const matchedGroup = medGroups.find(
+          (g) => g.group.scheduled_time.slice(0, 5) === time,
+        );
+        times.push({
+          time,
+          scheduleTimeOverride: null,
+          groupId: matchedGroup ? matchedGroup.group.id : null,
+        });
         minutes += stepMinutes;
       }
     }
 
-    for (const { time, scheduleTimeOverride } of times) {
-      const matchedGroup = medGroups.find(
-        (g) => g.group.scheduled_time.slice(0, 5) === time,
-      );
+    for (const { time, scheduleTimeOverride, groupId } of times) {
+      const group = groupId ? (groupsById.get(groupId) ?? null) : null;
+      const membership = groupId ? medGroups.find((g) => g.group.id === groupId) : undefined;
       const quantityPerDose = resolveQuantityPerDose({
         medication: med,
         scheduleTimeQuantityOverride: scheduleTimeOverride,
-        groupMemberQuantityOverride: matchedGroup ? matchedGroup.override : null,
+        groupMemberQuantityOverride: membership ? membership.override : null,
       });
 
       const log = logsByKey.get(`${med.id}|${time}`);
@@ -151,8 +179,8 @@ export function generateDaySlots(
         medicationName: med.name,
         dose: med.dose,
         scheduledTime: time,
-        groupId: matchedGroup ? matchedGroup.group.id : null,
-        groupName: matchedGroup ? matchedGroup.group.name : null,
+        groupId: group ? group.id : null,
+        groupName: group ? group.name : null,
         quantityPerDose,
         status: log?.status ?? "pending",
         takenAt: log?.taken_at ?? null,
