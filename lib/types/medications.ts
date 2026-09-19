@@ -11,6 +11,11 @@ export interface MedicationScheduleTime {
   medication_id: string;
   reminder_time: string;
   quantity_per_dose: number | null;
+  // FK to the medication_group that owns this reminder time, kept in sync
+  // by Postgres triggers whenever group membership or a group's
+  // scheduled_time changes — null for an individual (non-grouped) dose.
+  // See supabase/migrations/20260919000000_link_group_schedule_times.sql.
+  group_id: string | null;
   created_at: string;
 }
 

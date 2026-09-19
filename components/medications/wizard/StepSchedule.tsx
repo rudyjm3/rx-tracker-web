@@ -18,6 +18,8 @@ export function StepSchedule({ groups }: { groups: MedicationGroup[] }) {
 
   const asNeeded = watch("asNeeded");
   const scheduleMode = watch("scheduleMode");
+  const groupId = watch("groupId");
+  const selectedGroup = groups.find((g) => g.id === groupId);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -117,6 +119,17 @@ export function StepSchedule({ groups }: { groups: MedicationGroup[] }) {
           ))}
         </select>
       </Field>
+
+      {selectedGroup && (
+        <p className="rounded-control border border-brand-border bg-brand-card px-3 py-2 text-sm text-brand-text-muted">
+          This medication is also dosed at{" "}
+          <strong className="text-brand-text">
+            {to12h(selectedGroup.scheduled_time.slice(0, 5))}
+          </strong>{" "}
+          as part of the &ldquo;{selectedGroup.name}&rdquo; group. To change that time,
+          edit the group instead of adding it here.
+        </p>
+      )}
     </div>
   );
 }

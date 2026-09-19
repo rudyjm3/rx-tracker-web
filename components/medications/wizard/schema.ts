@@ -90,7 +90,11 @@ export const medicationFormSchema = z
     if (data.asNeeded) return;
 
     if (data.scheduleMode === "fixed_times") {
-      if (data.scheduleTimes.length === 0) {
+      // A medication whose only dose is a group's dose has no individual
+      // scheduleTimes entries at all (the group-owned row is excluded from
+      // this list -- see mappers.ts) -- the group's own scheduled_time
+      // already covers "at least one reminder time" for it.
+      if (data.scheduleTimes.length === 0 && !data.groupId) {
         ctx.addIssue({
           path: ["scheduleTimes"],
           code: "custom",

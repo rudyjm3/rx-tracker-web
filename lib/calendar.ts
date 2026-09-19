@@ -216,23 +216,56 @@ export interface CalendarDayMedicationSummary {
   slots: CalendarDaySlot[];
 }
 
+export interface CalendarDayGroupSummary {
+  groupId: string;
+  groupName: string;
+  medications: CalendarDayMedicationSummary[];
+}
+
 export interface CalendarDayDetail {
   date: string;
   dayName: string; // e.g. "Friday"
   displayDate: string; // e.g. "August 22, 2026"
-  medications: CalendarDayMedicationSummary[];
+  medications: CalendarDayMedicationSummary[]; // medications with no single shared group that day
+  groups: CalendarDayGroupSummary[]; // medications sharing a group that day, nested under it
 }
 
 /**
  * Groups a month's raw dose_logs into per-day, per-medication summaries
  * for the day-detail view — port of the reference PHP app's
- * $calendarDayData building loop in routes/calendar.php.
+ * $calendarDayData building loop in routes/calendar.php. Also clusters
+ * medications sharing a group into `day.groups`, resolved the same way
+ * generateDaySlots resolves group membership post-Part-1: via the FK on
+ * the medication's own medication_schedule_times row for that reminder
+ * time (`group_id`), never by comparing time-of-day strings.
+ *
+ * A medication only lands in `day.groups` when *every* dose it logged
+ * that day resolves to the exact same group — a medication with a mix of
+ * grouped and individual (or multiple different groups') doses the same
+ * day is left in the flat `medications` list instead of guessing which
+ * single group it "belongs to" for the day.
  */
 export function buildDayDetails(
   logs: CalendarLogRow[],
   graceMinutes: number,
+  medications: Pick<Medication, "id" | "medication_schedule_times">[],
+  groups: MedicationGroup[],
 ): Record<string, CalendarDayDetail> {
+  const groupIdByMedTime = new Map<string, string>();
+  for (const med of medications) {
+    for (const st of med.medication_schedule_times ?? []) {
+      if (st.group_id) {
+        groupIdByMedTime.set(`${med.id}|${st.reminder_time.slice(0, 5)}`, st.group_id);
+      }
+    }
+  }
+  const groupsById = new Map(groups.map((g) => [g.id, g]));
+
   const result: Record<string, CalendarDayDetail> = {};
+  // Per date, per medication: every group_id (or null, for an individual
+  // dose) its logged slots resolved to that day — used below to decide
+  // whether the medication can be nested under one shared group.
+  const groupIdsByDateAndMedication = new Map<string, Map<string, Set<string | null>>>();
 
   for (const log of logs) {
     const date = log.scheduled_for_date;
@@ -248,6 +281,7 @@ export function buildDayDetails(
           day: "numeric",
         }),
         medications: [],
+        groups: [],
       };
       result[date] = day;
     }
@@ -296,6 +330,41 @@ export function buildDayDetails(
       note: log.note,
       deductedQuantity: log.deducted_quantity,
     });
+
+    const groupId = groupIdByMedTime.get(`${log.medication_id}|${time}`) ?? null;
+    let byMedication = groupIdsByDateAndMedication.get(date);
+    if (!byMedication) {
+      byMedication = new Map();
+      groupIdsByDateAndMedication.set(date, byMedication);
+    }
+    const ids = byMedication.get(log.medication_id) ?? new Set<string | null>();
+    ids.add(groupId);
+    byMedication.set(log.medication_id, ids);
+  }
+
+  for (const [date, day] of Object.entries(result)) {
+    const byMedication = groupIdsByDateAndMedication.get(date) ?? new Map();
+    const ungrouped: CalendarDayMedicationSummary[] = [];
+    const groupBuckets = new Map<string, CalendarDayMedicationSummary[]>();
+
+    for (const med of day.medications) {
+      const ids = byMedication.get(med.medicationId) ?? new Set<string | null>();
+      const groupId = ids.size === 1 ? [...ids][0] : null;
+      if (groupId && groupsById.has(groupId)) {
+        const bucket = groupBuckets.get(groupId) ?? [];
+        bucket.push(med);
+        groupBuckets.set(groupId, bucket);
+      } else {
+        ungrouped.push(med);
+      }
+    }
+
+    day.medications = ungrouped;
+    day.groups = [...groupBuckets.entries()].map(([groupId, meds]) => ({
+      groupId,
+      groupName: groupsById.get(groupId)!.name,
+      medications: meds,
+    }));
   }
 
   return result;

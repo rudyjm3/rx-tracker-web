@@ -25,7 +25,15 @@ export function medicationToFormValues(med: Medication): MedicationFormValues {
     medicationType: med.medication_type,
     asNeeded: med.as_needed,
     scheduleMode: med.schedule_mode,
+    // Group-owned schedule times (group_id set) are excluded here: they're
+    // driven by the group's own scheduled_time and kept in sync by a DB
+    // trigger whenever group membership changes (see
+    // supabase/migrations/20260919000000_link_group_schedule_times.sql).
+    // Surfacing one as a freely-editable individual time would let it drift
+    // from the group's time, and updateMedication()'s delete-and-reinsert of
+    // this list would then orphan it as a duplicate individual dose.
     scheduleTimes: (med.medication_schedule_times ?? [])
+      .filter((t) => t.group_id == null)
       .slice()
       .sort((a, b) => a.reminder_time.localeCompare(b.reminder_time))
       .map((t) => ({

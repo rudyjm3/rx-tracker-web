@@ -269,10 +269,17 @@ export async function updateMedication(
     if (doseChangeError) throw doseChangeError;
   }
 
+  // Only touch this medication's individual (group_id is null) schedule
+  // times here. Group-owned rows are managed exclusively by the group sync
+  // trigger (via setMedicationGroup()/group edits) — deleting them on every
+  // medication edit and relying on scheduleTimes to happen to reinsert an
+  // identical row was the source of a group-schedule-drift bug (see
+  // components/medications/wizard/mappers.ts).
   const { error: deleteError } = await supabase
     .from("medication_schedule_times")
     .delete()
-    .eq("medication_id", id);
+    .eq("medication_id", id)
+    .is("group_id", null);
   if (deleteError) throw deleteError;
 
   if (scheduleTimes.length > 0) {
