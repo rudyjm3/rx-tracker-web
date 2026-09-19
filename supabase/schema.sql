@@ -97,9 +97,23 @@ create table if not exists medication_schedule_times (
   medication_id     uuid not null references medications(id) on delete cascade,
   reminder_time     time not null,
   quantity_per_dose numeric(10,3),
-  created_at        timestamptz default now(),
-  unique (medication_id, reminder_time)
+  -- Links this schedule time to the medication_group that owns it (see
+  -- migrations/20260919000000_link_group_schedule_times.sql). NULL means an
+  -- individual dose. Kept in sync with medication_group_members and
+  -- medication_groups.scheduled_time by triggers, so grouping can be
+  -- decided structurally instead of by comparing time strings at read time.
+  group_id          uuid references medication_groups(id) on delete set null,
+  created_at        timestamptz default now()
 );
+
+create index if not exists idx_medication_schedule_times_group_id
+  on medication_schedule_times(group_id);
+create unique index if not exists medication_schedule_times_individual_uidx
+  on medication_schedule_times (medication_id, reminder_time)
+  where group_id is null;
+create unique index if not exists medication_schedule_times_group_uidx
+  on medication_schedule_times (medication_id, reminder_time, group_id)
+  where group_id is not null;
 
 -- ─────────────────────────────────────────
 -- DOSE LOGS
@@ -1015,3 +1029,112 @@ end;
 $$;
 
 grant execute on function edit_dose_log(uuid, text, timestamptz, smallint, smallint, text, numeric, boolean) to authenticated;
+
+-- ─────────────────────────────────────────
+-- MEDICATION GROUP SCHEDULE SYNC (triggers)
+-- Keeps medication_schedule_times.group_id in sync with group membership
+-- and each group's scheduled_time. See
+-- migrations/20260919000000_link_group_schedule_times.sql for the full
+-- rationale.
+-- ─────────────────────────────────────────
+create or replace function sync_medication_group_schedule_time()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_group_time time;
+  v_row_id uuid;
+begin
+  select scheduled_time into v_group_time
+  from medication_groups
+  where id = new.group_id;
+
+  if v_group_time is null then
+    return new;
+  end if;
+
+  select id into v_row_id
+  from medication_schedule_times
+  where medication_id = new.medication_id and group_id = new.group_id
+  limit 1;
+
+  if v_row_id is not null then
+    update medication_schedule_times
+      set reminder_time = v_group_time
+      where id = v_row_id
+        and reminder_time is distinct from v_group_time;
+    return new;
+  end if;
+
+  update medication_schedule_times
+    set group_id = new.group_id
+    where id = (
+      select id from medication_schedule_times
+      where medication_id = new.medication_id
+        and reminder_time = v_group_time
+        and group_id is null
+      limit 1
+    )
+    returning id into v_row_id;
+
+  if v_row_id is null then
+    insert into medication_schedule_times (medication_id, reminder_time, group_id, quantity_per_dose)
+    values (new.medication_id, v_group_time, new.group_id, new.quantity_per_dose)
+    on conflict do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_group_schedule_on_member_change on medication_group_members;
+create trigger trg_sync_group_schedule_on_member_change
+  after insert or update on medication_group_members
+  for each row execute function sync_medication_group_schedule_time();
+
+create or replace function cleanup_medication_group_schedule_time()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from medication_schedule_times
+  where medication_id = old.medication_id
+    and group_id = old.group_id;
+  return old;
+end;
+$$;
+
+drop trigger if exists trg_cleanup_group_schedule_on_member_remove on medication_group_members;
+create trigger trg_cleanup_group_schedule_on_member_remove
+  after delete on medication_group_members
+  for each row execute function cleanup_medication_group_schedule_time();
+
+create or replace function propagate_group_scheduled_time()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.scheduled_time is distinct from old.scheduled_time then
+    update medication_schedule_times
+      set reminder_time = new.scheduled_time
+      where group_id = new.id;
+  end if;
+
+  if new.active = false and old.active = true then
+    delete from medication_schedule_times where group_id = new.id;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_propagate_group_scheduled_time on medication_groups;
+create trigger trg_propagate_group_scheduled_time
+  after update of scheduled_time, active on medication_groups
+  for each row execute function propagate_group_scheduled_time();
