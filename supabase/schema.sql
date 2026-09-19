@@ -97,23 +97,12 @@ create table if not exists medication_schedule_times (
   medication_id     uuid not null references medications(id) on delete cascade,
   reminder_time     time not null,
   quantity_per_dose numeric(10,3),
-  -- Links this schedule time to the medication_group that owns it (see
-  -- migrations/20260919000000_link_group_schedule_times.sql). NULL means an
-  -- individual dose. Kept in sync with medication_group_members and
-  -- medication_groups.scheduled_time by triggers, so grouping can be
-  -- decided structurally instead of by comparing time strings at read time.
-  group_id          uuid references medication_groups(id) on delete set null,
-  created_at        timestamptz default now()
+  created_at        timestamptz default now(),
+  unique (medication_id, reminder_time)
 );
-
-create index if not exists idx_medication_schedule_times_group_id
-  on medication_schedule_times(group_id);
-create unique index if not exists medication_schedule_times_individual_uidx
-  on medication_schedule_times (medication_id, reminder_time)
-  where group_id is null;
-create unique index if not exists medication_schedule_times_group_uidx
-  on medication_schedule_times (medication_id, reminder_time, group_id)
-  where group_id is not null;
+-- group_id is added by ALTER TABLE further down, once medication_groups
+-- exists (see MEDICATION GROUP SCHEDULE SYNC below) -- it references that
+-- table, which isn't defined until later in this file.
 
 -- ─────────────────────────────────────────
 -- DOSE LOGS
@@ -1032,13 +1021,37 @@ grant execute on function edit_dose_log(uuid, text, timestamptz, smallint, small
 
 -- ─────────────────────────────────────────
 -- MEDICATION GROUP SCHEDULE SYNC (triggers)
--- Keeps medication_schedule_times.group_id in sync with group membership
--- and each group's scheduled_time. See
+-- Links medication_schedule_times to the medication_group that owns a given
+-- reminder time and keeps that link in sync with group membership and each
+-- group's scheduled_time, so grouping can be decided structurally instead
+-- of by comparing time strings at read time. group_id is added here, not
+-- on the table's own definition above, because it references
+-- medication_groups, which isn't defined until later in this file. See
 -- migrations/20260919000000_link_group_schedule_times.sql for the full
 -- rationale.
+--
+-- Uniqueness on medication_schedule_times stays exactly
+-- (medication_id, reminder_time), group or not: dose_logs has no
+-- schedule-row identity of its own (keyed only by
+-- medication_id/scheduled_for_date/scheduled_time), so two schedule rows at
+-- the same time for one medication would silently share a single dose_logs
+-- row underneath the UI. sync_medication_group_schedule_time_for() converts
+-- an existing individual row into a group-owned one in place rather than
+-- adding a second row alongside it, and no-ops (via ON CONFLICT) if some
+-- other row already occupies that exact time for that medication.
 -- ─────────────────────────────────────────
-create or replace function sync_medication_group_schedule_time()
-returns trigger
+alter table medication_schedule_times
+  add column if not exists group_id uuid references medication_groups(id) on delete set null;
+
+create index if not exists idx_medication_schedule_times_group_id
+  on medication_schedule_times(group_id);
+
+create or replace function sync_medication_group_schedule_time_for(
+  p_medication_id uuid,
+  p_group_id uuid,
+  p_quantity_per_dose numeric
+)
+returns void
 language plpgsql
 security definer
 set search_path = public
@@ -1049,15 +1062,15 @@ declare
 begin
   select scheduled_time into v_group_time
   from medication_groups
-  where id = new.group_id;
+  where id = p_group_id;
 
   if v_group_time is null then
-    return new;
+    return;
   end if;
 
   select id into v_row_id
   from medication_schedule_times
-  where medication_id = new.medication_id and group_id = new.group_id
+  where medication_id = p_medication_id and group_id = p_group_id
   limit 1;
 
   if v_row_id is not null then
@@ -1065,14 +1078,14 @@ begin
       set reminder_time = v_group_time
       where id = v_row_id
         and reminder_time is distinct from v_group_time;
-    return new;
+    return;
   end if;
 
   update medication_schedule_times
-    set group_id = new.group_id
+    set group_id = p_group_id
     where id = (
       select id from medication_schedule_times
-      where medication_id = new.medication_id
+      where medication_id = p_medication_id
         and reminder_time = v_group_time
         and group_id is null
       limit 1
@@ -1081,10 +1094,20 @@ begin
 
   if v_row_id is null then
     insert into medication_schedule_times (medication_id, reminder_time, group_id, quantity_per_dose)
-    values (new.medication_id, v_group_time, new.group_id, new.quantity_per_dose)
-    on conflict do nothing;
+    values (p_medication_id, v_group_time, p_group_id, p_quantity_per_dose)
+    on conflict (medication_id, reminder_time) do nothing;
   end if;
+end;
+$$;
 
+create or replace function sync_medication_group_schedule_time()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform sync_medication_group_schedule_time_for(new.medication_id, new.group_id, new.quantity_per_dose);
   return new;
 end;
 $$;
