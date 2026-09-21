@@ -297,16 +297,17 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       : (doseEvents.find((e) => e.time <= nowTick && nowTick <= e.time + graceMinutes * 60_000) ??
         null);
 
+  const toTrackedSlot = (s: DaySlot) => ({
+    status: s.status,
+    late: isLate(
+      { status: s.status, taken_at: s.takenAt, scheduled_for_date: date, scheduled_time: s.scheduledTime },
+      graceMinutes,
+    ),
+  });
+
   const adherenceStats = computeAdherenceStats(
-    slots
-      .filter((s) => s.status !== "pending" && s.medication.adherence_enabled && !s.isPrn)
-      .map((s) => ({
-        status: s.status as "taken" | "skipped" | "missed",
-        late: isLate(
-          { status: s.status, taken_at: s.takenAt, scheduled_for_date: date, scheduled_time: s.scheduledTime },
-          graceMinutes,
-        ),
-      })),
+    slots.filter((s) => s.medication.adherence_enabled && !s.isPrn).map(toTrackedSlot),
+    slots.filter((s) => s.medication.adherence_enabled && s.isPrn).map(toTrackedSlot),
   );
 
   const [requiredDosesOpen, setRequiredDosesOpen] = useState(false);
