@@ -13,5 +13,8 @@ for (const entry of await readdir(root, { withFileTypes: true })) {
   }
 }
 
+await rm(join(root, "next.config.compiled.js"), { force: true });
+console.log("[clean-hostinger-build-cache] removed stale next.config.compiled.js if present");
+
 await rm(join(root, ".next"), { recursive: true, force: true });
 console.log("[clean-hostinger-build-cache] cleared .next cache");
