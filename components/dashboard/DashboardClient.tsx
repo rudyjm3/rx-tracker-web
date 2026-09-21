@@ -41,6 +41,7 @@ import { QuickActionsPanel } from "./QuickActionsPanel";
 import { MedsOverviewPanel } from "./MedsOverviewPanel";
 import { TodayHistoryPanel } from "./TodayHistoryPanel";
 import { RequiredDosesModal } from "./RequiredDosesModal";
+import { NonRequiredDosesModal } from "./NonRequiredDosesModal";
 import { AlarmOverlay } from "./AlarmOverlay";
 import { ZeroPillModal } from "./ZeroPillModal";
 
@@ -311,6 +312,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   );
 
   const [requiredDosesOpen, setRequiredDosesOpen] = useState(false);
+  const [nonRequiredDosesOpen, setNonRequiredDosesOpen] = useState(false);
   const todaysDosesCount = slots.length;
   const dosesTaken = slots.filter((s) => s.status === "taken").length;
   const dosesMissed = slots.filter((s) => s.status === "missed").length;
@@ -425,6 +427,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
             dosesTaken={dosesTaken}
             dosesMissed={dosesMissed}
             onViewRequiredDoses={() => setRequiredDosesOpen(true)}
+            onViewNonRequiredDoses={() => setNonRequiredDosesOpen(true)}
           />
         </div>
       </div>
@@ -441,6 +444,11 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       <RequiredDosesModal
         open={requiredDosesOpen}
         onClose={() => setRequiredDosesOpen(false)}
+        slots={slots}
+      />
+      <NonRequiredDosesModal
+        open={nonRequiredDosesOpen}
+        onClose={() => setNonRequiredDosesOpen(false)}
         slots={slots}
       />
       <AlarmOverlay
