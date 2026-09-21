@@ -42,6 +42,31 @@ export async function getRefillHistory(
   return data as MedicationRefill[];
 }
 
+// One request for the whole visible medication list instead of one per
+// card — rows come back newest-first, so the first row seen per
+// medication_id is its latest refill.
+export async function getLatestRefills(
+  medicationIds: string[],
+): Promise<Map<string, MedicationRefill>> {
+  const latest = new Map<string, MedicationRefill>();
+  if (medicationIds.length === 0) return latest;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("medication_refills")
+    .select("*")
+    .in("medication_id", medicationIds)
+    .eq("entry_type", "refill")
+    .order("refill_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  for (const refill of (data as MedicationRefill[]) ?? []) {
+    if (!latest.has(refill.medication_id)) latest.set(refill.medication_id, refill);
+  }
+  return latest;
+}
+
 // Same row-locked shape as log_refill — the stored delta (newQuantity
 // minus whatever current_quantity actually was under the lock) needs the
 // same atomicity, not a delta computed from a quantity read moments

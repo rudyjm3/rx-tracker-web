@@ -27,7 +27,7 @@ import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
 import { daysUntilRunout, to12h, type GroupDoseOverride } from "@/lib/utils";
-import type { Medication } from "@/lib/types/medications";
+import type { Medication, MedicationRefill } from "@/lib/types/medications";
 import { RefillModal } from "./RefillModal";
 import { RefillHistoryModal } from "./RefillHistoryModal";
 import { SideEffectModal } from "./SideEffectModal";
@@ -38,6 +38,10 @@ import { DiscontinueModal } from "./DiscontinueModal";
 import { ResumeModal } from "./ResumeModal";
 import { UpdatePrescribedDoseModal } from "./UpdatePrescribedDoseModal";
 import { MedicationDetailsModal } from "./MedicationDetailsModal";
+
+function formatQty(n: number): string {
+  return Number(n.toFixed(3)).toString();
+}
 
 function formatMedDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -98,6 +102,7 @@ interface MedicationCardProps {
   groupDoseOverrides?: GroupDoseOverride[];
   dragHandle?: ReactNode;
   isDragging?: boolean;
+  latestRefill?: MedicationRefill | null;
 }
 
 export function MedicationCard({
@@ -105,6 +110,7 @@ export function MedicationCard({
   groupDoseOverrides = [],
   dragHandle,
   isDragging,
+  latestRefill = null,
 }: MedicationCardProps) {
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [expanded, setExpanded] = useState(false);
@@ -133,6 +139,7 @@ export function MedicationCard({
       ? "bg-status-warning"
       : "bg-status-success";
   const runoutText = runoutSummary(medication, groupDoseOverrides);
+
   const openDetails = (event: MouseEvent | KeyboardEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -184,16 +191,26 @@ export function MedicationCard({
 
           {showInventoryBar && (
             <div className="mt-2 max-w-xs">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand-bg">
+              <p className="text-xs text-brand-text-muted">
+                Pills: {formatQty(currentQty)} / {formatQty(capacity)} {medication.inventory_unit}
+                {" | "}
+                Refill alert at {formatQty(medication.low_supply_threshold)} {medication.inventory_unit}
+              </p>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand-bg">
                 <div
                   className={cn("h-full rounded-full", fillColor)}
                   style={{ width: `${fillPct}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-brand-text-muted">
-                {currentQty} / {capacity} {medication.inventory_unit}
-                {runoutText && <> | {runoutText}</>}
-              </p>
+              {runoutText && (
+                <p className="mt-1 text-xs text-brand-text-muted">{runoutText}</p>
+              )}
+              {latestRefill && (
+                <p className="mt-1 text-xs text-brand-text-muted">
+                  Last refill: {formatMedDate(latestRefill.refill_date)} ·{" "}
+                  {formatQty(latestRefill.amount)} {medication.inventory_unit}
+                </p>
+              )}
             </div>
           )}
           <div className="mt-2 flex justify-center">

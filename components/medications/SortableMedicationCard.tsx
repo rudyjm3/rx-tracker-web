@@ -3,18 +3,20 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import type { Medication } from "@/lib/types/medications";
+import type { Medication, MedicationRefill } from "@/lib/types/medications";
 import type { GroupDoseOverride } from "@/lib/utils";
 import { MedicationCard } from "./MedicationCard";
 
 interface SortableMedicationCardProps {
   medication: Medication;
   groupDoseOverrides?: GroupDoseOverride[];
+  latestRefill?: MedicationRefill | null;
 }
 
 export function SortableMedicationCard({
   medication,
   groupDoseOverrides,
+  latestRefill,
 }: SortableMedicationCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: medication.id });
@@ -29,6 +31,7 @@ export function SortableMedicationCard({
       <MedicationCard
         medication={medication}
         groupDoseOverrides={groupDoseOverrides}
+        latestRefill={latestRefill}
         isDragging={isDragging}
         dragHandle={
           <button

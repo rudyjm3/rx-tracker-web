@@ -79,6 +79,7 @@ export function RefillModal({
       toast.success(mode === "refill" ? "Refill logged" : "Quantity adjusted");
       queryClient.invalidateQueries({ queryKey: ["medications"] });
       queryClient.invalidateQueries({ queryKey: ["refill-history", medication.id] });
+      queryClient.invalidateQueries({ queryKey: ["latest-refills"] });
       setAmount("");
       setPillsOnHand(medication.current_quantity == null ? "" : String(medication.current_quantity));
       setRefillDate(localDateString());
