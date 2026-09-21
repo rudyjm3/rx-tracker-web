@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
 import { to12h } from "@/lib/utils";
 import { deleteGroup } from "@/lib/medications";
-import type { Medication, MedicationGroup } from "@/lib/types/medications";
+import type { Medication, MedicationGroup, MedicationRefill } from "@/lib/types/medications";
 import { MedicationCard } from "./MedicationCard";
 import { GroupModal } from "./GroupModal";
 
@@ -15,6 +15,7 @@ interface GroupCardProps {
   members: Medication[];
   memberOverrides: { medication_id: string; quantity_per_dose: number | null }[];
   allActiveMedications: Medication[];
+  latestRefillsById: Map<string, MedicationRefill>;
 }
 
 export function GroupCard({
@@ -22,6 +23,7 @@ export function GroupCard({
   members,
   memberOverrides,
   allActiveMedications,
+  latestRefillsById,
 }: GroupCardProps) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -81,6 +83,7 @@ export function GroupCard({
                   scheduled_time: group.scheduled_time,
                   quantity_per_dose: override.quantity_per_dose,
                 }))}
+              latestRefill={latestRefillsById.get(med.id) ?? null}
             />
           ))
         )}

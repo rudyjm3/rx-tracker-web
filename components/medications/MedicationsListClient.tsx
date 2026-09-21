@@ -27,6 +27,7 @@ import {
   reorderMedications,
 } from "@/lib/medications";
 import { deleteDraft, getDrafts } from "@/lib/drafts";
+import { getLatestRefills } from "@/lib/inventory";
 import { Button, buttonVariants } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { to12h } from "@/lib/utils";
@@ -122,6 +123,26 @@ export function MedicationsListClient() {
 
   const activeMedications = useMemo(() => activeQuery.data ?? [], [activeQuery.data]);
   const inactiveMedications = useMemo(() => inactiveQuery.data ?? [], [inactiveQuery.data]);
+
+  // One request for the whole visible list's latest refills instead of
+  // one per card (see MedicationCard's latestRefill prop) — recomputed
+  // only when the set of inventory-tracked medication ids actually
+  // changes, not on every render.
+  const inventoryMedicationIds = useMemo(
+    () =>
+      [...activeMedications, ...inactiveMedications]
+        .filter((m) => m.inventory_enabled && m.current_quantity != null)
+        .map((m) => m.id)
+        .sort(),
+    [activeMedications, inactiveMedications],
+  );
+  const latestRefillsQuery = useQuery({
+    queryKey: ["latest-refills", inventoryMedicationIds],
+    queryFn: () => getLatestRefills(inventoryMedicationIds),
+    enabled: inventoryMedicationIds.length > 0,
+  });
+  const latestRefillsById = latestRefillsQuery.data ?? new Map();
+
   const groups = groupsQuery.data ?? [];
   // getGroupMembers() returns memberships for every group regardless of
   // its active flag — deleteGroup() only soft-deletes the group row, it
@@ -306,6 +327,7 @@ export function MedicationsListClient() {
                       key={med.id}
                       medication={med}
                       groupDoseOverrides={groupDoseOverridesFor(med.id)}
+                      latestRefill={latestRefillsById.get(med.id) ?? null}
                     />
                   ))}
                 </div>
@@ -322,7 +344,11 @@ export function MedicationsListClient() {
                 strategy={verticalListSortingStrategy}
               >
                 {filteredUngroupedMedications.map((med) => (
-                  <SortableMedicationCard key={med.id} medication={med} />
+                  <SortableMedicationCard
+                    key={med.id}
+                    medication={med}
+                    latestRefill={latestRefillsById.get(med.id) ?? null}
+                  />
                 ))}
               </SortableContext>
             </DndContext>
@@ -339,7 +365,11 @@ export function MedicationsListClient() {
         ) : (
           <div className="flex flex-col gap-2">
             {filteredInactiveMedications.map((med) => (
-              <MedicationCard key={med.id} medication={med} />
+              <MedicationCard
+                key={med.id}
+                medication={med}
+                latestRefill={latestRefillsById.get(med.id) ?? null}
+              />
             ))}
           </div>
         ))}
@@ -363,6 +393,7 @@ export function MedicationsListClient() {
                 members={membersOf(group.id)}
                 memberOverrides={groupMembers.filter((m) => m.group_id === group.id)}
                 allActiveMedications={activeMedications}
+                latestRefillsById={latestRefillsById}
               />
             ))
           )}

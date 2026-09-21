@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   CalendarCheck,
@@ -28,8 +27,7 @@ import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
 import { daysUntilRunout, to12h, type GroupDoseOverride } from "@/lib/utils";
-import { getLatestRefill } from "@/lib/inventory";
-import type { Medication } from "@/lib/types/medications";
+import type { Medication, MedicationRefill } from "@/lib/types/medications";
 import { RefillModal } from "./RefillModal";
 import { RefillHistoryModal } from "./RefillHistoryModal";
 import { SideEffectModal } from "./SideEffectModal";
@@ -104,6 +102,7 @@ interface MedicationCardProps {
   groupDoseOverrides?: GroupDoseOverride[];
   dragHandle?: ReactNode;
   isDragging?: boolean;
+  latestRefill?: MedicationRefill | null;
 }
 
 export function MedicationCard({
@@ -111,6 +110,7 @@ export function MedicationCard({
   groupDoseOverrides = [],
   dragHandle,
   isDragging,
+  latestRefill = null,
 }: MedicationCardProps) {
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [expanded, setExpanded] = useState(false);
@@ -139,13 +139,6 @@ export function MedicationCard({
       ? "bg-status-warning"
       : "bg-status-success";
   const runoutText = runoutSummary(medication, groupDoseOverrides);
-
-  const latestRefillQuery = useQuery({
-    queryKey: ["latest-refill", medication.id],
-    queryFn: () => getLatestRefill(medication.id),
-    enabled: showInventoryBar,
-  });
-  const latestRefill = latestRefillQuery.data;
 
   const openDetails = (event: MouseEvent | KeyboardEvent) => {
     event.preventDefault();
@@ -215,7 +208,7 @@ export function MedicationCard({
               {latestRefill && (
                 <p className="mt-1 text-xs text-brand-text-muted">
                   Last refill: {formatMedDate(latestRefill.refill_date)} ·{" "}
-                  {formatQty(latestRefill.pills_on_hand)} {medication.inventory_unit}
+                  {formatQty(latestRefill.amount)} {medication.inventory_unit}
                 </p>
               )}
             </div>
