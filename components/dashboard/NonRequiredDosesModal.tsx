@@ -9,6 +9,7 @@ import type { DaySlot } from "@/lib/schedule";
 interface NonRequiredDosesModalProps {
   open: boolean;
   onClose: () => void;
+  /** Already scoped to non-required (as-needed + adherence-tracked) slots. */
   slots: DaySlot[];
 }
 
@@ -23,9 +24,8 @@ function statusLabel(slot: DaySlot): { text: string; className: string } {
 }
 
 export function NonRequiredDosesModal({ open, onClose, slots }: NonRequiredDosesModalProps) {
-  const nonRequired = slots.filter((s) => s.medication.adherence_enabled && s.isPrn);
   const byMedication = new Map<string, DaySlot[]>();
-  for (const slot of nonRequired) {
+  for (const slot of slots) {
     const existing = byMedication.get(slot.medicationId) ?? [];
     existing.push(slot);
     byMedication.set(slot.medicationId, existing);
