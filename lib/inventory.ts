@@ -42,6 +42,23 @@ export async function getRefillHistory(
   return data as MedicationRefill[];
 }
 
+export async function getLatestRefill(
+  medicationId: string,
+): Promise<MedicationRefill | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("medication_refills")
+    .select("*")
+    .eq("medication_id", medicationId)
+    .eq("entry_type", "refill")
+    .order("refill_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as MedicationRefill | null;
+}
+
 // Same row-locked shape as log_refill — the stored delta (newQuantity
 // minus whatever current_quantity actually was under the lock) needs the
 // same atomicity, not a delta computed from a quantity read moments

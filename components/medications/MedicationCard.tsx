@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   CalendarCheck,
@@ -27,6 +28,7 @@ import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
 import { daysUntilRunout, to12h, type GroupDoseOverride } from "@/lib/utils";
+import { getLatestRefill } from "@/lib/inventory";
 import type { Medication } from "@/lib/types/medications";
 import { RefillModal } from "./RefillModal";
 import { RefillHistoryModal } from "./RefillHistoryModal";
@@ -38,6 +40,10 @@ import { DiscontinueModal } from "./DiscontinueModal";
 import { ResumeModal } from "./ResumeModal";
 import { UpdatePrescribedDoseModal } from "./UpdatePrescribedDoseModal";
 import { MedicationDetailsModal } from "./MedicationDetailsModal";
+
+function formatQty(n: number): string {
+  return Number(n.toFixed(3)).toString();
+}
 
 function formatMedDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -133,6 +139,14 @@ export function MedicationCard({
       ? "bg-status-warning"
       : "bg-status-success";
   const runoutText = runoutSummary(medication, groupDoseOverrides);
+
+  const latestRefillQuery = useQuery({
+    queryKey: ["latest-refill", medication.id],
+    queryFn: () => getLatestRefill(medication.id),
+    enabled: showInventoryBar,
+  });
+  const latestRefill = latestRefillQuery.data;
+
   const openDetails = (event: MouseEvent | KeyboardEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -184,16 +198,26 @@ export function MedicationCard({
 
           {showInventoryBar && (
             <div className="mt-2 max-w-xs">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand-bg">
+              <p className="text-xs text-brand-text-muted">
+                Pills: {formatQty(currentQty)} / {formatQty(capacity)} {medication.inventory_unit}
+                {" | "}
+                Refill alert at {formatQty(medication.low_supply_threshold)} {medication.inventory_unit}
+              </p>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand-bg">
                 <div
                   className={cn("h-full rounded-full", fillColor)}
                   style={{ width: `${fillPct}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-brand-text-muted">
-                {currentQty} / {capacity} {medication.inventory_unit}
-                {runoutText && <> | {runoutText}</>}
-              </p>
+              {runoutText && (
+                <p className="mt-1 text-xs text-brand-text-muted">{runoutText}</p>
+              )}
+              {latestRefill && (
+                <p className="mt-1 text-xs text-brand-text-muted">
+                  Last refill: {formatMedDate(latestRefill.refill_date)} ·{" "}
+                  {formatQty(latestRefill.pills_on_hand)} {medication.inventory_unit}
+                </p>
+              )}
             </div>
           )}
           <div className="mt-2 flex justify-center">
