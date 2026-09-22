@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
@@ -43,7 +43,7 @@ function SnoozeRow({
           Snooze
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent>
+      <DropdownMenuContent className="z-[110]">
         {SNOOZE_OPTIONS.map((minutes) => (
           <DropdownMenuItem key={minutes} onSelect={() => onSnooze(minutes)}>
             {minutes} minutes
@@ -67,6 +67,16 @@ export function AlarmOverlay({
   disabled,
 }: AlarmOverlayProps) {
   const [manageEach, setManageEach] = useState(false);
+
+  const isOpen = event !== null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
   if (!event) return null;
 
@@ -95,10 +105,13 @@ export function AlarmOverlay({
           {event.kind === "single" ? (
             <>
               <h2 className="mt-2 text-2xl font-bold">
-                <MedicationNameWithDose medication={event.slot.medication} />
+                <MedicationNameWithDose
+                  medication={event.slot.medication}
+                  doseClassName="ml-1 inline-flex items-center rounded-full border border-cyan-300/40 bg-cyan-500/25 px-3 py-1 align-middle text-xs font-extrabold text-white shadow-sm"
+                />
               </h2>
-              <div className="mt-1 flex items-center justify-center gap-2 text-white/85">
-                <MedTypeBadge type={event.slot.medication.medication_type} />
+              <div className="mt-2 flex items-center justify-center gap-2 text-white/85">
+                <MedTypeBadge type={event.slot.medication.medication_type} onDark />
               </div>
             </>
           ) : (
@@ -148,7 +161,7 @@ export function AlarmOverlay({
                         Snooze
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent>
+                    <DropdownMenuContent className="z-[110]">
                       {SNOOZE_OPTIONS.map((minutes) => (
                         <DropdownMenuItem key={minutes} onSelect={() => onSnoozeOne(m, minutes)}>
                           {minutes} minutes
