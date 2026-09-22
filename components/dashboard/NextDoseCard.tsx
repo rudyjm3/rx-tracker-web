@@ -54,10 +54,10 @@ export function NextDoseCard({ events }: NextDoseCardProps) {
                   <h2 className="text-2xl font-extrabold text-white">
                     <MedicationNameWithDose
                       medication={next.slot.medication}
-                      doseClassName="text-[0.875em] font-bold text-white/75"
+                      doseClassName="ml-1 inline-flex items-center rounded-full border border-cyan-300/40 bg-cyan-500/25 px-3 py-1 align-middle text-xs font-extrabold text-white shadow-sm"
                     />
                   </h2>
-                  <MedTypeBadge type={next.slot.medication.medication_type} />
+                  <MedTypeBadge type={next.slot.medication.medication_type} onDark />
                 </div>
               </>
             ) : (
@@ -82,7 +82,7 @@ export function NextDoseCard({ events }: NextDoseCardProps) {
                           className="font-medium"
                           doseClassName="text-[0.875em] font-bold text-white/75"
                         />
-                        <MedTypeBadge type={m.medication.medication_type} />
+                        <MedTypeBadge type={m.medication.medication_type} onDark />
                       </li>
                     ))}
                   </ul>
