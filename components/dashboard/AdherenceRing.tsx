@@ -23,7 +23,7 @@ export function AdherenceRing({
 
   const hasInner = innerPercent !== undefined;
   const innerStrokeWidth = 9;
-  const innerSize = size - (strokeWidth + 10) * 2;
+  const innerSize = size - (strokeWidth + 5) * 2;
   const innerOffsetXY = (size - innerSize) / 2;
   const inner = hasInner ? ringGeometry(innerSize, innerStrokeWidth) : null;
   const innerDashOffset = inner ? inner.circumference * (1 - (innerPercent ?? 0) / 100) : 0;
