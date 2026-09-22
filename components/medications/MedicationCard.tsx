@@ -43,6 +43,10 @@ function formatQty(n: number): string {
   return Number(n.toFixed(3)).toString();
 }
 
+function capitalize(value: string): string {
+  return value.length === 0 ? value : value[0].toUpperCase() + value.slice(1);
+}
+
 function formatMedDate(value: string | null | undefined): string {
   if (!value) return "—";
   // Date-only fields (start_date/end_date/created_at's date portion) must be
@@ -192,7 +196,7 @@ export function MedicationCard({
           {showInventoryBar && (
             <div className="mt-2 max-w-xs">
               <p className="text-xs text-brand-text-muted">
-                Pills: {formatQty(currentQty)} / {formatQty(capacity)} {medication.inventory_unit}
+                {capitalize(medication.inventory_type || "Pills")}: {formatQty(currentQty)} / {formatQty(capacity)} {medication.inventory_unit}
                 {" | "}
                 Refill alert at {formatQty(medication.low_supply_threshold)} {medication.inventory_unit}
               </p>
