@@ -30,6 +30,7 @@ import {
   calculateAge,
   fallbackDisplayName,
   formatFeetInches,
+  formatUpdatedDate,
   heightToInches,
 } from "@/lib/utils";
 import type { UserProfile } from "@/lib/types/profile";
@@ -104,6 +105,22 @@ export function ProfileClient() {
             <Row
               label="Height"
               value={`${profile.height_value} ${profile.height_unit} (${formatFeetInches(heightToInches(profile.height_value, profile.height_unit ?? "in"))})`}
+              subValue={
+                profile.height_updated_at
+                  ? `Last updated ${formatUpdatedDate(profile.height_updated_at)}`
+                  : undefined
+              }
+            />
+          )}
+          {profile?.weight_value != null && (
+            <Row
+              label="Weight"
+              value={`${profile.weight_value} ${profile.weight_unit}`}
+              subValue={
+                profile.weight_updated_at
+                  ? `Last updated ${formatUpdatedDate(profile.weight_updated_at)}`
+                  : undefined
+              }
             />
           )}
         </dl>
@@ -145,11 +162,14 @@ export function ProfileClient() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, subValue }: { label: string; value: string; subValue?: string }) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="text-brand-text-muted">{label}</dt>
-      <dd className="text-right text-brand-text">{value}</dd>
+      <dd className="text-right text-brand-text">
+        {value}
+        {subValue && <span className="block text-xs text-brand-text-muted">{subValue}</span>}
+      </dd>
     </div>
   );
 }
@@ -170,6 +190,10 @@ function EditProfileForm({ profile, email, onSaved, onCancel }: EditProfileFormP
     profile?.height_value != null ? String(profile.height_value) : "",
   );
   const [heightUnit, setHeightUnit] = useState(profile?.height_unit ?? "in");
+  const [weightValue, setWeightValue] = useState(
+    profile?.weight_value != null ? String(profile.weight_value) : "",
+  );
+  const [weightUnit, setWeightUnit] = useState(profile?.weight_unit ?? "lb");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -197,6 +221,21 @@ function EditProfileForm({ profile, email, onSaved, onCancel }: EditProfileFormP
         }
       }
 
+      const weightNum = weightValue.trim() ? Number(weightValue) : null;
+      if (weightNum !== null) {
+        const bounds = weightUnit === "kg" ? [1, 300] : [1, 660];
+        if (weightNum < bounds[0] || weightNum > bounds[1]) {
+          throw new Error("Weight value is out of range.");
+        }
+      }
+
+      const heightChanged =
+        heightNum !== (profile?.height_value ?? null) ||
+        (heightNum !== null && heightUnit !== (profile?.height_unit ?? "in"));
+      const weightChanged =
+        weightNum !== (profile?.weight_value ?? null) ||
+        (weightNum !== null && weightUnit !== (profile?.weight_unit ?? "lb"));
+
       let profilePicture = profile?.profile_picture ?? null;
       if (avatarFile) {
         const newUrl = await uploadAvatar(avatarFile);
@@ -214,6 +253,12 @@ function EditProfileForm({ profile, email, onSaved, onCancel }: EditProfileFormP
         birth_date: birthDate || null,
         height_value: heightNum,
         height_unit: heightNum !== null ? heightUnit : null,
+        height_updated_at:
+          heightNum === null ? null : heightChanged ? new Date().toISOString() : (profile?.height_updated_at ?? null),
+        weight_value: weightNum,
+        weight_unit: weightNum !== null ? weightUnit : null,
+        weight_updated_at:
+          weightNum === null ? null : weightChanged ? new Date().toISOString() : (profile?.weight_updated_at ?? null),
         profile_picture: profilePicture,
       });
       onSaved();
@@ -284,6 +329,26 @@ function EditProfileForm({ profile, email, onSaved, onCancel }: EditProfileFormP
             >
               <option value="in">in</option>
               <option value="cm">cm</option>
+            </select>
+          </div>
+        </Field>
+        <Field label="Weight">
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              className={`${inputClass} w-28`}
+              value={weightValue}
+              onChange={(e) => setWeightValue(e.target.value)}
+            />
+            <select
+              className={inputClass}
+              value={weightUnit}
+              onChange={(e) => setWeightUnit(e.target.value)}
+            >
+              <option value="lb">lb</option>
+              <option value="kg">kg</option>
             </select>
           </div>
         </Field>

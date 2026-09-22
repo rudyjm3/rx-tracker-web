@@ -20,6 +20,10 @@ create table if not exists family_profiles (
   birth_date       date,
   height_value     numeric(5,2),
   height_unit      text,
+  weight_value     numeric(6,2),
+  weight_unit      text,
+  height_updated_at timestamptz,
+  weight_updated_at timestamptz,
   profile_picture  text,
   created_at       timestamptz default now()
 );
@@ -38,6 +42,10 @@ create table if not exists user_profiles (
   birth_date       date,
   height_value     numeric(5,2),
   height_unit      text,
+  weight_value     numeric(6,2),
+  weight_unit      text,
+  height_updated_at timestamptz,
+  weight_updated_at timestamptz,
   profile_picture  text,
   updated_at       timestamptz default now()
 );
