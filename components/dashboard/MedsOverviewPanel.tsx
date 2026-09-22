@@ -7,6 +7,7 @@ interface MedsOverviewPanelProps {
   dosesTaken: number;
   dosesMissed: number;
   onViewRequiredDoses: () => void;
+  onViewNonRequiredDoses: () => void;
 }
 
 function StatRow({
@@ -32,6 +33,7 @@ export function MedsOverviewPanel({
   dosesTaken,
   dosesMissed,
   onViewRequiredDoses,
+  onViewNonRequiredDoses,
 }: MedsOverviewPanelProps) {
   return (
     <div className="rounded-card border border-brand-border bg-brand-card p-4 shadow-card">
@@ -52,6 +54,15 @@ export function MedsOverviewPanel({
       >
         <ListChecks size={15} />
         <span className="flex-1 text-left">View required doses list</span>
+        <ChevronRight size={15} />
+      </button>
+      <button
+        type="button"
+        onClick={onViewNonRequiredDoses}
+        className="flex w-full items-center gap-2 py-1.5 text-sm text-brand-deep-blue hover:underline"
+      >
+        <ListChecks size={15} />
+        <span className="flex-1 text-left">View non required doses list</span>
         <ChevronRight size={15} />
       </button>
       <Link

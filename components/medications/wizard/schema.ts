@@ -84,6 +84,9 @@ export const medicationFormSchema = z
     feedbackType: z.enum(["none", "pain", "mood", "both"]),
     dashboardEnabled: z.boolean(),
     remindersEnabled: z.boolean(),
+    // For a fixed-schedule med this gates the required-dose count. For an
+    // asNeeded med it instead opts into the dashboard's separate
+    // non-required (optional-dose) tracking bucket — see StepFeedback.
     adherenceEnabled: z.boolean(),
   })
   .superRefine((data, ctx) => {

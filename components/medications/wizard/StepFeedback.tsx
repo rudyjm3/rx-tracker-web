@@ -5,7 +5,8 @@ import { Field, inputClass } from "@/components/ui/Field";
 import type { MedicationFormValues } from "./schema";
 
 export function StepFeedback() {
-  const { register } = useFormContext<MedicationFormValues>();
+  const { register, watch } = useFormContext<MedicationFormValues>();
+  const asNeeded = watch("asNeeded");
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,8 +30,15 @@ export function StepFeedback() {
         </label>
         <label className="flex items-center gap-2 text-sm text-brand-text">
           <input type="checkbox" {...register("adherenceEnabled")} />
-          Include in adherence tracking
+          {asNeeded ? "Track as a non-required (optional) dose" : "Include in adherence tracking"}
         </label>
+        {asNeeded && (
+          <p className="text-xs text-brand-text-muted">
+            This medication is take as needed, so it&apos;s never counted toward the
+            dashboard&apos;s required-dose count. Checking this tracks it separately as an
+            optional dose instead of leaving it untracked.
+          </p>
+        )}
       </div>
     </div>
   );

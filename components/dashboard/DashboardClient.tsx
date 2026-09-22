@@ -25,6 +25,7 @@ import { computeAdherenceStats } from "@/lib/adherence";
 import { playAlarmSound, triggerVibration } from "@/lib/notifications";
 import {
   buildDoseEvents,
+  generateAdHocPrnSlots,
   generateDaySlots,
   slotDueTime,
   type DaySlot,
@@ -41,6 +42,7 @@ import { QuickActionsPanel } from "./QuickActionsPanel";
 import { MedsOverviewPanel } from "./MedsOverviewPanel";
 import { TodayHistoryPanel } from "./TodayHistoryPanel";
 import { RequiredDosesModal } from "./RequiredDosesModal";
+import { NonRequiredDosesModal } from "./NonRequiredDosesModal";
 import { AlarmOverlay } from "./AlarmOverlay";
 import { ZeroPillModal } from "./ZeroPillModal";
 
@@ -163,6 +165,19 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     logsQuery.data,
     postponesQuery.data,
   ]);
+
+  // Ungrouped as-needed medications never get a slot from generateDaySlots
+  // (their doses are logged ad hoc) — pull those dose_logs in separately so
+  // they still surface in non-required dose tracking.
+  const adHocPrnSlots = useMemo<DaySlot[]>(() => {
+    if (!medicationsQuery.data || !logsQuery.data) return [];
+    return generateAdHocPrnSlots(medicationsQuery.data, groupMembersQuery.data ?? [], logsQuery.data);
+  }, [medicationsQuery.data, groupMembersQuery.data, logsQuery.data]);
+
+  const nonRequiredSlots = useMemo<DaySlot[]>(
+    () => [...slots.filter((s) => s.medication.adherence_enabled && s.isPrn), ...adHocPrnSlots],
+    [slots, adHocPrnSlots],
+  );
 
   const graceMinutes = graceQuery.data ?? 60;
 
@@ -297,19 +312,21 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       : (doseEvents.find((e) => e.time <= nowTick && nowTick <= e.time + graceMinutes * 60_000) ??
         null);
 
+  const toTrackedSlot = (s: DaySlot) => ({
+    status: s.status,
+    late: isLate(
+      { status: s.status, taken_at: s.takenAt, scheduled_for_date: date, scheduled_time: s.scheduledTime },
+      graceMinutes,
+    ),
+  });
+
   const adherenceStats = computeAdherenceStats(
-    slots
-      .filter((s) => s.status !== "pending" && s.medication.adherence_enabled && !s.isPrn)
-      .map((s) => ({
-        status: s.status as "taken" | "skipped" | "missed",
-        late: isLate(
-          { status: s.status, taken_at: s.takenAt, scheduled_for_date: date, scheduled_time: s.scheduledTime },
-          graceMinutes,
-        ),
-      })),
+    slots.filter((s) => s.medication.adherence_enabled && !s.isPrn).map(toTrackedSlot),
+    nonRequiredSlots.map(toTrackedSlot),
   );
 
   const [requiredDosesOpen, setRequiredDosesOpen] = useState(false);
+  const [nonRequiredDosesOpen, setNonRequiredDosesOpen] = useState(false);
   const todaysDosesCount = slots.length;
   const dosesTaken = slots.filter((s) => s.status === "taken").length;
   const dosesMissed = slots.filter((s) => s.status === "missed").length;
@@ -424,6 +441,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
             dosesTaken={dosesTaken}
             dosesMissed={dosesMissed}
             onViewRequiredDoses={() => setRequiredDosesOpen(true)}
+            onViewNonRequiredDoses={() => setNonRequiredDosesOpen(true)}
           />
         </div>
       </div>
@@ -441,6 +459,11 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
         open={requiredDosesOpen}
         onClose={() => setRequiredDosesOpen(false)}
         slots={slots}
+      />
+      <NonRequiredDosesModal
+        open={nonRequiredDosesOpen}
+        onClose={() => setNonRequiredDosesOpen(false)}
+        slots={nonRequiredSlots}
       />
       <AlarmOverlay
         event={dueNowEvent}

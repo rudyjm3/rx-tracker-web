@@ -17,6 +17,16 @@ export function computeAdherence(logs: AdherenceLog[]): number {
   return denom === 0 ? 0 : Math.round((taken / denom) * 100);
 }
 
+export interface DoseTrackingStats {
+  percent: number;
+  taken: number;
+  total: number;
+  onTime: number;
+  late: number;
+  skipped: number;
+  missed: number;
+}
+
 export interface AdherenceStats {
   percent: number;
   requiredTaken: number;
@@ -25,31 +35,60 @@ export interface AdherenceStats {
   late: number;
   skipped: number;
   missed: number;
+  // "Take as needed" medications that also have "include in adherence
+  // tracking" checked: tracked on their own, never folded into the
+  // required-dose numbers above.
+  nonRequired: DoseTrackingStats;
 }
 
-/**
- * Full adherence breakdown for the dashboard's "Today's Adherence" card:
- * the same percent as computeAdherence() plus the on-time/late/skipped
- * counts shown beneath the ring. requiredTotal is every required slot
- * that's due to be resolved today (taken/skipped/missed), not the day's
- * full schedule — a still-pending slot isn't counted either way yet.
- */
-export function computeAdherenceStats(
-  logs: (AdherenceLog & { late: boolean })[],
-): AdherenceStats {
-  const requiredTaken = logs.filter((l) => l.status === "taken").length;
-  const onTime = logs.filter((l) => l.status === "taken" && !l.late).length;
-  const late = logs.filter((l) => l.status === "taken" && l.late).length;
-  const skipped = logs.filter((l) => l.status === "skipped").length;
-  const missed = logs.filter((l) => l.status === "missed").length;
-  const requiredTotal = logs.length;
+interface TrackedSlot {
+  status: DoseLogStatus | "pending";
+  late: boolean;
+}
+
+function summarize(slots: TrackedSlot[]): DoseTrackingStats {
+  const taken = slots.filter((s) => s.status === "taken").length;
+  const onTime = slots.filter((s) => s.status === "taken" && !s.late).length;
+  const late = slots.filter((s) => s.status === "taken" && s.late).length;
+  const skipped = slots.filter((s) => s.status === "skipped").length;
+  const missed = slots.filter((s) => s.status === "missed").length;
+  const total = slots.length;
   return {
-    percent: requiredTotal === 0 ? 0 : Math.round((requiredTaken / requiredTotal) * 100),
-    requiredTaken,
-    requiredTotal,
+    percent: total === 0 ? 0 : Math.round((taken / total) * 100),
+    taken,
+    total,
     onTime,
     late,
     skipped,
     missed,
+  };
+}
+
+/**
+ * Full adherence breakdown for the dashboard's "Today's Adherence" card.
+ *
+ * requiredSlots is every slot generated for today for a required
+ * (adherence-tracked, non-PRN) medication, including ones still
+ * pending — so requiredTotal reflects the full day's required doses up
+ * front rather than growing only as doses get resolved.
+ *
+ * nonRequiredSlots is the separate "take as needed + include in
+ * adherence tracking" bucket — it never contributes to requiredTaken/
+ * requiredTotal/percent above.
+ */
+export function computeAdherenceStats(
+  requiredSlots: TrackedSlot[],
+  nonRequiredSlots: TrackedSlot[] = [],
+): AdherenceStats {
+  const required = summarize(requiredSlots);
+  return {
+    percent: required.percent,
+    requiredTaken: required.taken,
+    requiredTotal: required.total,
+    onTime: required.onTime,
+    late: required.late,
+    skipped: required.skipped,
+    missed: required.missed,
+    nonRequired: summarize(nonRequiredSlots),
   };
 }
