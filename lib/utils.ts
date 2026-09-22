@@ -195,6 +195,17 @@ export function heightToInches(value: number, unit: string): number {
   return unit === "cm" ? value / 2.54 : value;
 }
 
+// "Sep 20, 2026" for a timestamptz value — used by the height/weight
+// "last updated" labels, distinct from formatShortDate which expects a
+// bare YYYY-MM-DD date rather than a full timestamp.
+export function formatUpdatedDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function formatFeetInches(totalInches: number): string {
   const clamped = Math.max(0, totalInches);
   let feet = Math.floor(clamped / 12);

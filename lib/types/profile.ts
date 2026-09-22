@@ -6,6 +6,10 @@ export interface UserProfile {
   birth_date: string | null;
   height_value: number | null;
   height_unit: string | null;
+  weight_value: number | null;
+  weight_unit: string | null;
+  height_updated_at: string | null;
+  weight_updated_at: string | null;
   profile_picture: string | null;
   updated_at: string;
 }
@@ -22,6 +26,10 @@ export interface FamilyProfile {
   birth_date: string | null;
   height_value: number | null;
   height_unit: string | null;
+  weight_value: number | null;
+  weight_unit: string | null;
+  height_updated_at: string | null;
+  weight_updated_at: string | null;
   profile_picture: string | null;
   created_at: string;
 }

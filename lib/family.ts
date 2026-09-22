@@ -30,6 +30,10 @@ export interface FamilyProfileInput {
   birth_date?: string | null;
   height_value?: number | null;
   height_unit?: string | null;
+  weight_value?: number | null;
+  weight_unit?: string | null;
+  height_updated_at?: string | null;
+  weight_updated_at?: string | null;
   profile_picture?: string | null;
   avatar_color?: string | null;
 }
@@ -77,6 +81,10 @@ export async function createFamilyProfile(input: FamilyProfileInput): Promise<Fa
       birth_date: input.birth_date ?? null,
       height_value: input.height_value ?? null,
       height_unit: input.height_value != null ? (input.height_unit ?? "in") : null,
+      weight_value: input.weight_value ?? null,
+      weight_unit: input.weight_value != null ? (input.weight_unit ?? "lb") : null,
+      height_updated_at: input.height_value != null ? (input.height_updated_at ?? new Date().toISOString()) : null,
+      weight_updated_at: input.weight_value != null ? (input.weight_updated_at ?? new Date().toISOString()) : null,
       profile_picture: input.profile_picture ?? null,
       avatar_color: input.avatar_color ?? AVATAR_COLOR_PALETTE[0],
     })
@@ -101,6 +109,10 @@ export async function updateFamilyProfile(
       birth_date: input.birth_date ?? null,
       height_value: input.height_value ?? null,
       height_unit: input.height_value != null ? (input.height_unit ?? "in") : null,
+      weight_value: input.weight_value ?? null,
+      weight_unit: input.weight_value != null ? (input.weight_unit ?? "lb") : null,
+      height_updated_at: input.height_value != null ? (input.height_updated_at ?? null) : null,
+      weight_updated_at: input.weight_value != null ? (input.weight_updated_at ?? null) : null,
       profile_picture: input.profile_picture ?? null,
       avatar_color: input.avatar_color ?? AVATAR_COLOR_PALETTE[0],
     })

@@ -23,6 +23,10 @@ export interface UserProfileInput {
   birth_date?: string | null;
   height_value?: number | null;
   height_unit?: string | null;
+  weight_value?: number | null;
+  weight_unit?: string | null;
+  height_updated_at?: string | null;
+  weight_updated_at?: string | null;
   profile_picture?: string | null;
 }
 

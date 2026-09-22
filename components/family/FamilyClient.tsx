@@ -217,6 +217,10 @@ function FamilyMemberForm({ existing, onSaved, onCancel }: FamilyMemberFormProps
     existing?.height_value != null ? String(existing.height_value) : "",
   );
   const [heightUnit, setHeightUnit] = useState(existing?.height_unit ?? "in");
+  const [weightValue, setWeightValue] = useState(
+    existing?.weight_value != null ? String(existing.weight_value) : "",
+  );
+  const [weightUnit, setWeightUnit] = useState(existing?.weight_unit ?? "lb");
   const [avatarColor, setAvatarColor] = useState(existing?.avatar_color ?? AVATAR_COLOR_PALETTE[0]);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
@@ -241,6 +245,21 @@ function FamilyMemberForm({ existing, onSaved, onCancel }: FamilyMemberFormProps
         }
       }
 
+      const weightNum = weightValue.trim() ? Number(weightValue) : null;
+      if (weightNum !== null) {
+        const bounds = weightUnit === "kg" ? [1, 300] : [1, 660];
+        if (weightNum < bounds[0] || weightNum > bounds[1]) {
+          throw new Error("Weight value is out of range.");
+        }
+      }
+
+      const heightChanged =
+        heightNum !== (existing?.height_value ?? null) ||
+        (heightNum !== null && heightUnit !== (existing?.height_unit ?? "in"));
+      const weightChanged =
+        weightNum !== (existing?.weight_value ?? null) ||
+        (weightNum !== null && weightUnit !== (existing?.weight_unit ?? "lb"));
+
       let profilePicture = existing?.profile_picture ?? null;
       if (avatarFile) {
         const newUrl = await uploadAvatar(avatarFile);
@@ -259,6 +278,12 @@ function FamilyMemberForm({ existing, onSaved, onCancel }: FamilyMemberFormProps
         birth_date: birthDate || null,
         height_value: heightNum,
         height_unit: heightUnit,
+        height_updated_at:
+          heightNum === null ? null : heightChanged ? new Date().toISOString() : (existing?.height_updated_at ?? null),
+        weight_value: weightNum,
+        weight_unit: weightUnit,
+        weight_updated_at:
+          weightNum === null ? null : weightChanged ? new Date().toISOString() : (existing?.weight_updated_at ?? null),
         profile_picture: profilePicture,
         avatar_color: avatarColor,
       };
@@ -355,6 +380,26 @@ function FamilyMemberForm({ existing, onSaved, onCancel }: FamilyMemberFormProps
             >
               <option value="in">in</option>
               <option value="cm">cm</option>
+            </select>
+          </div>
+        </Field>
+        <Field label="Weight">
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              className={`${inputClass} w-28`}
+              value={weightValue}
+              onChange={(e) => setWeightValue(e.target.value)}
+            />
+            <select
+              className={inputClass}
+              value={weightUnit}
+              onChange={(e) => setWeightUnit(e.target.value)}
+            >
+              <option value="lb">lb</option>
+              <option value="kg">kg</option>
             </select>
           </div>
         </Field>

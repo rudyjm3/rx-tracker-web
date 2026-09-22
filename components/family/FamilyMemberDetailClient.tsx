@@ -10,7 +10,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { ImageLightbox } from "@/components/ui/ImageLightbox";
 import { getFamilyProfile } from "@/lib/family";
-import { calculateAge, formatFeetInches, heightToInches } from "@/lib/utils";
+import { calculateAge, formatFeetInches, formatUpdatedDate, heightToInches } from "@/lib/utils";
 
 interface FamilyMemberDetailClientProps {
   profileId: string;
@@ -100,6 +100,22 @@ export function FamilyMemberDetailClient({ profileId }: FamilyMemberDetailClient
             <Row
               label="Height"
               value={`${profile.height_value} ${profile.height_unit} (${formatFeetInches(heightToInches(profile.height_value, profile.height_unit ?? "in"))})`}
+              subValue={
+                profile.height_updated_at
+                  ? `Last updated ${formatUpdatedDate(profile.height_updated_at)}`
+                  : undefined
+              }
+            />
+          )}
+          {profile.weight_value != null && (
+            <Row
+              label="Weight"
+              value={`${profile.weight_value} ${profile.weight_unit}`}
+              subValue={
+                profile.weight_updated_at
+                  ? `Last updated ${formatUpdatedDate(profile.weight_updated_at)}`
+                  : undefined
+              }
             />
           )}
         </dl>
@@ -119,11 +135,14 @@ export function FamilyMemberDetailClient({ profileId }: FamilyMemberDetailClient
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, subValue }: { label: string; value: string; subValue?: string }) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="text-brand-text-muted">{label}</dt>
-      <dd className="text-right font-medium text-brand-text">{value}</dd>
+      <dd className="text-right font-medium text-brand-text">
+        {value}
+        {subValue && <span className="block text-xs font-normal text-brand-text-muted">{subValue}</span>}
+      </dd>
     </div>
   );
 }
