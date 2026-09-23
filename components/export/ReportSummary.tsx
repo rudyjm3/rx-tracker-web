@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/Badge";
 import { FeedbackChip, feedbackChipTypes } from "@/components/ui/FeedbackChip";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
+import { formatPrescribedDose } from "@/lib/medication-label";
 import { formatLongDate, formatShortDate, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import type { DoctorVisitReportData, TrendNoteEntry } from "./DoctorVisitReportPdf";
@@ -251,7 +252,9 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
               columns={[
                 {
                   header: "Medication",
-                  render: (r) => <MedicationLabel medication={r.medication} suffix={`– ${r.medication.dose}`} />,
+                  render: (r) => (
+                    <MedicationLabel medication={r.medication} suffix={`– ${formatPrescribedDose(r.medication)}`} />
+                  ),
                 },
                 {
                   header: "Adherence",
@@ -284,7 +287,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
                 />
               ),
             },
-            { header: "Dose", render: (r) => r.medication.dose },
+            { header: "Dose", render: (r) => formatPrescribedDose(r.medication) },
             {
               header: "Start Date",
               render: (r) => (r.medication.start_date ? formatShortDate(r.medication.start_date) : "—"),
@@ -328,7 +331,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
           rowKey={(r) => r.medication.id}
           columns={[
             { header: "Medication", render: (r) => <MedicationLabel medication={r.medication} includeDose={false} /> },
-            { header: "Dose", render: (r) => r.medication.dose },
+            { header: "Dose", render: (r) => formatPrescribedDose(r.medication) },
             { header: "Reason", render: (r) => r.event?.reason || "—" },
             { header: "Notes", render: (r) => r.event?.comment || "—" },
             {
