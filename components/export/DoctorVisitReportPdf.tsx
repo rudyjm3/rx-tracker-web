@@ -514,7 +514,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                       header: "Medication",
                       flex: 2,
                       render: (r: DoctorVisitReportData["adherenceBreakout"][number]) => (
-                        <MedicationLabel medication={r.medication} suffix={`– ${r.medication.dose}`} />
+                        <MedicationLabel medication={r.medication} suffix={`– ${formatPrescribedDose(r.medication)}`} />
                       ),
                     },
                     {
@@ -554,7 +554,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                     />
                   ),
                 },
-                { header: "Dose", flex: 1, render: (r) => r.medication.dose },
+                { header: "Dose", flex: 1, render: (r) => formatPrescribedDose(r.medication) },
                 { header: "Start Date", flex: 1, render: (r) => (r.medication.start_date ? formatShortDate(r.medication.start_date) : "—") },
                 { header: "Schedule", flex: 1.6, render: (r) => formatSchedule(r.medication) },
                 { header: "Instructions", flex: 2, render: (r) => r.medication.instructions },
