@@ -598,7 +598,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                     <MedicationLabel medication={r.medication} includeDose={false} />
                   ),
                 },
-                { header: "Dose", flex: 0.8, render: (r) => r.medication.dose },
+                { header: "Dose", flex: 0.8, render: (r) => formatPrescribedDose(r.medication) },
                 { header: "Reason", flex: 1, render: (r) => r.event?.reason ?? "—" },
                 { header: "Notes", flex: 1.4, render: (r) => r.event?.comment ?? "—" },
                 {
