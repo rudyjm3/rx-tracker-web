@@ -305,10 +305,23 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // pending-only: the alarm overlay and its bulk Take/Skip/Snooze
   // handlers still need to act on (and only on) what's actually still
   // due, not re-touch an already taken/skipped/missed groupmate.
+  //
+  // A group only qualifies as "next"/"upcoming" if it still has a
+  // pending *required* member. An as_needed dose never gets
+  // auto-finalized (see finalizeMissedDoses), so once every required
+  // member of a long-past group is taken/skipped/missed, the group's
+  // only remaining "pending" member can be a PRN dose that's been due
+  // for hours — that shouldn't keep pinning an hours-stale group in the
+  // Next Dose slot ahead of whatever's genuinely coming up next. A
+  // group made up entirely of PRN members is scoped out of this card by
+  // the same rule; it still surfaces via Today's Schedule and the
+  // Non-Required Doses list.
   const heroEvents = useMemo(
     () =>
       buildDoseEvents(slots, date).filter((e) =>
-        e.kind === "single" ? e.slot.status === "pending" : e.members.some((m) => m.status === "pending"),
+        e.kind === "single"
+          ? e.slot.status === "pending"
+          : e.members.some((m) => m.status === "pending" && !m.isPrn),
       ),
     [slots, date],
   );
