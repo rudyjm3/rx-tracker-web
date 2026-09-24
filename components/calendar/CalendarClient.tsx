@@ -177,8 +177,16 @@ export function CalendarClient() {
       allMedications,
       groupsQuery.data ?? [],
       groupMembersQuery.data ?? [],
+      statusEventsQuery.data ?? [],
     );
-  }, [logsQuery.data, graceMinutes, allMedications, groupsQuery.data, groupMembersQuery.data]);
+  }, [
+    logsQuery.data,
+    graceMinutes,
+    allMedications,
+    groupsQuery.data,
+    groupMembersQuery.data,
+    statusEventsQuery.data,
+  ]);
 
   const pendingLogMedication = pendingLogMember
     ? (allMedications.find((m) => m.id === pendingLogMember.medicationId) ?? null)
