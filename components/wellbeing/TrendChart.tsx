@@ -113,6 +113,18 @@ export function TrendChart({
 }: TrendChartProps) {
   const [drillDate, setDrillDate] = useState<string | null>(null);
 
+  // Reset the drill-down whenever rangeDays itself changes, not just on a
+  // click of this component's own tabs — a caller with hideRangeTabs (e.g.
+  // MedicationTrendModal's combined pain+mood view) changes rangeDays via
+  // an external RangeTabs, which wouldn't otherwise clear a stale drillDate
+  // left over from a previously selected day. Same "reset state when a
+  // prop changes" pattern WellbeingClient uses for its profile switch.
+  const [lastRangeDays, setLastRangeDays] = useState(rangeDays);
+  if (rangeDays !== lastRangeDays) {
+    setLastRangeDays(rangeDays);
+    setDrillDate(null);
+  }
+
   const showingDay = rangeDays === 0 ? (points[0]?.date ?? null) : drillDate;
 
   const dayPoints = useMemo(() => {
@@ -140,15 +152,7 @@ export function TrendChart({
 
   return (
     <div className="flex flex-col gap-3">
-      {!hideRangeTabs && (
-        <RangeTabs
-          rangeDays={rangeDays}
-          onRangeChange={(days) => {
-            onRangeChange(days);
-            setDrillDate(null);
-          }}
-        />
-      )}
+      {!hideRangeTabs && <RangeTabs rangeDays={rangeDays} onRangeChange={onRangeChange} />}
 
       {rangeDays > 0 && drillDate && (
         <div className="mood-graph-day-banner flex items-center justify-between gap-3 text-sm">
