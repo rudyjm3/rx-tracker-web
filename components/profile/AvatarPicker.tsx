@@ -19,8 +19,12 @@ interface AvatarPickerProps {
  * touches storage.
  */
 export function AvatarPicker({ currentUrl, label, color, onChange }: AvatarPickerProps) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(currentUrl);
-  const [hasPhoto, setHasPhoto] = useState(!!currentUrl);
+  // Local overrides only; when neither applies, the displayed photo tracks
+  // `currentUrl` live so a profile fetch that resolves after this form
+  // mounts (e.g. the dialog opened before the query settled) still shows
+  // up, instead of being frozen at whatever `currentUrl` was on first render.
+  const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
+  const [removed, setRemoved] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,21 +32,24 @@ export function AvatarPicker({ currentUrl, label, color, onChange }: AvatarPicke
     const file = e.target.files?.[0] ?? null;
     e.target.value = "";
     if (!file) return;
-    setPreviewUrl(URL.createObjectURL(file));
-    setHasPhoto(true);
+    setSelectedPreview(URL.createObjectURL(file));
+    setRemoved(false);
     onChange(file, false);
   }
 
   function handleRemove() {
-    setPreviewUrl(null);
-    setHasPhoto(false);
+    setSelectedPreview(null);
+    setRemoved(true);
     onChange(null, true);
   }
+
+  const displayedUrl = removed ? null : (selectedPreview ?? currentUrl);
+  const hasPhoto = !!displayedUrl;
 
   return (
     <div className="flex items-center gap-4">
       <span className="block h-16 w-16 shrink-0 overflow-hidden rounded-full">
-        <Avatar pictureUrl={hasPhoto ? previewUrl : null} label={label} color={color} />
+        <Avatar pictureUrl={displayedUrl} label={label} color={color} />
       </span>
       <div className="flex flex-col gap-2">
         <p className="text-xs font-medium text-brand-text-muted">Profile photo</p>
