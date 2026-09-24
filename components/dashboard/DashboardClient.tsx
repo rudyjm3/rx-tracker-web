@@ -341,6 +341,23 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       : (doseEvents.find((e) => e.time <= nowTick && nowTick <= e.time + graceMinutes * 60_000) ??
         null);
 
+  // dueNowEvent comes from doseEvents (pending-only, see above), so a
+  // group event's `members` there can already be a subset of the group —
+  // e.g. one groupmate logged early, leaving only the rest pending when
+  // the alarm window opens. That's correct for driving the overlay's
+  // Take All/Skip All/manage-each actions (nothing to do for an
+  // already-resolved groupmate), but the same slots also feed the
+  // overlay's "N medications in group" display, which would then
+  // undercount — the same class of bug heroEvents fixed for the Next
+  // Dose card above. Look up the full membership from `slots` for
+  // display purposes only.
+  const dueNowGroupMembers =
+    dueNowEvent?.kind === "group"
+      ? slots.filter(
+          (s) => s.groupId === dueNowEvent.groupId && slotDueTime(s, date) === dueNowEvent.time,
+        )
+      : null;
+
   const toTrackedSlot = (s: DaySlot) => ({
     status: s.status,
     late: isLate(
@@ -496,6 +513,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       />
       <AlarmOverlay
         event={dueNowEvent}
+        groupMembers={dueNowGroupMembers}
         onTakeAll={() => dueNowEvent && handleTakeAll(dueNowEvent)}
         onSkipAll={() => dueNowEvent && handleSkipAll(dueNowEvent)}
         onSnoozeAll={(minutes) => dueNowEvent && handleSnoozeAll(dueNowEvent, minutes)}
