@@ -17,9 +17,20 @@ function DoseBadge({ dose }: { dose: string }) {
   );
 }
 
+// A group event's `members` now includes already-resolved groupmates (see
+// DashboardClient's heroEvents), so members[0] is no longer guaranteed to
+// be the medication that's actually still due — prefer the first pending
+// one for anything representing "what's due", falling back to members[0]
+// only if every member is somehow resolved (heroEvents shouldn't produce
+// that, but stay defensive).
+function pendingRepresentative(event: NextDoseEvent) {
+  if (event.kind !== "group") return null;
+  return event.members.find((m) => m.status === "pending") ?? event.members[0] ?? null;
+}
+
 function eventDoseForm(event: NextDoseEvent): string | null {
   return event.kind === "group"
-    ? (event.members[0]?.medication.dose_form ?? null)
+    ? (pendingRepresentative(event)?.medication.dose_form ?? null)
     : event.slot.medication.dose_form;
 }
 
@@ -114,7 +125,7 @@ export function NextDoseCard({ events }: NextDoseCardProps) {
               )}
             </div>
             <DoseBadge
-              dose={upcoming.kind === "single" ? "" : (upcoming.members[0]?.dose ?? "")}
+              dose={upcoming.kind === "single" ? "" : (pendingRepresentative(upcoming)?.dose ?? "")}
             />
           </div>
         </div>
