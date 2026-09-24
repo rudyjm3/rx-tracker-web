@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Camera, Trash2, Upload } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 
 interface AvatarPickerProps {
@@ -11,53 +12,91 @@ interface AvatarPickerProps {
 }
 
 /**
- * File select + live preview + "remove current photo" — shared by My
- * Profile and Manage Family's edit forms. Only reports the selection up
- * to the parent; the actual upload/delete happens on save (see
- * lib/user-profile.ts's uploadAvatar/deleteAvatarIfManaged), so canceling
- * the dialog never touches storage.
+ * File select + live preview + remove — shared by My Profile and Manage
+ * Family's edit forms. Only reports the selection up to the parent; the
+ * actual upload/delete happens on save (see lib/user-profile.ts's
+ * uploadAvatar/deleteAvatarIfManaged), so canceling the dialog never
+ * touches storage.
  */
 export function AvatarPicker({ currentUrl, label, color, onChange }: AvatarPickerProps) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(currentUrl);
-  const [removeExisting, setRemoveExisting] = useState(false);
+  // Local overrides only; when neither applies, the displayed photo tracks
+  // `currentUrl` live so a profile fetch that resolves after this form
+  // mounts (e.g. the dialog opened before the query settled) still shows
+  // up, instead of being frozen at whatever `currentUrl` was on first render.
+  const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
+    e.target.value = "";
     if (!file) return;
-    setPreviewUrl(URL.createObjectURL(file));
-    setRemoveExisting(false);
+    setSelectedPreview(URL.createObjectURL(file));
+    setRemoved(false);
     onChange(file, false);
   }
 
-  function handleRemoveToggle(checked: boolean) {
-    setRemoveExisting(checked);
-    setPreviewUrl(checked ? null : currentUrl);
-    onChange(null, checked);
+  function handleRemove() {
+    setSelectedPreview(null);
+    setRemoved(true);
+    onChange(null, true);
   }
 
+  const displayedUrl = removed ? null : (selectedPreview ?? currentUrl);
+  const hasPhoto = !!displayedUrl;
+
   return (
-    <div className="flex items-center gap-3">
-      <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-full">
-        <Avatar pictureUrl={previewUrl} label={label} color={color} />
+    <div className="flex items-center gap-4">
+      <span className="block h-16 w-16 shrink-0 overflow-hidden rounded-full">
+        <Avatar pictureUrl={displayedUrl} label={label} color={color} />
       </span>
-      <div className="flex flex-col gap-1">
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={handleFile}
-          className="text-xs text-brand-text"
-        />
-        {currentUrl && (
-          <label className="flex items-center gap-1.5 text-xs font-normal text-brand-text-muted">
-            <input
-              type="checkbox"
-              checked={removeExisting}
-              onChange={(e) => handleRemoveToggle(e.target.checked)}
-            />
-            Remove current photo
-          </label>
-        )}
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-medium text-brand-text-muted">Profile photo</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => uploadInputRef.current?.click()}
+            className="flex items-center gap-1.5 rounded-control border border-brand-border px-3 py-1.5 text-xs font-medium text-brand-text hover:bg-brand-bg"
+          >
+            <Upload size={14} />
+            Upload photo
+          </button>
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="flex items-center gap-1.5 rounded-control border border-brand-border px-3 py-1.5 text-xs font-medium text-brand-text hover:bg-brand-bg"
+          >
+            <Camera size={14} />
+            Take a photo
+          </button>
+          {hasPhoto && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="flex items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-medium text-status-danger hover:bg-brand-bg"
+            >
+              <Trash2 size={14} />
+              Remove
+            </button>
+          )}
+        </div>
       </div>
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={handleFile}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        capture="user"
+        onChange={handleFile}
+        className="hidden"
+      />
     </div>
   );
 }

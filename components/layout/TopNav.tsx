@@ -50,7 +50,9 @@ export function TopNav() {
     email;
 
   const currentLabel = activeProfile?.display_name ?? ownerName;
-  const currentPicture = activeProfile?.profile_picture ?? profileQuery.data?.profile_picture ?? null;
+  const currentPicture = activeProfile
+    ? activeProfile.profile_picture
+    : (profileQuery.data?.profile_picture ?? null);
   const currentColor = activeProfile?.avatar_color ?? "#6366f1";
 
   return (
