@@ -17,6 +17,12 @@ import { DoseFormIcon } from "./DoseFormIcon";
 
 interface AlarmOverlayProps {
   event: NextDoseEvent | null;
+  // Full group membership for display (count, dose-form icon, the
+  // manage-each list) — `event.members` is pending-only (see
+  // DashboardClient's dueNowEvent/dueNowGroupMembers), which is correct
+  // for driving the take-all/skip-all actions but would undercount an
+  // already-partially-resolved group if used for display too.
+  groupMembers?: DaySlot[] | null;
   onTakeAll: () => void;
   onSkipAll: () => void;
   onSnoozeAll: (minutes: number) => void;
@@ -26,6 +32,12 @@ interface AlarmOverlayProps {
   defaultSnoozeMinutes?: number;
   disabled?: boolean;
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  taken: "Taken",
+  skipped: "Skipped",
+  missed: "Missed",
+};
 
 function SnoozeRow({
   onSnooze,
@@ -57,6 +69,7 @@ function SnoozeRow({
 
 export function AlarmOverlay({
   event,
+  groupMembers,
   onTakeAll,
   onSkipAll,
   onSnoozeAll,
@@ -80,8 +93,12 @@ export function AlarmOverlay({
 
   if (!event) return null;
 
+  const displayMembers = event.kind === "group" ? (groupMembers ?? event.members) : null;
   const doseForm =
-    event.kind === "group" ? (event.members[0]?.medication.dose_form ?? null) : event.slot.medication.dose_form;
+    event.kind === "group"
+      ? ((displayMembers!.find((m) => m.status === "pending") ?? displayMembers![0])?.medication
+          .dose_form ?? null)
+      : event.slot.medication.dose_form;
 
   return (
     <div
@@ -117,14 +134,14 @@ export function AlarmOverlay({
           ) : (
             <>
               <h2 className="mt-2 text-2xl font-bold">{event.groupName}</h2>
-              <p className="text-white/80">{event.members.length} medications in group</p>
+              <p className="text-white/80">{displayMembers!.length} medications in group</p>
             </>
           )}
         </div>
 
         {event.kind === "group" && manageEach && (
           <div className="flex w-full flex-col gap-2 rounded-card bg-white/10 p-3 text-left">
-            {event.members.map((m) => (
+            {displayMembers!.map((m) => (
               <div
                 key={m.medicationId}
                 className="flex items-center justify-between gap-2 border-b border-white/15 py-2 last:border-0"
@@ -137,39 +154,45 @@ export function AlarmOverlay({
                     {to12h(m.scheduledTime)}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button size="compact" onClick={() => onTakeOne(m)} disabled={disabled}>
-                    Take
-                  </Button>
-                  <Button
-                    size="compact"
-                    variant="secondary"
-                    className="border-white/30 bg-white/10 text-white hover:bg-white/20"
-                    onClick={() => onSkipOne(m)}
-                    disabled={disabled}
-                  >
-                    Skip
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="compact"
-                        variant="ghost"
-                        className="text-white hover:bg-white/20"
-                        disabled={disabled}
-                      >
-                        Snooze
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="z-[110]">
-                      {SNOOZE_OPTIONS.map((minutes) => (
-                        <DropdownMenuItem key={minutes} onSelect={() => onSnoozeOne(m, minutes)}>
-                          {minutes} minutes
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                {m.status === "pending" ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button size="compact" onClick={() => onTakeOne(m)} disabled={disabled}>
+                      Take
+                    </Button>
+                    <Button
+                      size="compact"
+                      variant="secondary"
+                      className="border-white/30 bg-white/10 text-white hover:bg-white/20"
+                      onClick={() => onSkipOne(m)}
+                      disabled={disabled}
+                    >
+                      Skip
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="compact"
+                          variant="ghost"
+                          className="text-white hover:bg-white/20"
+                          disabled={disabled}
+                        >
+                          Snooze
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="z-[110]">
+                        {SNOOZE_OPTIONS.map((minutes) => (
+                          <DropdownMenuItem key={minutes} onSelect={() => onSnoozeOne(m, minutes)}>
+                            {minutes} minutes
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ) : (
+                  <span className="shrink-0 text-xs font-medium text-white/70">
+                    {STATUS_LABEL[m.status] ?? m.status}
+                  </span>
+                )}
               </div>
             ))}
           </div>
