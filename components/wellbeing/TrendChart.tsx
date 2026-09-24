@@ -40,6 +40,37 @@ export function rangeDatesForDays(
   return { start: localDateString(start), end: today };
 }
 
+// Extracted so a caller showing more than one TrendChart at once (e.g. a
+// combined pain + mood view) can render a single shared range control
+// instead of one per chart — see MedicationTrendModal.
+export function RangeTabs({
+  rangeDays,
+  onRangeChange,
+}: {
+  rangeDays: RangeDays;
+  onRangeChange: (days: RangeDays) => void;
+}) {
+  return (
+    <div className="pain-graph-range-tabs flex flex-wrap gap-2" role="group" aria-label="Date range">
+      {RANGE_OPTIONS.map((opt) => (
+        <button
+          key={opt.days}
+          type="button"
+          onClick={() => onRangeChange(opt.days)}
+          className={cn(
+            "rounded-control px-3 py-1.5 text-sm font-medium transition",
+            rangeDays === opt.days
+              ? "bg-gradient-brand text-white"
+              : "bg-brand-bg text-brand-text-muted hover:bg-brand-border",
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function renderDot(metric: WellbeingMetric, scheme: MoodChartScheme) {
   function LevelDot(props: DotItemDotProps) {
     const { cx, cy, payload, index } = props;
@@ -66,6 +97,10 @@ interface TrendChartProps {
   rangeDays: RangeDays;
   onRangeChange: (days: RangeDays) => void;
   moodChartScheme?: MoodChartScheme;
+  // Hide the built-in range tabs when a caller already renders a single
+  // shared RangeTabs above more than one TrendChart (combined pain +
+  // mood view) — avoids showing the same date-range control twice.
+  hideRangeTabs?: boolean;
 }
 
 export function TrendChart({
@@ -74,6 +109,7 @@ export function TrendChart({
   rangeDays,
   onRangeChange,
   moodChartScheme = "classic",
+  hideRangeTabs = false,
 }: TrendChartProps) {
   const [drillDate, setDrillDate] = useState<string | null>(null);
 
@@ -104,26 +140,15 @@ export function TrendChart({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="pain-graph-range-tabs flex flex-wrap gap-2" role="group" aria-label="Date range">
-        {RANGE_OPTIONS.map((opt) => (
-          <button
-            key={opt.days}
-            type="button"
-            onClick={() => {
-              onRangeChange(opt.days);
-              setDrillDate(null);
-            }}
-            className={cn(
-              "rounded-control px-3 py-1.5 text-sm font-medium transition",
-              rangeDays === opt.days
-                ? "bg-gradient-brand text-white"
-                : "bg-brand-bg text-brand-text-muted hover:bg-brand-border",
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      {!hideRangeTabs && (
+        <RangeTabs
+          rangeDays={rangeDays}
+          onRangeChange={(days) => {
+            onRangeChange(days);
+            setDrillDate(null);
+          }}
+        />
+      )}
 
       {rangeDays > 0 && drillDate && (
         <div className="mood-graph-day-banner flex items-center justify-between gap-3 text-sm">
