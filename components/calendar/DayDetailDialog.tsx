@@ -8,6 +8,7 @@ import type {
   CalendarDayDetail,
   CalendarDayGroupSummary,
   CalendarDayMedicationSummary,
+  CalendarDayPendingMember,
   CalendarDaySlot,
 } from "@/lib/calendar";
 
@@ -61,9 +62,16 @@ interface DayDetailDialogProps {
   onClose: () => void;
   onEditSlot: (slot: CalendarDaySlot) => void;
   onEditGroup: (group: CalendarDayGroupSummary) => void;
+  onLogPending: (member: CalendarDayPendingMember) => void;
 }
 
-export function DayDetailDialog({ day, onClose, onEditSlot, onEditGroup }: DayDetailDialogProps) {
+export function DayDetailDialog({
+  day,
+  onClose,
+  onEditSlot,
+  onEditGroup,
+  onLogPending,
+}: DayDetailDialogProps) {
   const totalMedications =
     (day?.medications.length ?? 0) +
     (day?.groups.reduce((n, g) => n + g.medications.length, 0) ?? 0);
@@ -103,6 +111,24 @@ export function DayDetailDialog({ day, onClose, onEditSlot, onEditGroup }: DayDe
                       {group.medications.map((med) => (
                         <li key={med.medicationId}>
                           <MedicationSlots med={med} onEditSlot={onEditSlot} />
+                        </li>
+                      ))}
+                      {group.pendingAsNeeded.map((member) => (
+                        <li
+                          key={member.medicationId}
+                          className="flex items-center justify-between gap-2 rounded-control bg-brand-bg px-2.5 py-1.5 text-sm"
+                        >
+                          <MedicationNameWithDose medication={member} className="font-semibold text-brand-text" />
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-brand-text-muted">Not yet logged</span>
+                            <button
+                              type="button"
+                              onClick={() => onLogPending(member)}
+                              className="text-xs text-brand-deep-blue hover:underline"
+                            >
+                              Log dose
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>

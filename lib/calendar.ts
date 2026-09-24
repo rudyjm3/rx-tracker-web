@@ -216,10 +216,23 @@ export interface CalendarDayMedicationSummary {
   slots: CalendarDaySlot[];
 }
 
+export interface CalendarDayPendingMember {
+  medicationId: string;
+  name: string;
+  dose: string | null;
+  dose_amount: number | null;
+  dose_unit: string | null;
+}
+
 export interface CalendarDayGroupSummary {
   groupId: string;
   groupName: string;
   medications: CalendarDayMedicationSummary[];
+  // as-needed members of this group with no dose_logs row on this date at
+  // all (an as_needed dose is never auto-finalized as "missed" — see
+  // finalizeMissedDoses — so it would otherwise be silently invisible here
+  // once its required groupmates already have a logged/missed entry).
+  pendingAsNeeded: CalendarDayPendingMember[];
 }
 
 export interface CalendarDayDetail {
@@ -244,12 +257,20 @@ export interface CalendarDayDetail {
  * grouped and individual (or multiple different groups') doses the same
  * day is left in the flat `medications` list instead of guessing which
  * single group it "belongs to" for the day.
+ *
+ * Each resulting group is also annotated with `pendingAsNeeded`: any
+ * as_needed member of that group (via `groupMembers`) that has no
+ * dose_logs row at all on that date — see `CalendarDayPendingMember`.
  */
 export function buildDayDetails(
   logs: CalendarLogRow[],
   graceMinutes: number,
-  medications: Pick<Medication, "id" | "medication_schedule_times">[],
+  medications: Pick<
+    Medication,
+    "id" | "name" | "dose" | "dose_amount" | "dose_unit" | "as_needed" | "medication_schedule_times"
+  >[],
   groups: MedicationGroup[],
+  groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id">[],
 ): Record<string, CalendarDayDetail> {
   const groupIdByMedTime = new Map<string, string>();
   for (const med of medications) {
@@ -260,6 +281,13 @@ export function buildDayDetails(
     }
   }
   const groupsById = new Map(groups.map((g) => [g.id, g]));
+  const medsById = new Map(medications.map((m) => [m.id, m]));
+  const memberIdsByGroup = new Map<string, string[]>();
+  for (const member of groupMembers) {
+    const existing = memberIdsByGroup.get(member.group_id) ?? [];
+    existing.push(member.medication_id);
+    memberIdsByGroup.set(member.group_id, existing);
+  }
 
   const result: Record<string, CalendarDayDetail> = {};
   // Per date, per medication: every group_id (or null, for an individual
@@ -360,11 +388,26 @@ export function buildDayDetails(
     }
 
     day.medications = ungrouped;
-    day.groups = [...groupBuckets.entries()].map(([groupId, meds]) => ({
-      groupId,
-      groupName: groupsById.get(groupId)!.name,
-      medications: meds,
-    }));
+    day.groups = [...groupBuckets.entries()].map(([groupId, meds]) => {
+      const loggedIds = new Set(meds.map((m) => m.medicationId));
+      const pendingAsNeeded = (memberIdsByGroup.get(groupId) ?? [])
+        .filter((id) => !loggedIds.has(id))
+        .map((id) => medsById.get(id))
+        .filter((m): m is NonNullable<typeof m> => !!m && m.as_needed)
+        .map((m) => ({
+          medicationId: m.id,
+          name: m.name,
+          dose: m.dose,
+          dose_amount: m.dose_amount,
+          dose_unit: m.dose_unit,
+        }));
+      return {
+        groupId,
+        groupName: groupsById.get(groupId)!.name,
+        medications: meds,
+        pendingAsNeeded,
+      };
+    });
   }
 
   return result;
