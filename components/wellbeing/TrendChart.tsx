@@ -40,6 +40,37 @@ export function rangeDatesForDays(
   return { start: localDateString(start), end: today };
 }
 
+// Extracted so a caller showing more than one TrendChart at once (e.g. a
+// combined pain + mood view) can render a single shared range control
+// instead of one per chart — see MedicationTrendModal.
+export function RangeTabs({
+  rangeDays,
+  onRangeChange,
+}: {
+  rangeDays: RangeDays;
+  onRangeChange: (days: RangeDays) => void;
+}) {
+  return (
+    <div className="pain-graph-range-tabs flex flex-wrap gap-2" role="group" aria-label="Date range">
+      {RANGE_OPTIONS.map((opt) => (
+        <button
+          key={opt.days}
+          type="button"
+          onClick={() => onRangeChange(opt.days)}
+          className={cn(
+            "rounded-control px-3 py-1.5 text-sm font-medium transition",
+            rangeDays === opt.days
+              ? "bg-gradient-brand text-white"
+              : "bg-brand-bg text-brand-text-muted hover:bg-brand-border",
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function renderDot(metric: WellbeingMetric, scheme: MoodChartScheme) {
   function LevelDot(props: DotItemDotProps) {
     const { cx, cy, payload, index } = props;
@@ -66,6 +97,10 @@ interface TrendChartProps {
   rangeDays: RangeDays;
   onRangeChange: (days: RangeDays) => void;
   moodChartScheme?: MoodChartScheme;
+  // Hide the built-in range tabs when a caller already renders a single
+  // shared RangeTabs above more than one TrendChart (combined pain +
+  // mood view) — avoids showing the same date-range control twice.
+  hideRangeTabs?: boolean;
 }
 
 export function TrendChart({
@@ -74,8 +109,21 @@ export function TrendChart({
   rangeDays,
   onRangeChange,
   moodChartScheme = "classic",
+  hideRangeTabs = false,
 }: TrendChartProps) {
   const [drillDate, setDrillDate] = useState<string | null>(null);
+
+  // Reset the drill-down whenever rangeDays itself changes, not just on a
+  // click of this component's own tabs — a caller with hideRangeTabs (e.g.
+  // MedicationTrendModal's combined pain+mood view) changes rangeDays via
+  // an external RangeTabs, which wouldn't otherwise clear a stale drillDate
+  // left over from a previously selected day. Same "reset state when a
+  // prop changes" pattern WellbeingClient uses for its profile switch.
+  const [lastRangeDays, setLastRangeDays] = useState(rangeDays);
+  if (rangeDays !== lastRangeDays) {
+    setLastRangeDays(rangeDays);
+    setDrillDate(null);
+  }
 
   const showingDay = rangeDays === 0 ? (points[0]?.date ?? null) : drillDate;
 
@@ -104,26 +152,7 @@ export function TrendChart({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="pain-graph-range-tabs flex flex-wrap gap-2" role="group" aria-label="Date range">
-        {RANGE_OPTIONS.map((opt) => (
-          <button
-            key={opt.days}
-            type="button"
-            onClick={() => {
-              onRangeChange(opt.days);
-              setDrillDate(null);
-            }}
-            className={cn(
-              "rounded-control px-3 py-1.5 text-sm font-medium transition",
-              rangeDays === opt.days
-                ? "bg-gradient-brand text-white"
-                : "bg-brand-bg text-brand-text-muted hover:bg-brand-border",
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      {!hideRangeTabs && <RangeTabs rangeDays={rangeDays} onRangeChange={onRangeChange} />}
 
       {rangeDays > 0 && drillDate && (
         <div className="mood-graph-day-banner flex items-center justify-between gap-3 text-sm">

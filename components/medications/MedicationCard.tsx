@@ -10,6 +10,7 @@ import {
   ChevronsDown,
   FileText,
   History,
+  LineChart,
   MoreVertical,
   Pencil,
   Power,
@@ -26,8 +27,10 @@ import { Button } from "@/components/ui/Button";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
+import { medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
 import { daysUntilRunout, to12h, type GroupDoseOverride } from "@/lib/utils";
 import type { Medication, MedicationRefill } from "@/lib/types/medications";
+import { MedicationTrendModal } from "./MedicationTrendModal";
 import { RefillModal } from "./RefillModal";
 import { RefillHistoryModal } from "./RefillHistoryModal";
 import { SideEffectModal } from "./SideEffectModal";
@@ -99,6 +102,7 @@ type ModalKind =
   | "details"
   | "discontinue"
   | "resume"
+  | "trend"
   | null;
 
 interface MedicationCardProps {
@@ -144,10 +148,22 @@ export function MedicationCard({
       : "bg-status-success";
   const runoutText = runoutSummary(medication, groupDoseOverrides);
 
+  const tracksPain = medicationTracksPain(medication);
+  const tracksMood = medicationTracksMood(medication);
+  const tracksTrend = tracksPain || tracksMood;
+  const trendLabel =
+    tracksPain && tracksMood ? "pain & mood tracking" : tracksPain ? "pain tracking" : "mood tracking";
+
   const openDetails = (event: MouseEvent | KeyboardEvent) => {
     event.preventDefault();
     event.stopPropagation();
     setOpenModal("details");
+  };
+
+  const openTrend = (event: MouseEvent | KeyboardEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setOpenModal("trend");
   };
 
   return (
@@ -185,6 +201,20 @@ export function MedicationCard({
             >
               <i className="fa-solid fa-circle-info" aria-hidden="true" />
             </span>
+            {tracksTrend && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={openTrend}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") openTrend(event);
+                }}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-brand-text-muted hover:bg-brand-bg hover:text-brand-deep-blue"
+                aria-label={`View ${trendLabel} for ${medication.name}`}
+              >
+                <LineChart size={14} aria-hidden="true" />
+              </span>
+            )}
             {isLowSupply && (
               <span className="rounded-full bg-status-warning/10 px-2 py-0.5 text-xs font-medium text-status-warning">
                 Low supply
@@ -378,6 +408,13 @@ export function MedicationCard({
         onOpenChange={(open) => setOpenModal(open ? "resume" : null)}
         medication={medication}
       />
+      {openModal === "trend" && (
+        <MedicationTrendModal
+          open
+          onOpenChange={(open) => setOpenModal(open ? "trend" : null)}
+          medication={medication}
+        />
+      )}
     </div>
   );
 }
