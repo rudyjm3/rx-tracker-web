@@ -297,6 +297,22 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     [slots, date],
   );
 
+  // Same "next"/"upcoming" events as doseEvents, but built from every
+  // slot (not just pending ones) so a group event's `members` — and thus
+  // the Hero card's "N medications in group" count and expanded list —
+  // reflects the group's real membership instead of only whichever
+  // members haven't been resolved yet. doseEvents itself stays
+  // pending-only: the alarm overlay and its bulk Take/Skip/Snooze
+  // handlers still need to act on (and only on) what's actually still
+  // due, not re-touch an already taken/skipped/missed groupmate.
+  const heroEvents = useMemo(
+    () =>
+      buildDoseEvents(slots, date).filter((e) =>
+        e.kind === "single" ? e.slot.status === "pending" : e.members.some((m) => m.status === "pending"),
+      ),
+    [slots, date],
+  );
+
   // The earliest pending event whose due time has already passed but
   // hasn't yet crossed the missed-dose grace cutoff — the same window
   // finalizeMissedDoses/the sound alert below use, so the overlay only
@@ -389,7 +405,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       {showSetupBanner && <SetupCompleteBanner />}
       <LowSupplyBanner medications={medicationsQuery.data ?? []} />
 
-      <HeroPanel events={doseEvents} adherenceStats={adherenceStats} />
+      <HeroPanel events={heroEvents} adherenceStats={adherenceStats} />
 
       <PwaInstallBanner />
 
