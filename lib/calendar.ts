@@ -216,10 +216,23 @@ export interface CalendarDayMedicationSummary {
   slots: CalendarDaySlot[];
 }
 
+export interface CalendarDayPendingMember {
+  medicationId: string;
+  name: string;
+  dose: string | null;
+  dose_amount: number | null;
+  dose_unit: string | null;
+}
+
 export interface CalendarDayGroupSummary {
   groupId: string;
   groupName: string;
   medications: CalendarDayMedicationSummary[];
+  // as-needed members of this group with no dose_logs row on this date at
+  // all (an as_needed dose is never auto-finalized as "missed" — see
+  // finalizeMissedDoses — so it would otherwise be silently invisible here
+  // once its required groupmates already have a logged/missed entry).
+  pendingAsNeeded: CalendarDayPendingMember[];
 }
 
 export interface CalendarDayDetail {
@@ -244,12 +257,35 @@ export interface CalendarDayDetail {
  * grouped and individual (or multiple different groups') doses the same
  * day is left in the flat `medications` list instead of guessing which
  * single group it "belongs to" for the day.
+ *
+ * Each resulting group is also annotated with `pendingAsNeeded`: any
+ * as_needed member of that group (via `groupMembers`) that has no
+ * dose_logs row at all on that date and was actually active/in-range on
+ * that date (per `statusEvents` and its own start/end dates, the same
+ * eligibility `backfillMonth` uses) — see `CalendarDayPendingMember`. A
+ * group can owe a pending member even on a date where its only *other*
+ * logged medication didn't cleanly bucket into that group (e.g. it also
+ * logged an individual dose that day) — group candidacy for pending
+ * purposes is tracked per logged slot, not just per finalized bucket.
  */
 export function buildDayDetails(
   logs: CalendarLogRow[],
   graceMinutes: number,
-  medications: Pick<Medication, "id" | "medication_schedule_times">[],
+  medications: Pick<
+    Medication,
+    | "id"
+    | "name"
+    | "dose"
+    | "dose_amount"
+    | "dose_unit"
+    | "as_needed"
+    | "start_date"
+    | "end_date"
+    | "medication_schedule_times"
+  >[],
   groups: MedicationGroup[],
+  groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id">[],
+  statusEvents: MedicationStatusEvent[],
 ): Record<string, CalendarDayDetail> {
   const groupIdByMedTime = new Map<string, string>();
   for (const med of medications) {
@@ -260,6 +296,13 @@ export function buildDayDetails(
     }
   }
   const groupsById = new Map(groups.map((g) => [g.id, g]));
+  const medsById = new Map(medications.map((m) => [m.id, m]));
+  const memberIdsByGroup = new Map<string, string[]>();
+  for (const member of groupMembers) {
+    const existing = memberIdsByGroup.get(member.group_id) ?? [];
+    existing.push(member.medication_id);
+    memberIdsByGroup.set(member.group_id, existing);
+  }
 
   const result: Record<string, CalendarDayDetail> = {};
   // Per date, per medication: every group_id (or null, for an individual
@@ -344,6 +387,22 @@ export function buildDayDetails(
 
   for (const [date, day] of Object.entries(result)) {
     const byMedication = groupIdsByDateAndMedication.get(date) ?? new Map();
+    // Every medication with *any* log that day, regardless of which group
+    // bucket (if any) it ended up in — a grouped PRN logged at a custom
+    // time that doesn't resolve to the group-owned schedule row still
+    // counts as logged, and must not also show as pending.
+    const loggedMedicationIds = new Set(byMedication.keys());
+    // Every group any logged slot resolved to that day — broader than
+    // groupBuckets' keys, since a medication with a mix of grouped and
+    // individual doses that day is deliberately left out of groupBuckets
+    // (see above) but its groupmates can still owe a pending member.
+    const candidateGroupIds = new Set<string>();
+    for (const ids of byMedication.values()) {
+      for (const id of ids) {
+        if (id) candidateGroupIds.add(id);
+      }
+    }
+
     const ungrouped: CalendarDayMedicationSummary[] = [];
     const groupBuckets = new Map<string, CalendarDayMedicationSummary[]>();
 
@@ -359,12 +418,47 @@ export function buildDayDetails(
       }
     }
 
+    function pendingAsNeededFor(groupId: string): CalendarDayPendingMember[] {
+      return (memberIdsByGroup.get(groupId) ?? [])
+        .filter((id) => !loggedMedicationIds.has(id))
+        .map((id) => medsById.get(id))
+        .filter((m): m is NonNullable<typeof m> => !!m && m.as_needed)
+        .filter(
+          (m) =>
+            (!m.start_date || date >= m.start_date) &&
+            (!m.end_date || date <= m.end_date) &&
+            wasActiveOnDate(m.id, date, statusEvents),
+        )
+        .map((m) => ({
+          medicationId: m.id,
+          name: m.name,
+          dose: m.dose,
+          dose_amount: m.dose_amount,
+          dose_unit: m.dose_unit,
+        }));
+    }
+
     day.medications = ungrouped;
-    day.groups = [...groupBuckets.entries()].map(([groupId, meds]) => ({
+    const groups: CalendarDayGroupSummary[] = [...groupBuckets.entries()].map(([groupId, meds]) => ({
       groupId,
       groupName: groupsById.get(groupId)!.name,
       medications: meds,
+      pendingAsNeeded: pendingAsNeededFor(groupId),
     }));
+
+    for (const groupId of candidateGroupIds) {
+      if (groupBuckets.has(groupId) || !groupsById.has(groupId)) continue;
+      const pendingAsNeeded = pendingAsNeededFor(groupId);
+      if (pendingAsNeeded.length === 0) continue;
+      groups.push({
+        groupId,
+        groupName: groupsById.get(groupId)!.name,
+        medications: [],
+        pendingAsNeeded,
+      });
+    }
+
+    day.groups = groups;
   }
 
   return result;

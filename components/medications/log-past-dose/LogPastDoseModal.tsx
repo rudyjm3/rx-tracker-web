@@ -24,15 +24,29 @@ interface LogPastDoseModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   medication: Medication;
+  // Defaults to today — set when opening this from a specific calendar day
+  // (e.g. logging an as_needed group member that was never logged that day)
+  // so the modal starts scoped to that date instead of today's.
+  initialDate?: string;
+  // Extra invalidation/refresh for a caller with its own query keys this
+  // modal doesn't know about (e.g. the calendar's month-scoped queries).
+  onLogged?: () => void;
 }
 
 function isTerminal(status: DaySlot["status"]): boolean {
   return status === "taken" || status === "skipped";
 }
 
-export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDoseModalProps) {
+export function LogPastDoseModal({
+  open,
+  onOpenChange,
+  medication,
+  initialDate,
+  onLogged,
+}: LogPastDoseModalProps) {
   const queryClient = useQueryClient();
   const today = localDateString();
+  const startingDate = initialDate ?? today;
 
   const groupMembersQuery = useQuery({
     queryKey: ["group-members"],
@@ -47,14 +61,14 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
   const resolvingPrnGrouping = medication.as_needed && groupMembersQuery.isPending;
   const groupMembershipError = medication.as_needed && groupMembersQuery.isError;
 
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(startingDate);
   const [slot, setSlot] = useState<DaySlot | null>(null);
   const [entryStepChosen, setEntryStepChosen] = useState(false);
   const entryStep = entryStepChosen || neverScheduled;
 
   function handleOpenChange(next: boolean) {
     if (next) {
-      setDate(today);
+      setDate(startingDate);
       setSlot(null);
       setEntryStepChosen(false);
     }
@@ -116,6 +130,7 @@ export function LogPastDoseModal({ open, onOpenChange, medication }: LogPastDose
       queryClient.invalidateQueries({ queryKey: ["medications"] });
       queryClient.invalidateQueries({ queryKey: ["today-history"] });
       queryClient.invalidateQueries({ queryKey: ["dose-log-history"] });
+      onLogged?.();
       onOpenChange(false);
     },
     onError: (err) => {

@@ -12,6 +12,7 @@ import {
   monthBounds,
   type CalendarDayDetail,
   type CalendarDayGroupSummary,
+  type CalendarDayPendingMember,
   type CalendarDaySlot,
 } from "@/lib/calendar";
 import { getCalendarLogs, getCalendarMarkers } from "@/lib/dose-logs";
@@ -27,6 +28,7 @@ import { MonthGrid } from "./MonthGrid";
 import { DayDetailDialog } from "./DayDetailDialog";
 import { BulkEditDoseLogDialog, type BulkEditableDoseLog } from "./BulkEditDoseLogDialog";
 import { EditDoseLogDialog, type EditableDoseLog } from "@/components/history/EditDoseLogDialog";
+import { LogPastDoseModal } from "@/components/medications/log-past-dose/LogPastDoseModal";
 
 function currentMonth(): string {
   return localDateString().slice(0, 7);
@@ -43,6 +45,7 @@ export function CalendarClient() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<CalendarDaySlot | null>(null);
   const [editingGroup, setEditingGroup] = useState<CalendarDayGroupSummary | null>(null);
+  const [pendingLogMember, setPendingLogMember] = useState<CalendarDayPendingMember | null>(null);
 
   function navigateToMonth(nextMonth: string) {
     const params = new URLSearchParams(searchParams);
@@ -168,8 +171,26 @@ export function CalendarClient() {
 
   const dayDetails = useMemo<Record<string, CalendarDayDetail>>(() => {
     if (!logsQuery.data) return {};
-    return buildDayDetails(logsQuery.data, graceMinutes, allMedications, groupsQuery.data ?? []);
-  }, [logsQuery.data, graceMinutes, allMedications, groupsQuery.data]);
+    return buildDayDetails(
+      logsQuery.data,
+      graceMinutes,
+      allMedications,
+      groupsQuery.data ?? [],
+      groupMembersQuery.data ?? [],
+      statusEventsQuery.data ?? [],
+    );
+  }, [
+    logsQuery.data,
+    graceMinutes,
+    allMedications,
+    groupsQuery.data,
+    groupMembersQuery.data,
+    statusEventsQuery.data,
+  ]);
+
+  const pendingLogMedication = pendingLogMember
+    ? (allMedications.find((m) => m.id === pendingLogMember.medicationId) ?? null)
+    : null;
 
   const editingMedication = editingSlot
     ? (allMedications.find((m) => m.id === editingSlot.medicationId) ?? null)
@@ -251,7 +272,19 @@ export function CalendarClient() {
         onClose={() => setSelectedDate(null)}
         onEditSlot={setEditingSlot}
         onEditGroup={setEditingGroup}
+        onLogPending={setPendingLogMember}
       />
+      {pendingLogMedication && (
+        <LogPastDoseModal
+          open={pendingLogMember !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingLogMember(null);
+          }}
+          medication={pendingLogMedication}
+          initialDate={selectedDate ?? undefined}
+          onLogged={refreshCalendarData}
+        />
+      )}
       <EditDoseLogDialog
         log={editingLog}
         medication={editingMedication}
