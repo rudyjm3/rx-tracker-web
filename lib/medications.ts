@@ -40,12 +40,6 @@ export interface MedicationInput {
   profile_id?: string | null;
 }
 
-function formatDose(input: Pick<MedicationInput, "dose_amount" | "dose_unit" | "dose_form">) {
-  return [input.dose_amount, input.dose_unit, input.dose_form]
-    .filter(Boolean)
-    .join(" ");
-}
-
 function normalizeDoseAmount(value: unknown): number | null {
   if (value == null || value === "") return null;
   const amount = Number(value);
@@ -125,68 +119,55 @@ export async function getMedication(id: string): Promise<Medication> {
   return data as Medication;
 }
 
+/**
+ * Runs as the atomic `create_medication` RPC (see supabase/schema.sql)
+ * rather than separate insert/insert requests, so a dropped connection
+ * between them can't leave a medication created with no schedule times,
+ * silently missing from every schedule/dashboard view. The RPC also
+ * computes `dose` server-side, matching updateMedication below.
+ */
 export async function createMedication(
   input: MedicationInput,
   scheduleTimes: ScheduleTimeInput[],
 ): Promise<Medication> {
   const supabase = createClient();
-  const userId = await getCurrentUserId();
-
-  const { data: medication, error } = await supabase
-    .from("medications")
-    .insert({
-      user_id: userId,
-      profile_id: input.profile_id ?? null,
-      name: input.name,
-      dose: formatDose(input),
-      dose_amount: input.dose_amount ?? null,
-      dose_unit: input.dose_unit ?? null,
-      dose_form: input.dose_form ?? null,
-      instructions: input.instructions ?? "",
-      schedule_mode: input.schedule_mode,
-      interval_hours: input.interval_hours ?? null,
-      first_dose_time: input.first_dose_time ?? null,
-      as_needed: input.as_needed,
-      medication_type: input.medication_type,
-      inventory_type: input.inventory_type,
-      inventory_unit: input.inventory_unit,
-      starting_quantity: input.inventory_enabled
-        ? (input.starting_quantity ?? null)
-        : null,
-      current_quantity: input.inventory_enabled
-        ? (input.starting_quantity ?? null)
-        : null,
-      quantity_per_dose: input.quantity_per_dose,
-      low_supply_threshold: input.low_supply_threshold,
-      track_dose_feedback: input.feedback_type !== "none",
-      feedback_type: input.feedback_type,
-      start_date: input.start_date ?? null,
-      end_date: input.end_date ?? null,
-      active: true,
-      setup_status: "active",
-      dashboard_enabled: input.dashboard_enabled,
-      reminders_enabled: input.reminders_enabled,
-      adherence_enabled: input.adherence_enabled,
-      inventory_enabled: input.inventory_enabled,
+  const { data, error } = await supabase
+    .rpc("create_medication", {
+      p_medication: {
+        profile_id: input.profile_id ?? null,
+        name: input.name,
+        dose_amount: input.dose_amount ?? null,
+        dose_unit: input.dose_unit ?? null,
+        dose_form: input.dose_form ?? null,
+        instructions: input.instructions ?? "",
+        schedule_mode: input.schedule_mode,
+        interval_hours: input.interval_hours ?? null,
+        first_dose_time: input.first_dose_time ?? null,
+        as_needed: input.as_needed,
+        medication_type: input.medication_type,
+        inventory_type: input.inventory_type,
+        inventory_unit: input.inventory_unit,
+        starting_quantity: input.starting_quantity ?? null,
+        quantity_per_dose: input.quantity_per_dose,
+        low_supply_threshold: input.low_supply_threshold,
+        feedback_type: input.feedback_type,
+        start_date: input.start_date ?? null,
+        end_date: input.end_date ?? null,
+        dashboard_enabled: input.dashboard_enabled,
+        reminders_enabled: input.reminders_enabled,
+        adherence_enabled: input.adherence_enabled,
+        inventory_enabled: input.inventory_enabled,
+      },
+      p_schedule_times: scheduleTimes.map((t) => ({
+        reminder_time: t.reminder_time,
+        quantity_per_dose: t.quantity_per_dose ?? null,
+      })),
     })
     .select()
     .single();
   if (error) throw error;
 
-  if (scheduleTimes.length > 0) {
-    const { error: scheduleError } = await supabase
-      .from("medication_schedule_times")
-      .insert(
-        scheduleTimes.map((t) => ({
-          medication_id: medication.id,
-          reminder_time: t.reminder_time,
-          quantity_per_dose: t.quantity_per_dose ?? null,
-        })),
-      );
-    if (scheduleError) throw scheduleError;
-  }
-
-  return medication as Medication;
+  return data as Medication;
 }
 
 /**
