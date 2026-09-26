@@ -73,6 +73,11 @@ export interface DaySlot {
  * stored), so a computed time is matched against a group's scheduled_time
  * as before — a narrower, still-legitimate case since there's no stored
  * reminder_time of the medication's own that could drift from it.
+ *
+ * `options.ignoreDashboardVisibility` skips the dashboard_enabled filter,
+ * for callers building the "required adherence" slot set — a medication a
+ * user hid from their daily view can still be opted into adherence
+ * tracking, and shouldn't disappear from that calculation entirely.
  */
 export function generateDaySlots(
   date: string,
@@ -81,6 +86,7 @@ export function generateDaySlots(
   groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id" | "quantity_per_dose">[],
   doseLogs: DoseLog[],
   postpones: DosePostpone[],
+  options?: { ignoreDashboardVisibility?: boolean },
 ): DaySlot[] {
   const groupsByMedication = new Map<
     string,
@@ -109,7 +115,7 @@ export function generateDaySlots(
   const slots: DaySlot[] = [];
 
   for (const med of medications) {
-    if (!med.dashboard_enabled) continue;
+    if (!med.dashboard_enabled && !options?.ignoreDashboardVisibility) continue;
     if (med.start_date && date < med.start_date) continue;
     if (med.end_date && date > med.end_date) continue;
 
