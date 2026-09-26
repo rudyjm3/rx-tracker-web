@@ -535,7 +535,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       <RequiredDosesModal
         open={requiredDosesOpen}
         onClose={() => setRequiredDosesOpen(false)}
-        slots={slots}
+        slots={requiredSlots}
       />
       <NonRequiredDosesModal
         open={nonRequiredDosesOpen}
