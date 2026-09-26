@@ -209,11 +209,15 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   const graceMinutes = graceQuery.data ?? 60;
 
   // Finalize missed doses once slots/grace are available, then whenever
-  // the underlying data changes (new medications, a new day, etc.).
+  // the underlying data changes (new medications, a new day, etc.). Uses
+  // requiredSlots rather than slots so a dashboard-hidden required
+  // medication still gets its missed dose persisted to dose_logs (for
+  // history/exports) rather than staying "pending" forever just because
+  // it's excluded from the on-screen schedule — flagged by Codex review.
   useEffect(() => {
-    if (slots.length === 0 || graceQuery.data == null) return;
+    if (requiredSlots.length === 0 || graceQuery.data == null) return;
     let cancelled = false;
-    finalizeMissedDoses(date, slots, graceMinutes)
+    finalizeMissedDoses(date, requiredSlots, graceMinutes)
       .then((didFinalize) => {
         if (!cancelled && didFinalize) {
           queryClient.invalidateQueries({ queryKey: ["dose-logs", date] });
