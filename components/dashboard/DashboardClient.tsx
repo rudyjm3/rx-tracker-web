@@ -166,6 +166,33 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     postponesQuery.data,
   ]);
 
+  // The required (adherence-tracked, non-PRN) slot set is built separately
+  // from `slots` above, with ignoreDashboardVisibility so a medication the
+  // user has hidden from the daily schedule but still opted into adherence
+  // tracking still counts toward it — `slots` itself stays scoped to what's
+  // actually shown on screen.
+  const requiredSlots = useMemo<DaySlot[]>(() => {
+    if (!medicationsQuery.data || !logsQuery.data || !postponesQuery.data) {
+      return [];
+    }
+    return generateDaySlots(
+      date,
+      medicationsQuery.data,
+      groupsQuery.data ?? [],
+      groupMembersQuery.data ?? [],
+      logsQuery.data,
+      postponesQuery.data,
+      { ignoreDashboardVisibility: true },
+    ).filter((s) => s.medication.adherence_enabled && !s.isPrn);
+  }, [
+    date,
+    medicationsQuery.data,
+    groupsQuery.data,
+    groupMembersQuery.data,
+    logsQuery.data,
+    postponesQuery.data,
+  ]);
+
   // Ungrouped as-needed medications never get a slot from generateDaySlots
   // (their doses are logged ad hoc) — pull those dose_logs in separately so
   // they still surface in non-required dose tracking.
@@ -367,7 +394,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   });
 
   const adherenceStats = computeAdherenceStats(
-    slots.filter((s) => s.medication.adherence_enabled && !s.isPrn).map(toTrackedSlot),
+    requiredSlots.map(toTrackedSlot),
     nonRequiredSlots.map(toTrackedSlot),
   );
 
