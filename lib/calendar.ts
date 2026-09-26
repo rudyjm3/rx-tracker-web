@@ -120,7 +120,13 @@ export async function backfillMonth(
       ...activeMedications.filter((med) => wasActiveOnDate(med.id, date, statusEvents)),
       ...historicallyActiveMedications(date, inactiveMedications, statusEvents),
     ].filter((med) => scheduleValidForDate(med, date));
-    const slots = generateDaySlots(date, medsForDate, groups, groupMembers, [], []);
+    // ignoreDashboardVisibility: this feeds finalizeMissedDoses only (never
+    // rendered), so a dashboard-hidden but adherence-tracked medication must
+    // still get its missed doses backfilled — finalizeMissedDoses itself
+    // already excludes PRN and non-adherence medications.
+    const slots = generateDaySlots(date, medsForDate, groups, groupMembers, [], [], {
+      ignoreDashboardVisibility: true,
+    });
     const finalized = await finalizeMissedDoses(date, slots, graceMinutes);
     didFinalize ||= finalized;
   }
