@@ -15,7 +15,7 @@ import { Field, inputClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import {
-  addSideEffect,
+  addSideEffects,
   deleteSideEffect,
   getSideEffects,
 } from "@/lib/side-effects";
@@ -55,16 +55,12 @@ export function SideEffectModal({
 
   const addMutation = useMutation({
     mutationFn: () =>
-      Promise.all(
-        selectedEffects.map((description) =>
-          addSideEffect(medication.id, {
-            occurred_date: occurredDate,
-            description,
-            severity,
-            note,
-          }),
-        ),
-      ),
+      addSideEffects(medication.id, {
+        occurred_date: occurredDate,
+        descriptions: selectedEffects,
+        severity,
+        note,
+      }),
     onSuccess: () => {
       toast.success("Side effect logged");
       queryClient.invalidateQueries({ queryKey: ["side-effects", medication.id] });
