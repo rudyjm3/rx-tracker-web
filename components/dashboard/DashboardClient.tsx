@@ -498,7 +498,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   const effectiveTime = (slot: DaySlot) => slotDueTime(slot, date);
 
   const doseEvents = useMemo(
-    () => buildDoseEvents(slots.filter((s) => s.status === "pending"), date),
+    () => buildDoseEvents(slots.filter((s) => s.status === "pending" && !s.isPrn), date),
     [slots, date],
   );
 
@@ -561,7 +561,10 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   const dueNowGroupMembers =
     dueNowEvent?.kind === "group"
       ? slots.filter(
-          (s) => s.groupId === dueNowEvent.groupId && slotDueTime(s, date) === dueNowEvent.time,
+          (s) =>
+            s.groupId === dueNowEvent.groupId &&
+            !s.isPrn &&
+            slotDueTime(s, date) === dueNowEvent.time,
         )
       : null;
 
