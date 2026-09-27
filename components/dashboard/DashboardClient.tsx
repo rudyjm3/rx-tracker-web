@@ -14,6 +14,7 @@ import {
   getTodayPostpones,
   postponeDose,
   recordDose,
+  recordDoseAtTime,
   type DoseFeedback,
 } from "@/lib/dose-logs";
 import {
@@ -31,7 +32,7 @@ import {
   type DaySlot,
   type NextDoseEvent,
 } from "@/lib/schedule";
-import { isLate, localDateString } from "@/lib/utils";
+import { isLate, localDateString, to12h } from "@/lib/utils";
 import { HeroPanel } from "./HeroPanel";
 import { ScheduleList } from "./ScheduleList";
 import { LowSupplyBanner } from "./LowSupplyBanner";
@@ -44,7 +45,17 @@ import { TodayHistoryPanel } from "./TodayHistoryPanel";
 import { RequiredDosesModal } from "./RequiredDosesModal";
 import { NonRequiredDosesModal } from "./NonRequiredDosesModal";
 import { AlarmOverlay } from "./AlarmOverlay";
+import { AlarmTimeStepDialog } from "./AlarmTimeStepDialog";
 import { ZeroPillModal } from "./ZeroPillModal";
+
+function slotKey(slot: DaySlot): string {
+  return `${slot.medicationId}|${slot.scheduledTime}`;
+}
+
+function hhmm(epochMs: number): string {
+  const d = new Date(epochMs);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 const REFRESH_INTERVAL_MS = 60_000;
 const todayString = localDateString;
@@ -73,6 +84,172 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     setFeedbackBatchTotal(
       feedbackQueue.length === 0 ? 0 : Math.max(feedbackBatchTotal, feedbackQueue.length),
     );
+  }
+
+  // --- Alarm overlay Take flow ---
+  // Kept entirely separate from the feedbackQueue/takeMutation path above:
+  // a Take from the alarm overlay (Take Now, Take All, or a Manage Each
+  // row) must act on every non-terminal member of the event — pending
+  // *and* already-auto-finalized-missed — and record via
+  // recordDoseAtTime() with a user-entered time rather than recordDose()'s
+  // always-now() stamp. The regular in-list Take button is untouched.
+  //
+  // alarmZeroPillState holds the slot currently blocked on the zero-pill
+  // guard, plus the rest of the raw set still to be screened and the ones
+  // already cleared — screening happens synchronously via recursion
+  // (screenAlarmZeroPill below), not through this state, except when a
+  // slot needs the user's zero-pill decision.
+  const [alarmZeroPillState, setAlarmZeroPillState] = useState<{
+    slot: DaySlot;
+    remaining: DaySlot[];
+    confirmed: DaySlot[];
+  } | null>(null);
+  // The final set of slots this alarm Take action will record, once every
+  // slot has cleared the zero-pill guard. Non-empty for the whole
+  // lifetime of an in-progress alarm Take (feedback capture + time step).
+  const [alarmConfirmedSlots, setAlarmConfirmedSlots] = useState<DaySlot[]>([]);
+  const [alarmFeedbackQueue, setAlarmFeedbackQueue] = useState<DaySlot[]>([]);
+  const [alarmFeedbackBatchTotal, setAlarmFeedbackBatchTotal] = useState(0);
+  const [alarmFeedbackAnswers, setAlarmFeedbackAnswers] = useState<Map<string, DoseFeedback | undefined>>(
+    new Map(),
+  );
+  const [alarmTimeStep, setAlarmTimeStep] = useState(false);
+  const [alarmEventTime, setAlarmEventTime] = useState<number | null>(null);
+  const [alarmSubmitting, setAlarmSubmitting] = useState(false);
+  const alarmFlowActive = alarmZeroPillState !== null || alarmConfirmedSlots.length > 0;
+
+  function resetAlarmFlow() {
+    setAlarmZeroPillState(null);
+    setAlarmConfirmedSlots([]);
+    setAlarmFeedbackQueue([]);
+    setAlarmFeedbackBatchTotal(0);
+    setAlarmFeedbackAnswers(new Map());
+    setAlarmTimeStep(false);
+    setAlarmEventTime(null);
+    setAlarmSubmitting(false);
+  }
+
+  function isZeroPillBlocked(slot: DaySlot): boolean {
+    return slot.medication.inventory_enabled && (slot.medication.current_quantity ?? 0) <= 0;
+  }
+
+  function screenAlarmZeroPill(remaining: DaySlot[], confirmed: DaySlot[]) {
+    const [next, ...rest] = remaining;
+    if (!next) {
+      if (confirmed.length === 0) {
+        resetAlarmFlow();
+        return;
+      }
+      setAlarmConfirmedSlots(confirmed);
+      const needFeedback = confirmed.filter((s) => s.medication.feedback_type !== "none");
+      setAlarmFeedbackQueue(needFeedback);
+      setAlarmFeedbackBatchTotal(needFeedback.length);
+      // No feedback to collect for this batch — go straight to the
+      // shared time-input step instead of leaving the flow stalled with
+      // an empty feedback queue and alarmTimeStep still false.
+      if (needFeedback.length === 0) setAlarmTimeStep(true);
+      return;
+    }
+    if (isZeroPillBlocked(next)) {
+      setAlarmZeroPillState({ slot: next, remaining: rest, confirmed });
+    } else {
+      screenAlarmZeroPill(rest, [...confirmed, next]);
+    }
+  }
+
+  function startAlarmTake(slots: DaySlot[], eventTime: number) {
+    if (slots.length === 0) return;
+    setAlarmEventTime(eventTime);
+    screenAlarmZeroPill(slots, []);
+  }
+
+  function handleAlarmZeroPillTakeAnyway() {
+    const state = alarmZeroPillState;
+    if (!state) return;
+    setAlarmZeroPillState(null);
+    screenAlarmZeroPill(state.remaining, [...state.confirmed, state.slot]);
+  }
+  function handleAlarmZeroPillCancel() {
+    const state = alarmZeroPillState;
+    if (!state) return;
+    setAlarmZeroPillState(null);
+    screenAlarmZeroPill(state.remaining, state.confirmed);
+  }
+
+  const alarmFeedbackSlot = alarmFeedbackQueue[0] ?? null;
+  const alarmFeedbackQueuePosition = alarmFeedbackBatchTotal - alarmFeedbackQueue.length + 1;
+
+  function handleAlarmFeedbackSubmit(feedback?: DoseFeedback) {
+    const slot = alarmFeedbackQueue[0];
+    if (!slot) return;
+    setAlarmFeedbackAnswers((prev) => new Map(prev).set(slotKey(slot), feedback));
+    setAlarmFeedbackQueue((q) => q.slice(1));
+    // That was the last slot needing feedback — advance to the shared
+    // time-input step now rather than leaving the flow stalled.
+    if (alarmFeedbackQueue.length === 1) setAlarmTimeStep(true);
+  }
+  function handleAlarmFeedbackClose() {
+    // Dismissing (X/escape/outside-click) rather than submitting means
+    // "never mind, don't take this one" — matching the existing
+    // feedbackQueue dialog's semantics — so this slot drops out of the
+    // batch entirely rather than proceeding to the time step untouched.
+    const slot = alarmFeedbackQueue[0];
+    if (!slot) return;
+    const remainingConfirmed = alarmConfirmedSlots.filter((s) => s !== slot);
+    setAlarmFeedbackQueue((q) => q.slice(1));
+    setAlarmConfirmedSlots(remainingConfirmed);
+    if (alarmFeedbackQueue.length === 1) {
+      // That was the last slot needing feedback — either advance to the
+      // time step for whatever's left, or if this was the only slot in
+      // the batch, there's nothing left to record at all.
+      if (remainingConfirmed.length === 0) resetAlarmFlow();
+      else setAlarmTimeStep(true);
+    }
+  }
+
+  function handleAlarmTimeCancel() {
+    resetAlarmFlow();
+  }
+
+  function handleAlarmTimeSubmit(time: string) {
+    setAlarmSubmitting(true);
+    const takenAtIso = new Date(`${date}T${time}`).toISOString();
+    Promise.all(
+      alarmConfirmedSlots.map((slot) =>
+        recordDoseAtTime(
+          slot.medication,
+          date,
+          slot.scheduledTime,
+          takenAtIso,
+          slot.quantityPerDose,
+          alarmFeedbackAnswers.get(slotKey(slot)),
+        ),
+      ),
+    )
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["dose-logs"] });
+        queryClient.invalidateQueries({ queryKey: ["medications"] });
+        queryClient.invalidateQueries({ queryKey: ["today-history"] });
+        queryClient.invalidateQueries({ queryKey: ["dose-log-history"] });
+        toast.success(alarmConfirmedSlots.length > 1 ? "Doses recorded" : "Dose recorded");
+        resetAlarmFlow();
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Couldn't record dose");
+        setAlarmSubmitting(false);
+      });
+  }
+
+  function alarmAffectedSlots(event: NextDoseEvent): DaySlot[] {
+    if (event.kind === "single") return [event.slot];
+    const members = dueNowGroupMembers ?? event.members;
+    return members.filter((m) => m.status === "pending" || m.status === "missed");
+  }
+  function handleAlarmTakeAll(event: NextDoseEvent) {
+    startAlarmTake(alarmAffectedSlots(event), event.time);
+  }
+  function handleAlarmTakeOne(slot: DaySlot, event: NextDoseEvent) {
+    startAlarmTake([slot], event.time);
   }
 
   // Current time as state (not a raw Date.now() read during render, which
@@ -311,9 +488,6 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   function eventSlots(event: NextDoseEvent): DaySlot[] {
     return event.kind === "group" ? event.members : [event.slot];
   }
-  function handleTakeAll(event: NextDoseEvent) {
-    eventSlots(event).forEach(handleTake);
-  }
   function handleSkipAll(event: NextDoseEvent) {
     eventSlots(event).forEach(handleSkip);
   }
@@ -362,12 +536,14 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // finalizeMissedDoses/the sound alert below use, so the overlay only
   // ever covers a slot that's genuinely still actionable.
   //
-  // Suppressed while the feedback or zero-pill follow-up dialog is open:
-  // both render as a Radix Dialog at z-50, below this overlay's z-[100],
-  // so leaving the overlay mounted on top would block the user from
-  // ever completing the Take flow that opened it.
+  // Suppressed while the feedback or zero-pill follow-up dialog is open
+  // (both render as a Radix Dialog at z-50, below this overlay's
+  // z-[100]) or while the alarm overlay's own Take flow (zero-pill,
+  // feedback, or the shared time-input step) is in progress — leaving the
+  // overlay mounted on top in any of these cases would block the user
+  // from ever completing the flow that opened it.
   const dueNowEvent =
-    feedbackQueue.length > 0 || zeroPillSlot !== null
+    feedbackQueue.length > 0 || zeroPillSlot !== null || alarmFlowActive
       ? null
       : (doseEvents.find((e) => e.time <= nowTick && nowTick <= e.time + graceMinutes * 60_000) ??
         null);
@@ -545,10 +721,10 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       <AlarmOverlay
         event={dueNowEvent}
         groupMembers={dueNowGroupMembers}
-        onTakeAll={() => dueNowEvent && handleTakeAll(dueNowEvent)}
+        onTakeAll={() => dueNowEvent && handleAlarmTakeAll(dueNowEvent)}
         onSkipAll={() => dueNowEvent && handleSkipAll(dueNowEvent)}
         onSnoozeAll={(minutes) => dueNowEvent && handleSnoozeAll(dueNowEvent, minutes)}
-        onTakeOne={handleTake}
+        onTakeOne={(slot) => dueNowEvent && handleAlarmTakeOne(slot, dueNowEvent)}
         onSkipOne={handleSkip}
         onSnoozeOne={handleSnooze}
         defaultSnoozeMinutes={snoozeSettingQuery.data}
@@ -559,6 +735,26 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
         onClose={() => setZeroPillSlot(null)}
         onTakeAnyway={handleZeroPillTakeAnyway}
         onCancelDose={() => setZeroPillSlot(null)}
+      />
+      <ZeroPillModal
+        slot={alarmZeroPillState?.slot ?? null}
+        onClose={handleAlarmZeroPillCancel}
+        onTakeAnyway={handleAlarmZeroPillTakeAnyway}
+        onCancelDose={handleAlarmZeroPillCancel}
+      />
+      <FeedbackDialog
+        slot={alarmFeedbackSlot}
+        queuePosition={alarmFeedbackQueuePosition}
+        queueTotal={alarmFeedbackBatchTotal}
+        onSubmit={handleAlarmFeedbackSubmit}
+        onClose={handleAlarmFeedbackClose}
+      />
+      <AlarmTimeStepDialog
+        open={alarmTimeStep}
+        dueLabel={alarmEventTime != null ? `Originally due ${to12h(hhmm(alarmEventTime))}` : null}
+        onSubmit={handleAlarmTimeSubmit}
+        onCancel={handleAlarmTimeCancel}
+        submitting={alarmSubmitting}
       />
     </div>
   );
