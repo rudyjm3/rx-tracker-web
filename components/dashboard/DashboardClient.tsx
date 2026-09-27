@@ -737,6 +737,12 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
         onCancelDose={() => setZeroPillSlot(null)}
       />
       <ZeroPillModal
+        // Keyed by slot: this instance can cycle through several
+        // zero-inventory slots within one alarm Take flow (screened one at
+        // a time), and ZeroPillModal only initializes its local quantity
+        // count once — without remounting on slot change, a count entered
+        // for one medication could carry over and get applied to the next.
+        key={alarmZeroPillState ? slotKey(alarmZeroPillState.slot) : "none"}
         slot={alarmZeroPillState?.slot ?? null}
         onClose={handleAlarmZeroPillCancel}
         onTakeAnyway={handleAlarmZeroPillTakeAnyway}

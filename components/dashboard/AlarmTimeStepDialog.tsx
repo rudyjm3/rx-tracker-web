@@ -41,6 +41,18 @@ export function AlarmTimeStepDialog({
 }: AlarmTimeStepDialogProps) {
   const [time, setTime] = useState(nowHHMM);
 
+  // This component stays mounted the whole time (only `open` toggles), so
+  // without this the default would be whatever moment the dashboard first
+  // mounted, or whatever was left over from a previous alarm's flow — reset
+  // it fresh each time the dialog actually opens. Compared during render
+  // (not an effect) so the reset lands before the first paint of the
+  // reopened dialog rather than one tick late.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setTime(nowHHMM());
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     onSubmit(time);
@@ -49,7 +61,7 @@ export function AlarmTimeStepDialog({
   if (!open) return null;
 
   return (
-    <Dialog open onOpenChange={(isOpen) => !isOpen && onCancel()}>
+    <Dialog open onOpenChange={(isOpen) => !isOpen && !submitting && onCancel()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>What time did you take this?</DialogTitle>
