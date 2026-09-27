@@ -188,6 +188,15 @@ export function AlarmOverlay({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                ) : m.status === "missed" ? (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs font-medium text-white/70">
+                      {STATUS_LABEL[m.status] ?? m.status}
+                    </span>
+                    <Button size="compact" onClick={() => onTakeOne(m)} disabled={disabled}>
+                      Take
+                    </Button>
+                  </div>
                 ) : (
                   <span className="shrink-0 text-xs font-medium text-white/70">
                     {STATUS_LABEL[m.status] ?? m.status}
