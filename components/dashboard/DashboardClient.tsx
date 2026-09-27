@@ -607,7 +607,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   useEffect(() => {
     const now = nowTick;
     for (const slot of slots) {
-      if (slot.status !== "pending") continue;
+      if (slot.status !== "pending" || slot.isPrn) continue;
       const due = effectiveTime(slot);
       if (due > now) continue;
       if (now > due + graceMinutes * 60_000) continue;
