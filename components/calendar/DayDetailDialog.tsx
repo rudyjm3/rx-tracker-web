@@ -141,6 +141,13 @@ export function DayDetailDialog({
   const totalPlanned =
     (day?.plannedMedications.length ?? 0) +
     (day?.plannedGroups.reduce((n, g) => n + g.medications.length, 0) ?? 0);
+  // Distinct medications, not planned slot entries — a medication with
+  // more than one occurrence that day (e.g. twice-daily) must still count
+  // once, consistent with the non-future branch's medication summaries.
+  const totalPlannedMedications = new Set([
+    ...(day?.plannedMedications.map((m) => m.medicationId) ?? []),
+    ...(day?.plannedGroups.flatMap((g) => g.medications.map((m) => m.medicationId)) ?? []),
+  ]).size;
   const endingIds = new Set((day?.endingMedications ?? []).map((m) => m.medicationId));
 
   return (
@@ -153,9 +160,8 @@ export function DayDetailDialog({
                 {day.dayName}, {day.displayDate}
               </DialogTitle>
               <p className="text-sm text-brand-text-muted">
-                {day.isFuture
-                  ? `Planned doses — Required: ${day.plannedRequired} / Non-required: ${day.plannedNonRequired}`
-                  : `Medications: ${totalMedications}`}
+                Medications: {day.isFuture ? totalPlannedMedications : totalMedications} | Planned doses —{" "}
+                Required: {day.plannedRequired} / Non-required: {day.plannedNonRequired}
               </p>
             </DialogHeader>
 
