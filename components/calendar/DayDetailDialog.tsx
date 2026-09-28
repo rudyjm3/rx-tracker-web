@@ -153,9 +153,8 @@ export function DayDetailDialog({
                 {day.dayName}, {day.displayDate}
               </DialogTitle>
               <p className="text-sm text-brand-text-muted">
-                {day.isFuture
-                  ? `Planned doses — Required: ${day.plannedRequired} / Non-required: ${day.plannedNonRequired}`
-                  : `Medications: ${totalMedications}`}
+                Medications: {day.isFuture ? totalPlanned : totalMedications} | Planned doses — Required:{" "}
+                {day.plannedRequired} / Non-required: {day.plannedNonRequired}
               </p>
             </DialogHeader>
 
