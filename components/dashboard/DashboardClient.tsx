@@ -25,6 +25,7 @@ import {
 import { computeAdherenceStats } from "@/lib/adherence";
 import { playAlarmSound, triggerVibration } from "@/lib/notifications";
 import {
+  affectedGroupMembers,
   buildDoseEvents,
   generateAdHocPrnSlots,
   generateDaySlots,
@@ -243,13 +244,35 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   function alarmAffectedSlots(event: NextDoseEvent): DaySlot[] {
     if (event.kind === "single") return [event.slot];
     const members = dueNowGroupMembers ?? event.members;
-    return members.filter((m) => m.status === "pending" || m.status === "missed");
+    return affectedGroupMembers(members);
   }
   function handleAlarmTakeAll(event: NextDoseEvent) {
     startAlarmTake(alarmAffectedSlots(event), event.time);
   }
   function handleAlarmTakeOne(slot: DaySlot, event: NextDoseEvent) {
     startAlarmTake([slot], event.time);
+  }
+
+  // --- Regular schedule list Take routing ---
+  // A Take click in Today's Schedule (a single row, or a group's bulk
+  // button/manage-individually row) decides instant-vs-flow by whether
+  // the slot is already past its due time, not by whether the alarm
+  // overlay happens to be showing — this is what lets a past-due/missed
+  // item get corrected in place instead of only from the overlay.
+  function handleScheduleTake(slot: DaySlot) {
+    const due = slotDueTime(slot, date);
+    if (due <= Date.now()) {
+      startAlarmTake([slot], due);
+    } else {
+      handleTake(slot);
+    }
+  }
+  // GroupDoseCard resolves whether its bulk button is past due itself
+  // (it already has the group's due time and full membership) and only
+  // calls this once it's decided the flow path is needed, so this is a
+  // thin pass-through into the same startAlarmTake machinery.
+  function handleScheduleTakeAll(members: DaySlot[], groupTime: number) {
+    startAlarmTake(members, groupTime);
   }
 
   // Current time as state (not a raw Date.now() read during render, which
@@ -671,7 +694,8 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
               slots={slots}
               date={date}
               graceMinutes={graceMinutes}
-              onTake={handleTake}
+              onTake={handleScheduleTake}
+              onTakeAll={handleScheduleTakeAll}
               onSkip={handleSkip}
               onSnooze={handleSnooze}
               defaultSnoozeMinutes={snoozeSettingQuery.data}

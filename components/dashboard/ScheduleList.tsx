@@ -39,6 +39,7 @@ interface ScheduleListProps {
   date: string;
   graceMinutes: number;
   onTake: (slot: DaySlot) => void;
+  onTakeAll: (members: DaySlot[], groupTime: number) => void;
   onSkip: (slot: DaySlot) => void;
   onSnooze: (slot: DaySlot, minutes: number) => void;
   defaultSnoozeMinutes?: number;
@@ -50,6 +51,7 @@ export function ScheduleList({
   date,
   graceMinutes,
   onTake,
+  onTakeAll,
   onSkip,
   onSnooze,
   defaultSnoozeMinutes,
@@ -101,6 +103,7 @@ export function ScheduleList({
             date={date}
             graceMinutes={graceMinutes}
             onTake={onTake}
+            onTakeAll={onTakeAll}
             onSkip={onSkip}
             onSnooze={onSnooze}
             defaultSnoozeMinutes={defaultSnoozeMinutes}
