@@ -274,6 +274,16 @@ export interface NextDoseSingleEvent {
 export type NextDoseEvent = NextDoseGroupEvent | NextDoseSingleEvent;
 
 /**
+ * Non-PRN members still eligible for a bulk Take: pending ones (not yet
+ * acted on) and missed ones (past due, correctable in place). Shared by
+ * the alarm overlay and the regular schedule list's group card, both of
+ * which route a bulk Take into the same feedback/time-input flow.
+ */
+export function affectedGroupMembers(members: DaySlot[]): DaySlot[] {
+  return members.filter((m) => !m.isPrn && (m.status === "pending" || m.status === "missed"));
+}
+
+/**
  * Collapses a list of slots into chronological "dose events": consecutive
  * slots sharing a group and a due time collapse into one group event,
  * everything else is its own single event. Originally written for the

@@ -76,6 +76,13 @@ export function DoseRow({
         <Badge variant="snoozed">{`Snoozed until ${formatClockTime(slot.postponedUntil)}`}</Badge>
       ) : badgeVariant === "late" && lateMinutes != null ? (
         <Badge variant="late">{`Taken (${formatLate(lateMinutes)})`}</Badge>
+      ) : badgeVariant === "missed" ? (
+        <div className="flex items-center gap-1.5">
+          <Badge variant="missed" />
+          <Button size="compact" onClick={onTake} disabled={disabled}>
+            Take
+          </Button>
+        </div>
       ) : badgeVariant ? (
         <Badge variant={badgeVariant} />
       ) : (
