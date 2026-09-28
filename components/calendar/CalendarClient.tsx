@@ -172,6 +172,9 @@ export function CalendarClient() {
   const dayDetails = useMemo<Record<string, CalendarDayDetail>>(() => {
     if (!logsQuery.data) return {};
     return buildDayDetails(
+      bounds.monthStart,
+      bounds.monthEnd,
+      todayDate,
       logsQuery.data,
       graceMinutes,
       allMedications,
@@ -180,6 +183,9 @@ export function CalendarClient() {
       statusEventsQuery.data ?? [],
     );
   }, [
+    bounds.monthStart,
+    bounds.monthEnd,
+    todayDate,
     logsQuery.data,
     graceMinutes,
     allMedications,
@@ -263,7 +269,7 @@ export function CalendarClient() {
         month={month}
         todayDate={todayDate}
         markers={markersQuery.data ?? {}}
-        hasDetail={(date) => date in dayDetails}
+        dayDetails={dayDetails}
         onNavigate={navigateToMonth}
         onSelectDay={setSelectedDate}
       />

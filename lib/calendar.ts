@@ -241,12 +241,59 @@ export interface CalendarDayGroupSummary {
   pendingAsNeeded: CalendarDayPendingMember[];
 }
 
+// A schedule-driven occurrence for a date with no dose_logs to report on
+// yet (a future date opened via the newly-clickable cells) — no
+// taken/skipped/missed status exists, so this is deliberately a narrower
+// shape than CalendarDayMedicationSummary rather than one padded with
+// zeroed-out counts.
+export interface CalendarDayPlannedSlot {
+  medicationId: string;
+  name: string;
+  dose: string | null;
+  dose_amount: number | null;
+  dose_unit: string | null;
+  scheduledTime: string; // "HH:MM"
+  displayTime: string;
+  isPrn: boolean;
+}
+
+export interface CalendarDayPlannedGroup {
+  groupId: string;
+  groupName: string;
+  medications: CalendarDayPlannedSlot[];
+}
+
+export interface CalendarDayEndingMedication {
+  medicationId: string;
+  name: string;
+  dose: string | null;
+  dose_amount: number | null;
+  dose_unit: string | null;
+}
+
 export interface CalendarDayDetail {
   date: string;
   dayName: string; // e.g. "Friday"
   displayDate: string; // e.g. "August 22, 2026"
+  isFuture: boolean;
+  // Raw recurring-schedule occurrence counts for this date, with no
+  // adjustment for one-off skips or pauses — computed the same way for
+  // past, today, and future dates via generateDaySlots. plannedNonRequired
+  // reflects actual logged as-needed doses once any exist for the date
+  // (past/today), since PRN dosing isn't itself schedule-driven; it falls
+  // back to the schedule's own PRN-in-group occurrence count for dates
+  // with nothing logged yet (typically 0 for a future date).
+  plannedRequired: number;
+  plannedNonRequired: number;
+  // Medications whose end_date falls on this date (natural end-date
+  // rollover only — never a separate inactive/discontinued flag).
+  endingMedications: CalendarDayEndingMedication[];
   medications: CalendarDayMedicationSummary[]; // medications with no single shared group that day
   groups: CalendarDayGroupSummary[]; // medications sharing a group that day, nested under it
+  // Populated for a future date only: what the recurring schedule plans
+  // to generate, since nothing has been logged yet to summarize instead.
+  plannedMedications: CalendarDayPlannedSlot[];
+  plannedGroups: CalendarDayPlannedGroup[];
 }
 
 /**
@@ -275,22 +322,14 @@ export interface CalendarDayDetail {
  * purposes is tracked per logged slot, not just per finalized bucket.
  */
 export function buildDayDetails(
+  monthStart: string,
+  monthEnd: string,
+  todayDate: string,
   logs: CalendarLogRow[],
   graceMinutes: number,
-  medications: Pick<
-    Medication,
-    | "id"
-    | "name"
-    | "dose"
-    | "dose_amount"
-    | "dose_unit"
-    | "as_needed"
-    | "start_date"
-    | "end_date"
-    | "medication_schedule_times"
-  >[],
+  medications: Medication[],
   groups: MedicationGroup[],
-  groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id">[],
+  groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id" | "quantity_per_dose">[],
   statusEvents: MedicationStatusEvent[],
 ): Record<string, CalendarDayDetail> {
   const groupIdByMedTime = new Map<string, string>();
@@ -329,8 +368,14 @@ export function buildDayDetails(
           month: "long",
           day: "numeric",
         }),
+        isFuture: false,
+        plannedRequired: 0,
+        plannedNonRequired: 0,
+        endingMedications: [],
         medications: [],
         groups: [],
+        plannedMedications: [],
+        plannedGroups: [],
       };
       result[date] = day;
     }
@@ -465,6 +510,107 @@ export function buildDayDetails(
     }
 
     day.groups = groups;
+  }
+
+  // Ensure every date in the visible month has an entry — including future
+  // ones, whose day-detail is driven entirely by the recurring schedule
+  // since nothing has been logged yet — and annotate every date (past,
+  // today, and future alike) with its planned required/non-required
+  // counts and any medication ending that day.
+  for (let date = monthStart; date <= monthEnd; date = addDays(date, 1)) {
+    let day = result[date];
+    if (!day) {
+      const d = new Date(`${date}T00:00:00`);
+      day = {
+        date,
+        dayName: d.toLocaleDateString(undefined, { weekday: "long" }),
+        displayDate: d.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        isFuture: false,
+        plannedRequired: 0,
+        plannedNonRequired: 0,
+        endingMedications: [],
+        medications: [],
+        groups: [],
+        plannedMedications: [],
+        plannedGroups: [],
+      };
+      result[date] = day;
+    }
+
+    const isFuture = date > todayDate;
+    day.isFuture = isFuture;
+
+    // No adjustment for one-off skips or pauses per-date: a future date
+    // takes the medication's current active state (there's no history yet
+    // to replay), a past/today date replays status events the same way
+    // backfillMonth does.
+    const medsForDate = (
+      isFuture
+        ? medications.filter((m) => m.active)
+        : medications.filter((m) => wasActiveOnDate(m.id, date, statusEvents))
+    ).filter((m) => scheduleValidForDate(m, date));
+
+    const slots = generateDaySlots(date, medsForDate, groups, groupMembers, [], [], {
+      ignoreDashboardVisibility: true,
+    });
+    const requiredSlots = slots.filter((s) => !s.isPrn);
+    const prnSlots = slots.filter((s) => s.isPrn);
+    day.plannedRequired = requiredSlots.length;
+
+    const hasLogs = groupIdsByDateAndMedication.has(date);
+    if (hasLogs) {
+      const sumAsNeeded = (meds: CalendarDayMedicationSummary[]) =>
+        meds.reduce((n, m) => n + (medsById.get(m.medicationId)?.as_needed ? m.total : 0), 0);
+      day.plannedNonRequired =
+        sumAsNeeded(day.medications) +
+        day.groups.reduce((n, g) => n + sumAsNeeded(g.medications), 0);
+    } else {
+      day.plannedNonRequired = prnSlots.length;
+    }
+
+    day.endingMedications = medications
+      .filter((m) => m.end_date === date)
+      .map((m) => ({
+        medicationId: m.id,
+        name: m.name,
+        dose: m.dose,
+        dose_amount: m.dose_amount,
+        dose_unit: m.dose_unit,
+      }));
+
+    if (isFuture) {
+      const ungroupedPlanned: CalendarDayPlannedSlot[] = [];
+      const byGroup = new Map<string, CalendarDayPlannedSlot[]>();
+      for (const slot of slots) {
+        const planned: CalendarDayPlannedSlot = {
+          medicationId: slot.medicationId,
+          name: slot.medicationName,
+          dose: slot.dose,
+          dose_amount: medsById.get(slot.medicationId)?.dose_amount ?? null,
+          dose_unit: medsById.get(slot.medicationId)?.dose_unit ?? null,
+          scheduledTime: slot.scheduledTime,
+          displayTime: to12h(slot.scheduledTime),
+          isPrn: slot.isPrn,
+        };
+        if (slot.groupId) {
+          const bucket = byGroup.get(slot.groupId) ?? [];
+          bucket.push(planned);
+          byGroup.set(slot.groupId, bucket);
+        } else {
+          ungroupedPlanned.push(planned);
+        }
+      }
+      day.plannedMedications = ungroupedPlanned;
+      day.plannedGroups = [...byGroup.entries()].map(([groupId, meds]) => ({
+        groupId,
+        groupName: groupsById.get(groupId)?.name ?? "",
+        medications: meds,
+      }));
+    }
   }
 
   return result;

@@ -2,7 +2,12 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { calendarDayColor, monthBounds, type CalendarDayColor } from "@/lib/calendar";
+import {
+  calendarDayColor,
+  monthBounds,
+  type CalendarDayColor,
+  type CalendarDayDetail,
+} from "@/lib/calendar";
 import type { CalendarDayMarker } from "@/lib/dose-logs";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -29,7 +34,7 @@ interface MonthGridProps {
   month: string; // "YYYY-MM"
   todayDate: string; // "YYYY-MM-DD"
   markers: Record<string, CalendarDayMarker>;
-  hasDetail: (date: string) => boolean;
+  dayDetails: Record<string, CalendarDayDetail>;
   onNavigate: (month: string) => void;
   onSelectDay: (date: string) => void;
 }
@@ -38,7 +43,7 @@ export function MonthGrid({
   month,
   todayDate,
   markers,
-  hasDetail,
+  dayDetails,
   onNavigate,
   onSelectDay,
 }: MonthGridProps) {
@@ -81,15 +86,17 @@ export function MonthGrid({
           if (day === null) return <div key={`empty-${i}`} />;
 
           const dateStr = `${month}-${String(day).padStart(2, "0")}`;
-          const isFuture = dateStr > todayDate;
+          const detail = dayDetails[dateStr];
+          const isFuture = detail ? detail.isFuture : dateStr > todayDate;
           const isToday = dateStr === todayDate;
           const marker = markers[dateStr];
           const color = calendarDayColor(isFuture, marker);
-          const clickable = !isFuture && hasDetail(dateStr);
+          const clickable = !!detail;
           const hasMarkerCounts =
             !isFuture &&
             marker &&
             (marker.taken > 0 || marker.skipped > 0 || marker.missed > 0);
+          const endingMedications = detail?.endingMedications ?? [];
 
           return (
             <button
@@ -98,13 +105,18 @@ export function MonthGrid({
               disabled={!clickable}
               onClick={() => onSelectDay(dateStr)}
               className={cn(
-                "flex min-h-14 flex-col items-start justify-start gap-0.5 rounded-control p-1.5 text-sm transition disabled:cursor-default sm:min-h-16",
+                "flex min-h-20 flex-col items-start justify-start gap-0.5 rounded-control p-1.5 text-left text-sm transition disabled:cursor-default sm:min-h-24",
                 COLOR_CLASSES[color],
                 isToday && "ring-2 ring-brand-blue",
                 clickable && "cursor-pointer hover:opacity-80",
               )}
             >
               <span className="font-semibold">{day}</span>
+              {detail && (
+                <span className="text-[9px] leading-tight text-brand-text-muted">
+                  Total doses: Req {detail.plannedRequired} / Non-req {detail.plannedNonRequired}
+                </span>
+              )}
               {hasMarkerCounts && (
                 <span className="flex flex-wrap gap-x-1.5 text-[10px] font-medium">
                   {marker!.taken > 0 && (
@@ -116,6 +128,15 @@ export function MonthGrid({
                   {marker!.missed > 0 && (
                     <span className={COUNT_CLASSES.missed}>{marker!.missed}M</span>
                   )}
+                </span>
+              )}
+              {endingMedications.length > 0 && (
+                <span className="w-full truncate text-[9px] font-semibold text-brand-deep-blue">
+                  {endingMedications.length === 1
+                    ? `Ends today: ${endingMedications[0].name}${
+                        endingMedications[0].dose ? ` ${endingMedications[0].dose}` : ""
+                      }`
+                    : `Ends today: ${endingMedications[0].name} +${endingMedications.length - 1} more`}
                 </span>
               )}
             </button>
