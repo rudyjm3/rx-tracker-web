@@ -175,7 +175,7 @@ export function DayDetailDialog({
                         </div>
                         <ul className="mt-3 flex flex-col gap-2 border-t border-brand-border pt-3">
                           {group.medications.map((slot) => (
-                            <li key={slot.medicationId}>
+                            <li key={`${slot.medicationId}-${slot.scheduledTime}`}>
                               <PlannedMedicationRow slot={slot} endingToday={endingIds.has(slot.medicationId)} />
                             </li>
                           ))}
@@ -183,7 +183,10 @@ export function DayDetailDialog({
                       </li>
                     ))}
                     {day.plannedMedications.map((slot) => (
-                      <li key={slot.medicationId} className="rounded-card border border-brand-border p-3">
+                      <li
+                        key={`${slot.medicationId}-${slot.scheduledTime}`}
+                        className="rounded-card border border-brand-border p-3"
+                      >
                         <PlannedMedicationRow slot={slot} endingToday={endingIds.has(slot.medicationId)} />
                       </li>
                     ))}

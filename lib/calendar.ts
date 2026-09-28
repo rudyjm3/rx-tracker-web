@@ -547,12 +547,17 @@ export function buildDayDetails(
     // No adjustment for one-off skips or pauses per-date: a future date
     // takes the medication's current active state (there's no history yet
     // to replay), a past/today date replays status events the same way
-    // backfillMonth does.
+    // backfillMonth does. A null start_date has no lower bound in
+    // generateDaySlots, so it's floored at the medication's creation date
+    // here — otherwise a medication created today would report planned
+    // doses for every past date back to month zero.
     const medsForDate = (
       isFuture
         ? medications.filter((m) => m.active)
         : medications.filter((m) => wasActiveOnDate(m.id, date, statusEvents))
-    ).filter((m) => scheduleValidForDate(m, date));
+    ).filter(
+      (m) => scheduleValidForDate(m, date) && date >= (m.start_date ?? m.created_at.slice(0, 10)),
+    );
 
     const slots = generateDaySlots(date, medsForDate, groups, groupMembers, [], [], {
       ignoreDashboardVisibility: true,
