@@ -84,13 +84,23 @@ export function GroupDoseCard({
   // group), resolving the affected set once rather than looping the
   // per-slot decision. Still on time → same instant bulk-over-single-
   // slot-handlers pattern as DashboardClient's handleSkipAll/
-  // handleSnoozeAll, restricted to members still pending.
+  // handleSnoozeAll. Unlike affectedGroupMembers (used by the alarm
+  // overlay, which deliberately only auto-pops for non-PRN doses), this
+  // button acts on every member still pending regardless of PRN — it's
+  // the same set the instant path below has always taken, just recorded
+  // through one shared flow instead of one instant call per member.
   function handleTakeAll() {
     if (isPastDue(time)) {
-      onTakeAll(affectedGroupMembers(members), time);
+      onTakeAll(pendingMembers, time);
     } else {
       pendingMembers.forEach(onTake);
     }
+  }
+  // Every member is already resolved here, so the only members left to
+  // correct are non-PRN ones sitting at "missed" — reuses the same
+  // non-PRN filter the alarm overlay relies on.
+  function handleMissedTakeAll() {
+    onTakeAll(affectedGroupMembers(members), time);
   }
   function handleSkipAll() {
     pendingMembers.forEach(onSkip);
@@ -123,7 +133,7 @@ export function GroupDoseCard({
           <div className="flex shrink-0 items-center gap-1.5">
             <Badge variant={summaryVariant(members, date, graceMinutes)} />
             {hasMissedMember && (
-              <Button size="compact" onClick={handleTakeAll} disabled={disabled}>
+              <Button size="compact" onClick={handleMissedTakeAll} disabled={disabled}>
                 Take All
               </Button>
             )}
