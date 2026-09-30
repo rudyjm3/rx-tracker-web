@@ -579,6 +579,18 @@ export function buildDayDetails(
     // required slot a day (e.g. twice-daily) still keeps its still-
     // unlogged evening slot planned after only its morning dose is
     // logged.
+    //
+    // Known limitation: because the top-up is a per-medication count, not
+    // matched to which slot is actually still open, a dose logged off-
+    // schedule (LogPastDoseModal's "Log at a custom time instead", which
+    // doesn't require picking one of the remaining unlogged slots) can
+    // make this display total read as fully accounted for while a real
+    // slot for that medication is still unlogged. This is purely a
+    // cosmetic total (Req X / Non-req Y in MonthGrid/DayDetailDialog) —
+    // actual dose status/reminders are driven by each slot's own status,
+    // not by this aggregate — and disambiguating would require matching
+    // logs to slots by scheduled time again, reintroducing the stale-
+    // time-string bug this count-based approach was written to avoid.
     const sumTotals = (meds: CalendarDayMedicationSummary[], asNeeded: boolean) =>
       meds.reduce(
         (n, m) => n + ((medsById.get(m.medicationId)?.as_needed ?? false) === asNeeded ? m.total : 0),
