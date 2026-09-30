@@ -53,7 +53,7 @@ export function MedsOverviewPanel({
         className="mt-2 flex w-full items-center gap-2 py-1.5 text-sm text-brand-deep-blue hover:underline"
       >
         <ListChecks size={15} />
-        <span className="flex-1 text-left">View required doses list</span>
+        <span className="flex-1 text-left">View required dose list</span>
         <ChevronRight size={15} />
       </button>
       <button
@@ -62,7 +62,7 @@ export function MedsOverviewPanel({
         className="flex w-full items-center gap-2 py-1.5 text-sm text-brand-deep-blue hover:underline"
       >
         <ListChecks size={15} />
-        <span className="flex-1 text-left">View non required doses list</span>
+        <span className="flex-1 text-left">View non required dose list</span>
         <ChevronRight size={15} />
       </button>
       <Link
