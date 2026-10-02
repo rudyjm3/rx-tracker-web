@@ -51,26 +51,33 @@ function MedicationSlots({
         Missed: {med.missed}
       </p>
       <ul className="mt-2 flex flex-col gap-1.5">
-        {med.slots.map((slot) => (
-          <li
-            key={slot.logId}
-            className="flex items-center justify-between rounded-control bg-brand-bg px-2.5 py-1.5 text-sm"
-          >
-            <span className="text-brand-text">{slot.displayTime}</span>
-            <div className="flex items-center gap-2">
-              <Badge variant={badgeVariantFor(slot)}>
-                {slot.status === "taken" && slot.isLate ? `Taken (${slot.lateLabel})` : undefined}
-              </Badge>
-              <button
-                type="button"
-                onClick={() => onEditSlot(slot)}
-                className="text-xs text-brand-deep-blue hover:underline"
-              >
-                Edit
-              </button>
-            </div>
-          </li>
-        ))}
+        {med.slots.map((slot) => {
+          // "Auto-" notes are system-generated (e.g. snooze/postpone
+          // bookkeeping), not something the user wrote — hidden here the
+          // same way TodayHistoryPanel.tsx hides them from its list.
+          const isSystemNote = slot.note.startsWith("Auto-");
+          const showNote = slot.note && !isSystemNote;
+          return (
+            <li key={slot.logId} className="rounded-control bg-brand-bg px-2.5 py-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-brand-text">{slot.displayTime}</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={badgeVariantFor(slot)}>
+                    {slot.status === "taken" && slot.isLate ? `Taken (${slot.lateLabel})` : undefined}
+                  </Badge>
+                  <button
+                    type="button"
+                    onClick={() => onEditSlot(slot)}
+                    className="text-xs text-brand-deep-blue hover:underline"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+              {showNote && <p className="mt-1 text-xs text-brand-text-muted">{slot.note}</p>}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
