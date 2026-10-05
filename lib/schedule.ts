@@ -142,7 +142,9 @@ export function generateDaySlots(
       for (const st of med.medication_schedule_times ?? []) {
         times.push({
           time: st.reminder_time.slice(0, 5),
-          scheduleTimeOverride: st.quantity_per_dose,
+          // Group-owned rows defer to the group member's override; their
+          // copied quantity can go stale after a dose change.
+          scheduleTimeOverride: st.group_id ? null : st.quantity_per_dose,
           groupId: st.group_id ?? null,
         });
       }
