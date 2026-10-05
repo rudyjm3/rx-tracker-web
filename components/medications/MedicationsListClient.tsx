@@ -368,6 +368,7 @@ export function MedicationsListClient() {
               <MedicationCard
                 key={med.id}
                 medication={med}
+                groupDoseOverrides={groupDoseOverridesFor(med.id)}
                 latestRefill={latestRefillsById.get(med.id) ?? null}
               />
             ))}
@@ -392,6 +393,7 @@ export function MedicationsListClient() {
                 group={group}
                 members={membersOf(group.id)}
                 memberOverrides={groupMembers.filter((m) => m.group_id === group.id)}
+                doseOverridesFor={groupDoseOverridesFor}
                 allActiveMedications={activeMedications}
                 latestRefillsById={latestRefillsById}
               />

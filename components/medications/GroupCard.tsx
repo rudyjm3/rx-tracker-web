@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
-import { to12h } from "@/lib/utils";
+import { to12h, type GroupDoseOverride } from "@/lib/utils";
 import { deleteGroup } from "@/lib/medications";
 import type { Medication, MedicationGroup, MedicationRefill } from "@/lib/types/medications";
 import { MedicationCard } from "./MedicationCard";
@@ -14,6 +14,9 @@ interface GroupCardProps {
   group: MedicationGroup;
   members: Medication[];
   memberOverrides: { medication_id: string; quantity_per_dose: number | null }[];
+  // Overrides across every group a medication belongs to (not just this one)
+  // so run-out projections match the medication's other cards.
+  doseOverridesFor: (medicationId: string) => GroupDoseOverride[];
   allActiveMedications: Medication[];
   latestRefillsById: Map<string, MedicationRefill>;
 }
@@ -22,6 +25,7 @@ export function GroupCard({
   group,
   members,
   memberOverrides,
+  doseOverridesFor,
   allActiveMedications,
   latestRefillsById,
 }: GroupCardProps) {
@@ -77,12 +81,7 @@ export function GroupCard({
             <MedicationCard
               key={med.id}
               medication={med}
-              groupDoseOverrides={memberOverrides
-                .filter((override) => override.medication_id === med.id)
-                .map((override) => ({
-                  scheduled_time: group.scheduled_time,
-                  quantity_per_dose: override.quantity_per_dose,
-                }))}
+              groupDoseOverrides={doseOverridesFor(med.id)}
               latestRefill={latestRefillsById.get(med.id) ?? null}
             />
           ))
