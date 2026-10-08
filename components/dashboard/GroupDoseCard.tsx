@@ -86,12 +86,17 @@ export function GroupDoseCard({
   // slot-handlers pattern as DashboardClient's handleSkipAll/
   // handleSnoozeAll. Unlike affectedGroupMembers (used by the alarm
   // overlay, which deliberately only auto-pops for non-PRN doses), this
-  // button acts on every member still pending regardless of PRN — it's
-  // the same set the instant path below has always taken, just recorded
-  // through one shared flow instead of one instant call per member.
+  // button acts on every member still pending regardless of PRN, plus any
+  // non-PRN member already auto-finalized as missed. Past its due time the
+  // missed members are the ones that matter most: leaving them out meant a
+  // mixed group (missed RX meds + a still-pending PRN supplement) only
+  // logged the PRN member, leaving the rest "Missed".
   function handleTakeAll() {
     if (isPastDue(time)) {
-      onTakeAll(pendingMembers, time);
+      onTakeAll(
+        members.filter((m) => m.status === "pending" || (!m.isPrn && m.status === "missed")),
+        time,
+      );
     } else {
       pendingMembers.forEach(onTake);
     }
