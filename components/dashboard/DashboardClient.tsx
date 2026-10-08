@@ -666,9 +666,9 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   return (
     <div className="flex flex-col gap-6">
       {showSetupBanner && <SetupCompleteBanner />}
-      <LowSupplyBanner medications={medicationsQuery.data ?? []} />
-
       <HeroPanel events={heroEvents} adherenceStats={adherenceStats} />
+
+      <LowSupplyBanner />
 
       <PwaInstallBanner />
 

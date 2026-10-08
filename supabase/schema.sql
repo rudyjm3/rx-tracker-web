@@ -404,6 +404,25 @@ create table if not exists user_notifications (
 );
 
 -- ─────────────────────────────────────────
+-- LOW-SUPPLY REMINDER DISMISSALS
+-- Dismissing a low-supply reminder (dashboard banner or notification
+-- bell) hides it for the rest of that local calendar day, account-wide:
+-- the row is keyed on the medication, not the device, so dismissing on
+-- one device hides it on every other device too. There is deliberately
+-- no expiry job — the apps only read rows whose dismissed_date is
+-- today's local date, so a still-low medication reappears by itself the
+-- next day.
+-- ─────────────────────────────────────────
+create table if not exists low_supply_dismissals (
+  id             uuid primary key default uuid_generate_v4(),
+  user_id        uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  medication_id  uuid not null references medications(id) on delete cascade,
+  dismissed_date date not null,
+  created_at     timestamptz not null default now(),
+  unique (medication_id, dismissed_date)
+);
+
+-- ─────────────────────────────────────────
 -- ONBOARDING STATUS
 -- ─────────────────────────────────────────
 create table if not exists profile_onboarding (
@@ -459,6 +478,7 @@ alter table profile_allergies          enable row level security;
 alter table app_settings               enable row level security;
 alter table push_subscriptions         enable row level security;
 alter table user_notifications         enable row level security;
+alter table low_supply_dismissals      enable row level security;
 alter table family_profiles            enable row level security;
 alter table profile_onboarding         enable row level security;
 
@@ -532,6 +552,13 @@ create policy "own push subscriptions"
   on push_subscriptions for all using ((select auth.uid()) = user_id);
 create policy "own notifications"
   on user_notifications for all using ((select auth.uid()) = user_id);
+create policy "own low supply dismissals"
+  on low_supply_dismissals for all
+  using ((select auth.uid()) = user_id)
+  with check (
+    (select auth.uid()) = user_id
+    and medication_id in (select id from medications where user_id = (select auth.uid()))
+  );
 create policy "own family profiles"
   on family_profiles for all using ((select auth.uid()) = user_id);
 create policy "own onboarding"
@@ -594,6 +621,7 @@ create index if not exists idx_standalone_pain_mood_logs_medication_id on standa
 create index if not exists idx_standalone_pain_mood_logs_profile_id on standalone_pain_mood_logs(profile_id);
 create index if not exists idx_standalone_pain_mood_logs_user_id on standalone_pain_mood_logs(user_id);
 create index if not exists idx_user_notifications_medication_id on user_notifications(medication_id);
+create index if not exists idx_low_supply_dismissals_user_date on low_supply_dismissals(user_id, dismissed_date);
 create index if not exists idx_user_notifications_user_id on user_notifications(user_id);
 
 -- ─────────────────────────────────────────
