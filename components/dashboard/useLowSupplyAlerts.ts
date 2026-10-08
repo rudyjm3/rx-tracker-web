@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
@@ -38,7 +39,14 @@ export function refillHref(medicationId: string): string {
 export function useLowSupplyAlerts() {
   const queryClient = useQueryClient();
   const { activeProfileId, isResolving } = useActiveProfile();
-  const today = localDateString();
+  // Clock state, not a per-render read: a page left open across local
+  // midnight must roll over to the new day's dismissals (and write new
+  // dismissals under the new date) without waiting for an unrelated render.
+  const [today, setToday] = useState(() => localDateString());
+  useEffect(() => {
+    const interval = setInterval(() => setToday(localDateString()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const medicationsQuery = useQuery({
     queryKey: ["medications", "active", activeProfileId],

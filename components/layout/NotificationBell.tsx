@@ -5,6 +5,7 @@ import { Bell, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
@@ -57,21 +58,25 @@ export function NotificationBell() {
                   {SUPPLY_SEVERITY_LABEL[severity]} — {medication.current_quantity}{" "}
                   {medication.inventory_unit} remaining
                 </p>
-                <Link
-                  href={refillHref(medication.id)}
-                  className="mt-2 inline-flex rounded-control bg-brand-deep-blue px-3 py-1 text-xs font-semibold text-white hover:opacity-90"
+                <DropdownMenuItem
+                  asChild
+                  className="mt-2 inline-flex w-auto rounded-control bg-brand-deep-blue px-3 py-1 text-xs font-semibold text-white hover:opacity-90 data-[highlighted]:bg-brand-deep-blue data-[highlighted]:ring-2 data-[highlighted]:ring-brand-cyan"
                 >
-                  Refill
-                </Link>
+                  <Link href={refillHref(medication.id)}>Refill</Link>
+                </DropdownMenuItem>
               </div>
-              <button
-                type="button"
-                onClick={() => dismiss(medication.id)}
+              {/* Menu items (not bare buttons) so Radix's arrow-key roving
+                  focus reaches them; preventDefault keeps the menu open. */}
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  dismiss(medication.id);
+                }}
                 aria-label={`Dismiss alert for ${medication.name}`}
-                className="rounded-full p-1 text-brand-text-muted hover:bg-brand-bg"
+                className="rounded-full p-1 text-brand-text-muted"
               >
                 <X size={16} />
-              </button>
+              </DropdownMenuItem>
             </div>
           ))
         )}
