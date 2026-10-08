@@ -44,7 +44,9 @@ function cleanNumber(raw: string): string {
 }
 
 function strengthLabelFor(strengths: string[]): string {
-  if (strengths.length === 0) return "";
+  // Multivitamins and kits list dozens of ingredients; a strength label for
+  // them is noise, so they show by name only.
+  if (strengths.length === 0 || strengths.length > 3) return "";
   const parsed = strengths.map(parseStrength);
   if (parsed.every((p) => p)) {
     const units = new Set(parsed.map((p) => p!.unit));
@@ -132,17 +134,23 @@ export function toSuggestions(products: NdcProduct[], strengthFilter?: number | 
 }
 
 // "risperidone 3", "rispe 0.5mg", "lisinopril hydro" → name words plus an
-// optional leading strength number the user has started typing.
-export function parseSearchTerm(term: string): { words: string[]; strength: number | null } {
-  let text = term.toLowerCase().replace(/[^a-z0-9.\s]/g, " ").trim();
-  let strength: number | null = null;
+// optional trailing strength number the user may have started typing. A
+// trailing number can also belong to the name ("Vitamin B12", "Humulin
+// 70/30"), so `allWords` keeps it as a name word for callers to retry with
+// when treating it as a strength finds nothing.
+export function parseSearchTerm(term: string): {
+  words: string[];
+  allWords: string[];
+  strength: number | null;
+} {
+  const text = term.toLowerCase().replace(/[^a-z0-9.\s]/g, " ").trim();
+  const split = (value: string) => value.split(/\s+/).map((w) => w.replace(/\./g, "")).filter(Boolean);
+  const allWords = split(text);
   const tail = text.match(/\s(\d+(?:\.\d+)?|\.\d+)\s*(?:mg|mcg|ug|g|ml|iu|units?)?$/);
   if (tail && text.slice(0, tail.index).trim()) {
-    strength = Number(tail[1]);
-    text = text.slice(0, tail.index).trim();
+    return { words: split(text.slice(0, tail.index)), allWords, strength: Number(tail[1]) };
   }
-  const words = text.split(/\s+/).map((w) => w.replace(/\./g, "")).filter(Boolean);
-  return { words, strength };
+  return { words: allWords, allWords, strength: null };
 }
 
 export function ndcSearchUrl(words: string[]): string {

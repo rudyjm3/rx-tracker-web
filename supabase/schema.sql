@@ -792,11 +792,15 @@ begin
     reminders_enabled = coalesce((p_medication->>'reminders_enabled')::boolean, true),
     adherence_enabled = coalesce((p_medication->>'adherence_enabled')::boolean, true),
     inventory_enabled = v_inventory_enabled,
-    -- An omitted key (older clients) keeps the stored match; an explicit
-    -- JSON null or '' clears it.
+    -- An omitted key (older clients) keeps the stored match only while the
+    -- name and dose it was matched to are unchanged; an explicit JSON null
+    -- or '' clears it.
     dailymed_setid = case
       when p_medication ? 'dailymed_setid' then nullif(trim(p_medication->>'dailymed_setid'), '')
-      else dailymed_setid
+      when v_existing.name is not distinct from (p_medication->>'name')
+           and v_existing.dose_amount is not distinct from v_new_dose_amount
+           and v_old_dose_unit = v_new_dose_unit then v_existing.dailymed_setid
+      else null
     end,
     updated_at = now()
   where id = p_medication_id;

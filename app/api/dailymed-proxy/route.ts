@@ -68,9 +68,6 @@ export async function GET(request: Request) {
 
   let upstreamUrl: string;
   let normalizeResponse: ((data: unknown) => unknown) | null = null;
-  // openFDA answers a query with no matches as HTTP 404 NOT_FOUND. For the
-  // NDC modes that's an empty result, not an upstream failure.
-  let notFoundIsEmpty: unknown = undefined;
 
   switch (mode) {
     case "ndc_search": {
@@ -81,20 +78,7 @@ export async function GET(request: Request) {
           { status: 400 },
         );
       }
-      const { words, strength } = parseSearchTerm(term);
-      if (words.length === 0) return NextResponse.json({ data: [] });
-      upstreamUrl = ndcSearchUrl(words);
-      normalizeResponse = (data) => ({
-        data: toSuggestions(normalizeNdcProducts(data), strength).map((s) => ({
-          label: s.label,
-          name: s.name,
-          doseAmount: s.doseAmount,
-          doseUnit: s.doseUnit,
-          setId: s.setId,
-        })),
-      });
-      notFoundIsEmpty = { data: [] };
-      break;
+      return handleNdcSearch(term);
     }
     case "ndc_match": {
       const drugName = (searchParams.get("drug_name") ?? "").trim();
@@ -170,9 +154,6 @@ export async function GET(request: Request) {
       signal: AbortSignal.timeout(10_000),
     });
 
-    if (response.status === 404 && notFoundIsEmpty !== undefined) {
-      return NextResponse.json(notFoundIsEmpty);
-    }
     if (!response.ok) {
       return NextResponse.json(
         { error: "DailyMed upstream error" },
@@ -213,6 +194,38 @@ async function handleNdcMatch(drugName: string, doseAmount: number | null, doseU
       if (byName && (byName.exact || !match)) match = byName;
     }
     return NextResponse.json({ data: match });
+  } catch {
+    return NextResponse.json(
+      { error: "DailyMed request failed or timed out" },
+      { status: 504 },
+    );
+  }
+}
+
+// Suggestions for a typed term. A trailing number is first read as a
+// strength filter ("risperidone 3" → 3mg); if that leaves nothing, the
+// number is part of the name ("Vitamin B12", "Humulin 70/30") and the search
+// reruns with it as a name word.
+async function handleNdcSearch(term: string) {
+  try {
+    const { words, allWords, strength } = parseSearchTerm(term);
+    if (allWords.length === 0) return NextResponse.json({ data: [] });
+
+    const run = async (queryWords: string[], strengthFilter: number | null) =>
+      toSuggestions(normalizeNdcProducts(await fetchNdc(ndcSearchUrl(queryWords))), strengthFilter);
+
+    let suggestions = await run(words, strength);
+    if (suggestions.length === 0 && strength != null) suggestions = await run(allWords, null);
+
+    return NextResponse.json({
+      data: suggestions.map((s) => ({
+        label: s.label,
+        name: s.name,
+        doseAmount: s.doseAmount,
+        doseUnit: s.doseUnit,
+        setId: s.setId,
+      })),
+    });
   } catch {
     return NextResponse.json(
       { error: "DailyMed request failed or timed out" },

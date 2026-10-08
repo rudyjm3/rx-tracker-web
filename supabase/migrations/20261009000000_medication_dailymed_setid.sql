@@ -11,7 +11,7 @@
 -- create_medication / update_medication enumerate their columns, so both are
 -- redefined to carry the new field. update_medication keeps the stored value
 -- when the key is absent from p_medication (clients that predate this
--- column), and update_prescribed_dose clears it because changing the dose
+-- column) and the name/dose are unchanged, and update_prescribed_dose clears it because changing the dose
 -- invalidates the strength match.
 alter table medications add column if not exists dailymed_setid text;
 
@@ -162,11 +162,15 @@ begin
     reminders_enabled = coalesce((p_medication->>'reminders_enabled')::boolean, true),
     adherence_enabled = coalesce((p_medication->>'adherence_enabled')::boolean, true),
     inventory_enabled = v_inventory_enabled,
-    -- An omitted key (older clients) keeps the stored match; an explicit
-    -- JSON null or '' clears it.
+    -- An omitted key (older clients) keeps the stored match only while the
+    -- name and dose it was matched to are unchanged; an explicit JSON null
+    -- or '' clears it.
     dailymed_setid = case
       when p_medication ? 'dailymed_setid' then nullif(trim(p_medication->>'dailymed_setid'), '')
-      else dailymed_setid
+      when v_existing.name is not distinct from (p_medication->>'name')
+           and v_existing.dose_amount is not distinct from v_new_dose_amount
+           and v_old_dose_unit = v_new_dose_unit then v_existing.dailymed_setid
+      else null
     end,
     updated_at = now()
   where id = p_medication_id;
