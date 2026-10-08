@@ -11,6 +11,7 @@ export function StepIdentity() {
   const {
     register,
     watch,
+    setValue,
     formState: { errors },
   } = useFormContext<MedicationFormValues>();
 
@@ -20,6 +21,10 @@ export function StepIdentity() {
   // behind a collapsed toggle.
   const [showEndDate, setShowEndDate] = useState(() => Boolean(watch("endDate")));
   const [showNotes, setShowNotes] = useState(() => Boolean(watch("instructions")));
+
+  // Editing the dose by hand means the picked suggestion's strength (and
+  // its SPL set id) no longer describes this medication.
+  const clearDailyMedMatch = { onChange: () => setValue("dailymedSetId", "") };
 
   return (
     <div className="flex flex-col gap-4">
@@ -33,11 +38,11 @@ export function StepIdentity() {
             type="number"
             step="any"
             className={inputClass}
-            {...register("doseAmount")}
+            {...register("doseAmount", clearDailyMedMatch)}
           />
         </Field>
         <Field label="Unit">
-          <select className={inputClass} {...register("doseUnit")}>
+          <select className={inputClass} {...register("doseUnit", clearDailyMedMatch)}>
             <option value="mg">mg</option>
             <option value="mcg">mcg</option>
             <option value="g">g</option>

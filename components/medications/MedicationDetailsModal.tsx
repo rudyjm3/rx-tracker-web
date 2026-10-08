@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
-import { getDrugLabel, getMedia } from "@/lib/dailymed";
+import { findSetIdForStrength, getDrugLabel, getLabelBySetId, getMedia } from "@/lib/dailymed";
 import type { Medication } from "@/lib/types/medications";
 
 type DrugLabelResult = Record<string, unknown>;
@@ -97,13 +97,34 @@ export function MedicationDetailsModal({
   onOpenChange,
   medication,
 }: MedicationDetailsModalProps) {
-  const labelQuery = useQuery({
+  // Which SPL document describes this medication's strength, in order:
+  //  1. the set id saved when a strength was picked from the autocomplete;
+  //  2. for older medications, a strength-aware NDC lookup by name + dose;
+  //  3. the original name-only label search (the last resort — it returns
+  //     whichever strength's label openFDA lists first).
+  const savedSetId = medication.dailymed_setid;
+  const matchQuery = useQuery({
+    queryKey: ["drug-setid-match", medication.name, medication.dose_amount, medication.dose_unit],
+    queryFn: () => findSetIdForStrength(medication.name, medication.dose_amount, medication.dose_unit),
+    enabled: open && !savedSetId,
+  });
+  const resolvedSetId = savedSetId ?? matchQuery.data?.setId ?? null;
+
+  const setIdLabelQuery = useQuery({
+    queryKey: ["drug-label-setid", resolvedSetId],
+    queryFn: () => getLabelBySetId(resolvedSetId ?? ""),
+    enabled: open && !!resolvedSetId,
+  });
+  const setIdResult = firstResult(setIdLabelQuery.data);
+  const lookingUpSetId = !!resolvedSetId ? setIdLabelQuery.isLoading : matchQuery.isLoading;
+  const needsNameLookup = open && !lookingUpSetId && !setIdResult;
+  const nameLabelQuery = useQuery({
     queryKey: ["drug-label", medication.name],
     queryFn: () => getDrugLabel(medication.name),
-    enabled: open,
+    enabled: needsNameLookup,
   });
-  const result = firstResult(labelQuery.data);
-  const setId = labelSetId(result);
+  const result = setIdResult ?? firstResult(nameLabelQuery.data);
+  const setId = resolvedSetId ?? labelSetId(result);
   const mediaQuery = useQuery({
     queryKey: ["drug-media", setId],
     queryFn: () => getMedia(setId ?? ""),
@@ -134,7 +155,7 @@ export function MedicationDetailsModal({
           </div>
         )}
 
-        {labelQuery.isLoading ? (
+        {lookingUpSetId || nameLabelQuery.isLoading ? (
           <p className="text-sm text-brand-text-muted">Loading details…</p>
         ) : sections.length === 0 ? (
           <p className="text-sm text-brand-text-muted">

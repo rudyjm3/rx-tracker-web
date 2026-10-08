@@ -92,6 +92,9 @@ create table if not exists medications (
   reminders_enabled       boolean not null default true,
   adherence_enabled       boolean not null default true,
   inventory_enabled       boolean not null default false,
+  -- Exact DailyMed SPL document (openFDA NDC spl_set_id) matching this
+  -- medication's strength, chosen via the name autocomplete. Nullable.
+  dailymed_setid          text,
   sort_order              smallint not null default 0,
   created_at              timestamptz default now(),
   updated_at              timestamptz default now()
@@ -666,6 +669,8 @@ begin
      set dose = concat_ws(' ', p_dose_amount, nullif(v_new_dose_unit, ''), nullif(dose_form, '')),
          dose_amount = p_dose_amount,
          dose_unit = nullif(v_new_dose_unit, ''),
+         -- The saved DailyMed SPL was matched to the old strength.
+         dailymed_setid = null,
          updated_at = now()
    where id = p_medication_id;
 
@@ -787,6 +792,12 @@ begin
     reminders_enabled = coalesce((p_medication->>'reminders_enabled')::boolean, true),
     adherence_enabled = coalesce((p_medication->>'adherence_enabled')::boolean, true),
     inventory_enabled = v_inventory_enabled,
+    -- An omitted key (older clients) keeps the stored match; an explicit
+    -- JSON null or '' clears it.
+    dailymed_setid = case
+      when p_medication ? 'dailymed_setid' then nullif(trim(p_medication->>'dailymed_setid'), '')
+      else dailymed_setid
+    end,
     updated_at = now()
   where id = p_medication_id;
 
@@ -898,7 +909,7 @@ begin
     current_quantity, quantity_per_dose, low_supply_threshold,
     track_dose_feedback, feedback_type, start_date, end_date, active,
     setup_status, dashboard_enabled, reminders_enabled, adherence_enabled,
-    inventory_enabled
+    inventory_enabled, dailymed_setid
   ) values (
     (select auth.uid()),
     nullif(p_medication->>'profile_id', '')::uuid,
@@ -928,7 +939,8 @@ begin
     coalesce((p_medication->>'dashboard_enabled')::boolean, true),
     coalesce((p_medication->>'reminders_enabled')::boolean, true),
     coalesce((p_medication->>'adherence_enabled')::boolean, true),
-    v_inventory_enabled
+    v_inventory_enabled,
+    nullif(trim(p_medication->>'dailymed_setid'), '')
   )
   returning * into v_medication;
 

@@ -28,6 +28,7 @@ const identitySchema = z.object({
     .refine((v) => !v || (Number.isFinite(Number(v)) && Number(v) > 0), "Must be a positive number"),
   doseUnit: z.string().optional(),
   doseForm: z.string().optional(),
+  dailymedSetId: z.string().optional(),
   medicationType: z.enum(["prescription", "otc", "supplement"]),
   asNeeded: z.boolean(),
 });
@@ -41,12 +42,14 @@ function identityDefaults(draft?: ParsedDraft<MedicationFormValues>): IdentityFo
       doseAmount: "",
       doseUnit: "",
       doseForm: "",
+      dailymedSetId: "",
       medicationType: "prescription",
       asNeeded: false,
     };
   }
-  const { name, doseAmount, doseUnit, doseForm, medicationType, asNeeded } = draft.formData;
-  return { name, doseAmount, doseUnit, doseForm, medicationType, asNeeded };
+  const { name, doseAmount, doseUnit, doseForm, dailymedSetId, medicationType, asNeeded } =
+    draft.formData;
+  return { name, doseAmount, doseUnit, doseForm, dailymedSetId: dailymedSetId ?? "", medicationType, asNeeded };
 }
 
 function IdentityForm({
@@ -64,6 +67,9 @@ function IdentityForm({
     resolver: zodResolver(identitySchema),
     defaultValues: identityDefaults(draft),
   });
+
+  // Editing the dose by hand invalidates the picked suggestion's SPL match.
+  const clearDailyMedMatch = { onChange: () => form.setValue("dailymedSetId", "") };
 
   async function onSubmit(values: IdentityFormValues) {
     setSaving(true);
@@ -96,10 +102,10 @@ function IdentityForm({
         </Field>
         <div className="grid grid-cols-3 gap-3">
           <Field label="Amount" error={form.formState.errors.doseAmount?.message}>
-            <input type="number" step="any" className={inputClass} {...form.register("doseAmount")} />
+            <input type="number" step="any" className={inputClass} {...form.register("doseAmount", clearDailyMedMatch)} />
           </Field>
           <Field label="Unit">
-            <input type="text" placeholder="mg" className={inputClass} {...form.register("doseUnit")} />
+            <input type="text" placeholder="mg" className={inputClass} {...form.register("doseUnit", clearDailyMedMatch)} />
           </Field>
           <Field label="Form">
             <input type="text" placeholder="tablet" className={inputClass} {...form.register("doseForm")} />
