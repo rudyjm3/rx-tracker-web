@@ -32,6 +32,9 @@ export const medicationFormSchema = z
       .refine((v) => !v || isPositiveNumberString(v), "Must be a positive number"),
     doseUnit: z.string().optional(),
     doseForm: z.string().optional(),
+    // DailyMed SPL set id of the autocomplete suggestion the name/strength
+    // came from; "" when typed by hand. Cleared when the name or dose is edited.
+    dailymedSetId: z.string().optional(),
     instructions: z.string().optional(),
     medicationType: z.enum(["prescription", "otc", "supplement"]),
     startDate: z.string().optional(),
@@ -153,6 +156,7 @@ export const defaultFormValues: MedicationFormValues = {
   doseAmount: "",
   doseUnit: "",
   doseForm: "",
+  dailymedSetId: "",
   instructions: "",
   medicationType: "prescription",
   startDate: "",
