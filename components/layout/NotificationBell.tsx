@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Bell } from "lucide-react";
+import Link from "next/link";
+import { Bell, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,40 +10,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
-import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
-import { getActiveMedications } from "@/lib/medications";
-
-type Severity = "out_of_stock" | "critical" | "low_stock";
-
-function severityFor(current: number, threshold: number): Severity | null {
-  if (current <= 0) return "out_of_stock";
-  if (current <= threshold / 2) return "critical";
-  if (current <= threshold) return "low_stock";
-  return null;
-}
-
-const SEVERITY_LABEL: Record<Severity, string> = {
-  out_of_stock: "Out of stock",
-  critical: "Critically low",
-  low_stock: "Low supply",
-};
+import {
+  SUPPLY_SEVERITY_LABEL,
+  refillHref,
+  useLowSupplyAlerts,
+} from "@/components/dashboard/useLowSupplyAlerts";
 
 // The user_notifications table exists in the schema but nothing populates
 // it yet (no trigger/job writes low-stock rows) — this derives the same
 // alerts live from each medication's current_quantity/low_supply_threshold
-// instead of reading an always-empty table.
+// instead of reading an always-empty table. Dismissals are shared with the
+// dashboard reminder cards (per medication, per day, account-wide).
 export function NotificationBell() {
-  const { activeProfileId, isResolving } = useActiveProfile();
-  const medicationsQuery = useQuery({
-    queryKey: ["medications", "active", activeProfileId],
-    queryFn: () => getActiveMedications(activeProfileId),
-    enabled: !isResolving,
-  });
-
-  const alerts = (medicationsQuery.data ?? [])
-    .filter((m) => m.inventory_enabled && m.current_quantity != null)
-    .map((m) => ({ medication: m, severity: severityFor(m.current_quantity!, m.low_supply_threshold) }))
-    .filter((a): a is { medication: (typeof a)["medication"]; severity: Severity } => a.severity !== null);
+  const { alerts, dismiss } = useLowSupplyAlerts();
 
   return (
     <DropdownMenu>
@@ -61,7 +40,7 @@ export function NotificationBell() {
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="min-w-[16rem]">
+      <DropdownMenuContent className="min-w-[18rem]">
         <DropdownMenuLabel>Notifications</DropdownMenuLabel>
         {alerts.length === 0 ? (
           <p className="px-3 py-4 text-center text-sm text-brand-text-muted">
@@ -69,14 +48,36 @@ export function NotificationBell() {
           </p>
         ) : (
           alerts.map(({ medication, severity }) => (
-            <DropdownMenuItem key={medication.id} asChild>
-              <a href={`/medications`} className="flex flex-col items-start gap-0.5">
+            <div
+              key={medication.id}
+              className="flex items-start gap-2 border-l-4 border-status-warning px-3 py-2"
+            >
+              <div className="min-w-0 flex-1">
                 <MedicationNameWithDose medication={medication} className="font-medium text-brand-text" />
-                <span className="text-xs text-status-danger">
-                  {SEVERITY_LABEL[severity]} — {medication.current_quantity} {medication.inventory_unit} left
-                </span>
-              </a>
-            </DropdownMenuItem>
+                <p className="text-xs text-status-danger">
+                  {SUPPLY_SEVERITY_LABEL[severity]} — {medication.current_quantity}{" "}
+                  {medication.inventory_unit} remaining
+                </p>
+                <DropdownMenuItem
+                  asChild
+                  className="mt-2 inline-flex w-auto rounded-control bg-brand-deep-blue px-3 py-1 text-xs font-semibold text-white hover:opacity-90 data-[highlighted]:bg-brand-deep-blue data-[highlighted]:ring-2 data-[highlighted]:ring-brand-cyan"
+                >
+                  <Link href={refillHref(medication.id)}>Refill</Link>
+                </DropdownMenuItem>
+              </div>
+              {/* Menu items (not bare buttons) so Radix's arrow-key roving
+                  focus reaches them; preventDefault keeps the menu open. */}
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  dismiss(medication.id);
+                }}
+                aria-label={`Dismiss alert for ${medication.name}`}
+                className="rounded-full p-1 text-brand-text-muted"
+              >
+                <X size={16} />
+              </DropdownMenuItem>
+            </div>
           ))
         )}
       </DropdownMenuContent>

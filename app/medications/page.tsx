@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { TopNav } from "@/components/layout/TopNav";
 import { MedicationsListClient } from "@/components/medications/MedicationsListClient";
 
@@ -7,7 +8,9 @@ export default function MedicationsPage() {
       <TopNav />
       <main data-no-print className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <h1 className="mb-6 text-2xl font-bold text-brand-navy">Medication Plan</h1>
-        <MedicationsListClient />
+        <Suspense fallback={<p className="text-brand-text-muted">Loading medications…</p>}>
+          <MedicationsListClient />
+        </Suspense>
       </main>
     </>
   );

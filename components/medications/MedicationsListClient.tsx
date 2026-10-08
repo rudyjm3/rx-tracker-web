@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Layers } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +37,7 @@ import { MedicationCard } from "./MedicationCard";
 import { SortableMedicationCard } from "./SortableMedicationCard";
 import { GroupCard } from "./GroupCard";
 import { GroupModal } from "./GroupModal";
+import { RefillModal } from "./RefillModal";
 import { MedicationTypeFilter } from "./MedicationTypeFilter";
 
 type Tab = "active" | "inactive" | "groups";
@@ -48,6 +50,12 @@ export function MedicationsListClient() {
   const [tab, setTab] = useState<Tab>("active");
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Set<MedicationType>>(ALL_TYPES);
+  // Deep link from the low-supply reminder / bell: /medications?refill=<id>
+  // opens that medication's refill form directly, and closing it drops the
+  // param so a refresh doesn't reopen it.
+  const router = useRouter();
+  const pathname = usePathname();
+  const refillTargetId = useSearchParams().get("refill");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -176,6 +184,10 @@ export function MedicationsListClient() {
   if (isResolving || activeQuery.isLoading) {
     return <p className="text-brand-text-muted">Loading medications…</p>;
   }
+
+  const refillTarget = refillTargetId
+    ? (activeMedications.find((m) => m.id === refillTargetId && m.inventory_enabled) ?? null)
+    : null;
 
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: "active", label: "Active", count: activeMedications.length },
@@ -407,6 +419,17 @@ export function MedicationsListClient() {
         onOpenChange={setCreatingGroup}
         availableMedications={activeMedications}
       />
+
+      {refillTarget && (
+        <RefillModal
+          open
+          onOpenChange={(open) => {
+            if (!open) router.replace(pathname);
+          }}
+          medication={refillTarget}
+          mode="refill"
+        />
+      )}
     </div>
   );
 }
