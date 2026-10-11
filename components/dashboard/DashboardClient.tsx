@@ -704,6 +704,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
             />
             <AsNeededList
               medications={medicationsQuery.data ?? []}
+              groups={groupsQuery.data ?? []}
               groupMembers={groupMembersQuery.data ?? []}
               date={date}
             />

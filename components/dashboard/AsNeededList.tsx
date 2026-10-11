@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { LogPastDoseModal } from "@/components/medications/log-past-dose/LogPastDoseModal";
-import type { Medication, MedicationGroupMember } from "@/lib/types/medications";
+import type { Medication, MedicationGroup, MedicationGroupMember } from "@/lib/types/medications";
 
 interface AsNeededListProps {
   medications: Medication[];
-  groupMembers: Pick<MedicationGroupMember, "medication_id">[];
+  groups: Pick<MedicationGroup, "id">[];
+  groupMembers: Pick<MedicationGroupMember, "group_id" | "medication_id">[];
   date: string;
 }
 
@@ -18,13 +19,19 @@ interface AsNeededListProps {
  * Log dose action instead. Grouped as_needed members already appear
  * inside their group's card.
  */
-export function AsNeededList({ medications, groupMembers, date }: AsNeededListProps) {
+export function AsNeededList({ medications, groups, groupMembers, date }: AsNeededListProps) {
   const [logging, setLogging] = useState<Medication | null>(null);
 
-  const groupedIds = new Set(groupMembers.map((m) => m.medication_id));
+  // Only memberships of active groups count — `groups` excludes deactivated
+  // ones, which generateDaySlots can't slot a med into.
+  const activeGroupIds = new Set(groups.map((g) => g.id));
+  const groupedIds = new Set(
+    groupMembers.filter((m) => activeGroupIds.has(m.group_id)).map((m) => m.medication_id),
+  );
   const items = medications.filter(
     (m) =>
       m.as_needed &&
+      m.dashboard_enabled &&
       !groupedIds.has(m.id) &&
       (!m.start_date || date >= m.start_date) &&
       (!m.end_date || date <= m.end_date),
