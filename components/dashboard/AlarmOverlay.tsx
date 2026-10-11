@@ -147,8 +147,11 @@ export function AlarmOverlay({
                 className="flex items-center justify-between gap-2 border-b border-white/15 py-2 last:border-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    <MedicationNameWithDose medication={m.medication} />
+                  <p className="flex items-center gap-2 font-medium">
+                    <span className="truncate">
+                      <MedicationNameWithDose medication={m.medication} />
+                    </span>
+                    <MedTypeBadge type={m.medication.medication_type} onDark />
                   </p>
                   <p className="text-xs text-white/70">
                     {to12h(m.scheduledTime)}
@@ -158,15 +161,6 @@ export function AlarmOverlay({
                   <div className="flex shrink-0 items-center gap-1">
                     <Button size="compact" onClick={() => onTakeOne(m)} disabled={disabled}>
                       Take
-                    </Button>
-                    <Button
-                      size="compact"
-                      variant="secondary"
-                      className="border-white/30 bg-white/10 text-white hover:bg-white/20"
-                      onClick={() => onSkipOne(m)}
-                      disabled={disabled}
-                    >
-                      Skip
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -187,6 +181,15 @@ export function AlarmOverlay({
                         ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    <Button
+                      size="compact"
+                      variant="secondary"
+                      className="border-white/30 bg-white/10 text-white hover:bg-white/20"
+                      onClick={() => onSkipOne(m)}
+                      disabled={disabled}
+                    >
+                      Skip
+                    </Button>
                   </div>
                 ) : m.status === "missed" ? (
                   <div className="flex shrink-0 items-center gap-2">
@@ -212,6 +215,7 @@ export function AlarmOverlay({
             <Button size="default" onClick={onTakeAll} disabled={disabled} className="min-w-[9rem]">
               Take Now
             </Button>
+            <SnoozeRow onSnooze={onSnoozeAll} defaultSnoozeMinutes={defaultSnoozeMinutes} disabled={disabled} />
             <Button
               variant="secondary"
               className="border-white/30 bg-white/10 text-white hover:bg-white/20"
@@ -233,9 +237,6 @@ export function AlarmOverlay({
           </div>
         )}
 
-        {!(event.kind === "group" && manageEach) && (
-          <SnoozeRow onSnooze={onSnoozeAll} defaultSnoozeMinutes={defaultSnoozeMinutes} disabled={disabled} />
-        )}
       </div>
     </div>
   );

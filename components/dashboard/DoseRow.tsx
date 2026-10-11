@@ -90,9 +90,6 @@ export function DoseRow({
           <Button size="compact" onClick={onTake} disabled={disabled}>
             Take
           </Button>
-          <Button size="compact" variant="secondary" onClick={onSkip} disabled={disabled}>
-            Skip
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="compact" variant="ghost" disabled={disabled}>
@@ -108,6 +105,9 @@ export function DoseRow({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button size="compact" variant="secondary" onClick={onSkip} disabled={disabled}>
+            Skip
+          </Button>
         </div>
       )}
     </div>

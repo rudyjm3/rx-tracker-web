@@ -148,9 +148,6 @@ export function GroupDoseCard({
             <Button size="compact" onClick={handleTakeAll} disabled={disabled}>
               Take All
             </Button>
-            <Button size="compact" variant="secondary" onClick={handleSkipAll} disabled={disabled}>
-              Skip
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="compact" variant="ghost" disabled={disabled}>
@@ -166,6 +163,9 @@ export function GroupDoseCard({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button size="compact" variant="secondary" onClick={handleSkipAll} disabled={disabled}>
+              Skip
+            </Button>
           </div>
         )}
       </div>
@@ -233,14 +233,6 @@ export function GroupDoseCard({
                     <Button size="compact" onClick={() => onTake(m)} disabled={pendingKey === key}>
                       Take
                     </Button>
-                    <Button
-                      size="compact"
-                      variant="secondary"
-                      onClick={() => onSkip(m)}
-                      disabled={pendingKey === key}
-                    >
-                      Skip
-                    </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button size="compact" variant="ghost" disabled={pendingKey === key}>
@@ -256,6 +248,14 @@ export function GroupDoseCard({
                         ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    <Button
+                      size="compact"
+                      variant="secondary"
+                      onClick={() => onSkip(m)}
+                      disabled={pendingKey === key}
+                    >
+                      Skip
+                    </Button>
                   </div>
                 ) : m.status === "pending" ? (
                   <Badge variant="pending" />
