@@ -282,13 +282,15 @@ export function DayDetailDialog({
                     >
                       <MedicationNameWithDose medication={member} className="font-semibold text-brand-text" />
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-brand-text-muted">As needed · not yet logged</span>
+                        <span className="text-xs text-brand-text-muted">
+                          {member.alreadyLogged ? "As needed" : "As needed · not yet logged"}
+                        </span>
                         <button
                           type="button"
                           onClick={() => onLogPending(member)}
                           className="text-xs text-brand-deep-blue hover:underline"
                         >
-                          Log dose
+                          {member.alreadyLogged ? "Log another dose" : "Log dose"}
                         </button>
                       </div>
                     </li>
