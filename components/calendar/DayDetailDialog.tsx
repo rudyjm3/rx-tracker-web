@@ -205,7 +205,7 @@ export function DayDetailDialog({
                     ))}
                   </ul>
                 )
-              ) : totalMedications === 0 ? (
+              ) : totalMedications === 0 && day.pendingUngroupedAsNeeded.length === 0 ? (
                 <p className="text-sm text-brand-text-muted">No dose data for this day.</p>
               ) : (
                 <ul className="flex flex-col gap-4">
@@ -273,6 +273,26 @@ export function DayDetailDialog({
                         endingToday={endingIds.has(med.medicationId)}
                         onEditSlot={onEditSlot}
                       />
+                    </li>
+                  ))}
+                  {day.pendingUngroupedAsNeeded.map((member) => (
+                    <li
+                      key={member.medicationId}
+                      className="flex items-center justify-between gap-2 rounded-card border border-brand-border p-3 text-sm"
+                    >
+                      <MedicationNameWithDose medication={member} className="font-semibold text-brand-text" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-brand-text-muted">
+                          {member.alreadyLogged ? "As needed" : "As needed · not yet logged"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onLogPending(member)}
+                          className="text-xs text-brand-deep-blue hover:underline"
+                        >
+                          {member.alreadyLogged ? "Log another dose" : "Log dose"}
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
