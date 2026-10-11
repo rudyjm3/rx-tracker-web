@@ -7,6 +7,9 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/auth/callback",
+  // Legal pages are linked from sign-in / sign-up, so they must be public.
+  "/terms",
+  "/privacy",
 ];
 
 function isPublicPath(pathname: string) {
