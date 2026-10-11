@@ -40,6 +40,7 @@ import { LowSupplyBanner } from "./LowSupplyBanner";
 import { SetupCompleteBanner } from "./SetupCompleteBanner";
 import { FeedbackDialog } from "./FeedbackDialog";
 import { PwaInstallBanner } from "./PwaInstallBanner";
+import { AsNeededList } from "./AsNeededList";
 import { QuickActionsPanel } from "./QuickActionsPanel";
 import { MedsOverviewPanel } from "./MedsOverviewPanel";
 import { TodayHistoryPanel } from "./TodayHistoryPanel";
@@ -700,6 +701,11 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
               onSnooze={handleSnooze}
               defaultSnoozeMinutes={snoozeSettingQuery.data}
               pendingKey={pendingKey}
+            />
+            <AsNeededList
+              medications={medicationsQuery.data ?? []}
+              groupMembers={groupMembersQuery.data ?? []}
+              date={date}
             />
           </div>
           <Link
