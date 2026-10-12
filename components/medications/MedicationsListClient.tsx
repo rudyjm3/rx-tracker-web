@@ -219,31 +219,16 @@ export function MedicationsListClient() {
     reordered.splice(oldIndex, 1);
     reordered.splice(newIndex, 0, String(active.id));
     
-    // Merge the reordered visible subset back into the full ungrouped list
-    // to preserve positions of hidden (filtered-out) medications, avoiding
-    // duplicate sort_order values when the filter is cleared or changed.
-    const allUngroupedIds = activeMedications.map((m) => m.id);
+    // Merge the reordered visible subset back into the full active list:
+    // every hidden (filtered-out) medication keeps its original slot and the
+    // visible ones fill the remaining slots in their new order, so sort_order
+    // stays unique and hidden medications never move.
     const reorderedSet = new Set(reordered);
-    
-    // Insert each hidden medication back into its original relative position
-    // among the reordered visible medications.
-    const byId = new Map(activeMedications.map((m, i) => [m.id, i]));
-    const merged: string[] = [];
     let visibleIdx = 0;
-    
-    for (const id of allUngroupedIds) {
-      if (reorderedSet.has(id)) {
-        merged.push(reordered[visibleIdx++]);
-      } else {
-        // Find where this hidden medication sits relative to visible ones
-        const originalPos = byId.get(id) ?? 0;
-        const beforeCount = allUngroupedIds
-          .slice(0, originalPos)
-          .filter((beforeId) => reorderedSet.has(beforeId)).length;
-        merged.splice(beforeCount, 0, id);
-      }
-    }
-    
+    const merged = activeMedications.map((m) =>
+      reorderedSet.has(m.id) ? reordered[visibleIdx++] : m.id,
+    );
+
     reorderMutation.mutate(merged);
   }
 
