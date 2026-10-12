@@ -45,11 +45,26 @@ export async function POST(request: Request) {
   // linked to auth.users by a foreign key, so deleting the user first
   // would leave them orphaned in storage rather than being cleaned up
   // automatically.
-  const { data: avatarFiles } = await admin.storage.from("avatars").list(user.id);
+  // If cleanup fails, stop before deleting the account: once the auth user is
+  // gone there is no way to retry, and the Privacy Policy promises that
+  // deleting an account removes its data, including profile photos.
+  const { data: avatarFiles, error: listError } = await admin.storage.from("avatars").list(user.id);
+  if (listError) {
+    return NextResponse.json(
+      { error: "Couldn't remove your profile photos, so your account was not deleted. Please try again." },
+      { status: 500 },
+    );
+  }
   if (avatarFiles && avatarFiles.length > 0) {
-    await admin.storage
+    const { error: removeError } = await admin.storage
       .from("avatars")
       .remove(avatarFiles.map((file) => `${user.id}/${file.name}`));
+    if (removeError) {
+      return NextResponse.json(
+        { error: "Couldn't remove your profile photos, so your account was not deleted. Please try again." },
+        { status: 500 },
+      );
+    }
   }
 
   const { error } = await admin.auth.admin.deleteUser(user.id);
