@@ -11,12 +11,14 @@ interface SortableMedicationCardProps {
   medication: Medication;
   groupDoseOverrides?: GroupDoseOverride[];
   latestRefill?: MedicationRefill | null;
+  groupNames?: string[];
 }
 
 export function SortableMedicationCard({
   medication,
   groupDoseOverrides,
   latestRefill,
+  groupNames,
 }: SortableMedicationCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: medication.id });
@@ -32,6 +34,7 @@ export function SortableMedicationCard({
         medication={medication}
         groupDoseOverrides={groupDoseOverrides}
         latestRefill={latestRefill}
+        groupNames={groupNames}
         isDragging={isDragging}
         dragHandle={
           <button

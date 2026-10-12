@@ -10,6 +10,7 @@ import {
   ChevronsDown,
   FileText,
   History,
+  Layers,
   LineChart,
   MoreVertical,
   Pencil,
@@ -111,6 +112,8 @@ interface MedicationCardProps {
   dragHandle?: ReactNode;
   isDragging?: boolean;
   latestRefill?: MedicationRefill | null;
+  // Names of the groups this medication belongs to, shown as a notation.
+  groupNames?: string[];
 }
 
 export function MedicationCard({
@@ -119,6 +122,7 @@ export function MedicationCard({
   dragHandle,
   isDragging,
   latestRefill = null,
+  groupNames = [],
 }: MedicationCardProps) {
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [expanded, setExpanded] = useState(false);
@@ -189,6 +193,12 @@ export function MedicationCard({
               />
             </h3>
             <MedTypeBadge type={medication.medication_type} />
+            {groupNames.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-bg px-2 py-0.5 text-xs font-medium text-brand-text-muted">
+                <Layers size={12} aria-hidden="true" />
+                {groupNames.join(", ")}
+              </span>
+            )}
             <span
               role="button"
               tabIndex={0}

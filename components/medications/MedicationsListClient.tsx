@@ -161,11 +161,6 @@ export function MedicationsListClient() {
     activeGroupIds.has(m.group_id),
   );
 
-  const groupedMedicationIds = new Set(groupMembers.map((m) => m.medication_id));
-  const ungroupedMedications = activeMedications.filter(
-    (m) => !groupedMedicationIds.has(m.id),
-  );
-
   const filteredActiveMedications = useMemo(
     () => activeMedications.filter((m) => typeFilter.has(m.medication_type)),
     [activeMedications, typeFilter],
@@ -173,10 +168,6 @@ export function MedicationsListClient() {
   const filteredInactiveMedications = useMemo(
     () => inactiveMedications.filter((m) => typeFilter.has(m.medication_type)),
     [inactiveMedications, typeFilter],
-  );
-  const filteredUngroupedMedications = useMemo(
-    () => ungroupedMedications.filter((m) => typeFilter.has(m.medication_type)),
-    [ungroupedMedications, typeFilter],
   );
 
   if (isResolving || activeQuery.isLoading) {
@@ -204,6 +195,12 @@ export function MedicationsListClient() {
       });
   }
 
+  function groupNamesFor(medicationId: string) {
+    return groupMembers
+      .filter((member) => member.medication_id === medicationId)
+      .flatMap((member) => groups.find((g) => g.id === member.group_id)?.name ?? []);
+  }
+
   function membersOf(groupId: string) {
     const memberIds = groupMembers
       .filter((m) => m.group_id === groupId)
@@ -211,10 +208,10 @@ export function MedicationsListClient() {
     return activeMedications.filter((m) => memberIds.includes(m.id));
   }
 
-  function handleUngroupedDragEnd(event: DragEndEvent) {
+  function handleActiveDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const ids = filteredUngroupedMedications.map((m) => m.id);
+    const ids = filteredActiveMedications.map((m) => m.id);
     const oldIndex = ids.indexOf(String(active.id));
     const newIndex = ids.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
@@ -225,12 +222,12 @@ export function MedicationsListClient() {
     // Merge the reordered visible subset back into the full ungrouped list
     // to preserve positions of hidden (filtered-out) medications, avoiding
     // duplicate sort_order values when the filter is cleared or changed.
-    const allUngroupedIds = ungroupedMedications.map((m) => m.id);
+    const allUngroupedIds = activeMedications.map((m) => m.id);
     const reorderedSet = new Set(reordered);
     
     // Insert each hidden medication back into its original relative position
     // among the reordered visible medications.
-    const byId = new Map(ungroupedMedications.map((m, i) => [m.id, i]));
+    const byId = new Map(activeMedications.map((m, i) => [m.id, i]));
     const merged: string[] = [];
     let visibleIdx = 0;
     
@@ -321,37 +318,21 @@ export function MedicationsListClient() {
           </p>
         ) : (
           <div className="flex flex-col gap-4">
-            {groups.map((group) => {
-              const members = membersOf(group.id).filter((m) =>
-                typeFilter.has(m.medication_type),
-              );
-              if (members.length === 0) return null;
-              return (
-                <GroupCard
-                  key={group.id}
-                  group={group}
-                  members={members}
-                  memberOverrides={groupMembers.filter((m) => m.group_id === group.id)}
-                  doseOverridesFor={groupDoseOverridesFor}
-                  allActiveMedications={activeMedications}
-                  latestRefillsById={latestRefillsById}
-                />
-              );
-            })}
-
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
-              onDragEnd={handleUngroupedDragEnd}
+              onDragEnd={handleActiveDragEnd}
             >
               <SortableContext
-                items={filteredUngroupedMedications.map((m) => m.id)}
+                items={filteredActiveMedications.map((m) => m.id)}
                 strategy={verticalListSortingStrategy}
               >
-                {filteredUngroupedMedications.map((med) => (
+                {filteredActiveMedications.map((med) => (
                   <SortableMedicationCard
                     key={med.id}
                     medication={med}
+                    groupDoseOverrides={groupDoseOverridesFor(med.id)}
+                    groupNames={groupNamesFor(med.id)}
                     latestRefill={latestRefillsById.get(med.id) ?? null}
                   />
                 ))}
