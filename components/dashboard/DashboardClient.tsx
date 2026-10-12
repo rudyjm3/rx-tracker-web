@@ -30,6 +30,7 @@ import {
   generateAdHocPrnSlots,
   generateDaySlots,
   slotDueTime,
+  slotGroupTime,
   type DaySlot,
   type NextDoseEvent,
 } from "@/lib/schedule";
@@ -600,7 +601,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
           (s) =>
             s.groupId === dueNowEvent.groupId &&
             !s.isPrn &&
-            slotDueTime(s, date) === dueNowEvent.time,
+            slotGroupTime(s, date, slots) === dueNowEvent.time,
         )
       : null;
 
