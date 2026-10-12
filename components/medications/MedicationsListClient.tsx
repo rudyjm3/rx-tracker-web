@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Layers } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -31,7 +30,6 @@ import { deleteDraft, getDrafts } from "@/lib/drafts";
 import { getLatestRefills } from "@/lib/inventory";
 import { Button, buttonVariants } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
-import { to12h } from "@/lib/utils";
 import type { Medication, MedicationType } from "@/lib/types/medications";
 import { MedicationCard } from "./MedicationCard";
 import { SortableMedicationCard } from "./SortableMedicationCard";
@@ -329,20 +327,15 @@ export function MedicationsListClient() {
               );
               if (members.length === 0) return null;
               return (
-                <div key={group.id} className="flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5 px-1 text-sm font-semibold text-brand-text-muted">
-                    <Layers size={14} />
-                    {group.name} · {to12h(group.scheduled_time.slice(0, 5))}
-                  </div>
-                  {members.map((med) => (
-                    <MedicationCard
-                      key={med.id}
-                      medication={med}
-                      groupDoseOverrides={groupDoseOverridesFor(med.id)}
-                      latestRefill={latestRefillsById.get(med.id) ?? null}
-                    />
-                  ))}
-                </div>
+                <GroupCard
+                  key={group.id}
+                  group={group}
+                  members={members}
+                  memberOverrides={groupMembers.filter((m) => m.group_id === group.id)}
+                  doseOverridesFor={groupDoseOverridesFor}
+                  allActiveMedications={activeMedications}
+                  latestRefillsById={latestRefillsById}
+                />
               );
             })}
 
