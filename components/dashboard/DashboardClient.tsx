@@ -372,7 +372,10 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // user has hidden from the daily schedule but still opted into adherence
   // tracking still counts toward it — `slots` itself stays scoped to what's
   // actually shown on screen.
-  const requiredSlots = useMemo<DaySlot[]>(() => {
+  // Every adherence-tracked slot for today, regardless of dashboard
+  // visibility: a medication hidden from the daily view (or an as-needed one
+  // in a hidden group) can still be opted into adherence tracking.
+  const adherenceSlots = useMemo<DaySlot[]>(() => {
     if (!medicationsQuery.data || !logsQuery.data || !postponesQuery.data) {
       return [];
     }
@@ -384,7 +387,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
       logsQuery.data,
       postponesQuery.data,
       { ignoreDashboardVisibility: true },
-    ).filter((s) => s.medication.adherence_enabled && !s.isPrn);
+    ).filter((s) => s.medication.adherence_enabled);
   }, [
     date,
     medicationsQuery.data,
@@ -393,18 +396,27 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     logsQuery.data,
     postponesQuery.data,
   ]);
+  const requiredSlots = useMemo<DaySlot[]>(
+    () => adherenceSlots.filter((s) => !s.isPrn),
+    [adherenceSlots],
+  );
 
   // Ungrouped as-needed medications never get a slot from generateDaySlots
   // (their doses are logged ad hoc) — pull those dose_logs in separately so
   // they still surface in non-required dose tracking.
   const adHocPrnSlots = useMemo<DaySlot[]>(() => {
     if (!medicationsQuery.data || !logsQuery.data) return [];
-    return generateAdHocPrnSlots(medicationsQuery.data, groupMembersQuery.data ?? [], logsQuery.data);
-  }, [medicationsQuery.data, groupMembersQuery.data, logsQuery.data]);
+    // Only memberships of active groups count: deleting a group just marks it
+    // inactive and leaves its membership rows, and its medications are
+    // ungrouped again.
+    const activeGroupIds = new Set((groupsQuery.data ?? []).map((g) => g.id));
+    const activeMemberships = (groupMembersQuery.data ?? []).filter((m) => activeGroupIds.has(m.group_id));
+    return generateAdHocPrnSlots(medicationsQuery.data, activeMemberships, logsQuery.data);
+  }, [medicationsQuery.data, groupsQuery.data, groupMembersQuery.data, logsQuery.data]);
 
   const nonRequiredSlots = useMemo<DaySlot[]>(
-    () => [...slots.filter((s) => s.medication.adherence_enabled && s.isPrn), ...adHocPrnSlots],
-    [slots, adHocPrnSlots],
+    () => [...adherenceSlots.filter((s) => s.isPrn), ...adHocPrnSlots],
+    [adherenceSlots, adHocPrnSlots],
   );
 
   const graceMinutes = graceQuery.data ?? 60;

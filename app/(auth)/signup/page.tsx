@@ -33,7 +33,7 @@ export default function SignupPage() {
     }
 
     if (!acceptedTerms) {
-      setError("Please agree to the Terms of Service and Privacy Policy.");
+      setError("Please agree to the Terms of Use and Privacy Policy.");
       return;
     }
 
@@ -231,7 +231,7 @@ export default function SignupPage() {
           <span>
             I agree to the{" "}
             <Link href="/terms" className="font-bold text-brand-blue hover:underline">
-              Terms of Service
+              Terms of Use
             </Link>{" "}
             and{" "}
             <Link href="/privacy" className="font-bold text-brand-blue hover:underline">
@@ -267,6 +267,15 @@ export default function SignupPage() {
         Already have an account?{" "}
         <Link href="/login" className="font-bold text-brand-blue hover:underline">
           Sign in
+        </Link>
+      </p>
+      <p className="mt-4 text-center text-xs text-brand-text-muted">
+        <Link href="/terms" className="hover:underline">
+          Terms of Use
+        </Link>{" "}
+        &middot;{" "}
+        <Link href="/privacy" className="hover:underline">
+          Privacy Policy
         </Link>
       </p>
     </div>

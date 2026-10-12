@@ -179,6 +179,15 @@ function LoginForm() {
           Sign up
         </Link>
       </p>
+      <p className="mt-4 text-center text-xs text-brand-text-muted">
+        <Link href="/terms" className="hover:underline">
+          Terms of Use
+        </Link>{" "}
+        &middot;{" "}
+        <Link href="/privacy" className="hover:underline">
+          Privacy Policy
+        </Link>
+      </p>
     </div>
   );
 }
