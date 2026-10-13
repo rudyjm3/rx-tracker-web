@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers } from "lucide-react";
+import { Flag, Layers } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
@@ -120,18 +120,16 @@ interface DayDetailDialogProps {
 function EndingTodayCallout({ endingMedications }: { endingMedications: CalendarDayEndingMedication[] }) {
   if (endingMedications.length === 0) return null;
   return (
-    <div className="rounded-card border border-amber-400 bg-amber-50 p-3 dark:border-amber-600 dark:bg-amber-950/30">
-      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-        {endingMedications.length === 1 ? "Regimen ending today" : "Regimens ending today"}
-      </p>
-      <ul className="mt-1 flex flex-col gap-0.5 text-sm text-brand-text">
-        {endingMedications.map((med) => (
-          <li key={med.medicationId}>
-            <MedicationNameWithDose medication={med} />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <p className="flex flex-wrap items-center gap-x-1 text-sm text-brand-text">
+      <Flag size={14} className="text-status-warning" fill="currentColor" aria-hidden="true" />
+      <span className="font-semibold text-status-warning">Ends today:</span>
+      {endingMedications.map((med, i) => (
+        <span key={med.medicationId}>
+          <MedicationNameWithDose medication={med} />
+          {i < endingMedications.length - 1 && ","}
+        </span>
+      ))}
+    </p>
   );
 }
 

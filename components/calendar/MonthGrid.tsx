@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   calendarDayColor,
@@ -112,11 +112,6 @@ export function MonthGrid({
               )}
             >
               <span className="font-semibold">{day}</span>
-              {detail && (
-                <span className="text-[9px] leading-tight text-brand-text-muted">
-                  Total doses: Req {detail.plannedRequired} / Non-req {detail.plannedNonRequired}
-                </span>
-              )}
               {hasMarkerCounts && (
                 <span className="flex flex-wrap gap-x-1.5 text-[10px] font-medium">
                   {marker!.taken > 0 && (
@@ -131,13 +126,13 @@ export function MonthGrid({
                 </span>
               )}
               {endingMedications.length > 0 && (
-                <span className="w-full truncate text-[9px] font-semibold text-brand-deep-blue">
-                  {endingMedications.length === 1
-                    ? `Ends today: ${endingMedications[0].name}${
-                        endingMedications[0].dose ? ` ${endingMedications[0].dose}` : ""
-                      }`
-                    : `Ends today: ${endingMedications[0].name} +${endingMedications.length - 1} more`}
-                </span>
+                <Flag
+                  size={12}
+                  className="text-status-warning"
+                  fill="currentColor"
+                  role="img"
+                  aria-label="Medication ends"
+                />
               )}
             </button>
           );
