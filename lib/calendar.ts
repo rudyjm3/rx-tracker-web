@@ -292,8 +292,8 @@ export interface CalendarDayDetail {
   endingMedications: CalendarDayEndingMedication[];
   medications: CalendarDayMedicationSummary[]; // medications with no single shared group that day
   groups: CalendarDayGroupSummary[]; // medications sharing a group that day, nested under it
-  // Eligible ungrouped as_needed medications for this date (past/today
-  // only), with `alreadyLogged` set once they have any dose_logs row.
+  // Eligible ungrouped as_needed medications for this date (listed on
+  // future dates too, but never counted in the planned totals), with `alreadyLogged` set once they have any dose_logs row.
   // They never get a scheduled slot, so without this there'd be no way to
   // log them from the day detail — and as-needed meds can be taken more
   // than once a day, so they stay listed after the first dose.
@@ -559,30 +559,30 @@ export function buildDayDetails(
     const isFuture = date > todayDate;
     day.isFuture = isFuture;
 
-    if (!isFuture) {
-      const loggedIds = new Set([
-        ...day.medications.map((m) => m.medicationId),
-        ...day.groups.flatMap((g) => g.medications.map((m) => m.medicationId)),
-      ]);
-      day.pendingUngroupedAsNeeded = medications
-        .filter(
-          (m) =>
-            m.as_needed &&
-            !groupedMedicationIds.has(m.id) &&
-            (!m.start_date || date >= m.start_date) &&
-            (!m.end_date || date <= m.end_date) &&
-            date >= m.created_at.slice(0, 10) &&
-            wasActiveOnDate(m.id, date, statusEvents),
-        )
-        .map((m) => ({
-          medicationId: m.id,
-          name: m.name,
-          dose: m.dose,
-          dose_amount: m.dose_amount,
-          dose_unit: m.dose_unit,
-          alreadyLogged: loggedIds.has(m.id),
-        }));
-    }
+    const loggedIds = new Set([
+      ...day.medications.map((m) => m.medicationId),
+      ...day.groups.flatMap((g) => g.medications.map((m) => m.medicationId)),
+    ]);
+    // Future dates have no status history to replay, so they take the
+    // medication's current active state (same as medsForDate below).
+    day.pendingUngroupedAsNeeded = medications
+      .filter(
+        (m) =>
+          m.as_needed &&
+          !groupedMedicationIds.has(m.id) &&
+          (!m.start_date || date >= m.start_date) &&
+          (!m.end_date || date <= m.end_date) &&
+          date >= m.created_at.slice(0, 10) &&
+          (isFuture ? m.active : wasActiveOnDate(m.id, date, statusEvents)),
+      )
+      .map((m) => ({
+        medicationId: m.id,
+        name: m.name,
+        dose: m.dose,
+        dose_amount: m.dose_amount,
+        dose_unit: m.dose_unit,
+        alreadyLogged: loggedIds.has(m.id),
+      }));
 
     // No adjustment for one-off skips or pauses per-date: a future date
     // takes the medication's current active state (there's no history yet

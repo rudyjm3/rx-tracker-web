@@ -174,7 +174,7 @@ export function DayDetailDialog({
               <EndingTodayCallout endingMedications={day.endingMedications} />
 
               {day.isFuture ? (
-                totalPlanned === 0 ? (
+                totalPlanned === 0 && day.pendingUngroupedAsNeeded.length === 0 ? (
                   <p className="text-sm text-brand-text-muted">No doses planned for this day.</p>
                 ) : (
                   <ul className="flex flex-col gap-4">
@@ -199,6 +199,15 @@ export function DayDetailDialog({
                         className="rounded-card border border-brand-border p-3"
                       >
                         <PlannedMedicationRow slot={slot} endingToday={endingIds.has(slot.medicationId)} />
+                      </li>
+                    ))}
+                    {day.pendingUngroupedAsNeeded.map((member) => (
+                      <li
+                        key={member.medicationId}
+                        className="flex items-center justify-between gap-2 rounded-card border border-brand-border p-3 text-sm"
+                      >
+                        <MedicationNameWithDose medication={member} className="font-semibold text-brand-text" />
+                        <span className="text-xs text-brand-text-muted">As needed</span>
                       </li>
                     ))}
                   </ul>
