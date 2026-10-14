@@ -16,6 +16,7 @@ import {
   type CalendarDayPendingMember,
   type CalendarDaySlot,
 } from "@/lib/calendar";
+import { getRunoutByDate } from "@/lib/schedule";
 import { getCalendarLogs, getCalendarMarkers } from "@/lib/dose-logs";
 import {
   getActiveMedications,
@@ -206,6 +207,20 @@ export function CalendarClient() {
     [dayDetails, todayDate, asNeededIds],
   );
 
+  // Derived from the same medication/group queries as everything else, so a
+  // logged dose or inventory edit (which invalidates ["medications"]) moves
+  // the markers without any extra fetching.
+  const runoutByDate = useMemo(
+    () =>
+      getRunoutByDate(
+        activeMedicationsQuery.data ?? [],
+        groupsQuery.data ?? [],
+        groupMembersQuery.data ?? [],
+        todayDate,
+      ),
+    [activeMedicationsQuery.data, groupsQuery.data, groupMembersQuery.data, todayDate],
+  );
+
   const pendingLogMedication = pendingLogMember
     ? (allMedications.find((m) => m.id === pendingLogMember.medicationId) ?? null)
     : null;
@@ -284,11 +299,13 @@ export function CalendarClient() {
         dayDetails={dayDetails}
         asNeededIds={asNeededIds}
         summary={summary}
+        runoutByDate={runoutByDate}
         onNavigate={navigateToMonth}
         onSelectDay={setSelectedDate}
       />
       <DayDetailDialog
         day={selectedDate ? (dayDetails[selectedDate] ?? null) : null}
+        runouts={selectedDate ? (runoutByDate[selectedDate] ?? []) : []}
         onClose={() => setSelectedDate(null)}
         onEditSlot={setEditingSlot}
         onEditGroup={setEditingGroup}
