@@ -195,8 +195,10 @@ export function CalendarClient() {
     statusEventsQuery.data,
   ]);
 
+  // Medications outside "required" adherence: as-needed, or opted out via
+  // "Include in adherence tracking" (same rule as the dashboard/export).
   const asNeededIds = useMemo(
-    () => new Set(allMedications.filter((m) => m.as_needed).map((m) => m.id)),
+    () => new Set(allMedications.filter((m) => m.as_needed || !m.adherence_enabled).map((m) => m.id)),
     [allMedications],
   );
   const summary = useMemo(
