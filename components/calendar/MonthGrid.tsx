@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag, PillBottle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   calendarDayColor,
@@ -11,6 +11,10 @@ import {
   type CalendarDayDetail,
 } from "@/lib/calendar";
 import type { CalendarDayMarker } from "@/lib/dose-logs";
+import type { RunoutEntry } from "@/lib/schedule";
+
+// Run-out within this many days of today reads as urgent (danger color).
+const RUNOUT_URGENT_DAYS = 7;
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -40,6 +44,7 @@ interface MonthGridProps {
   dayDetails: Record<string, CalendarDayDetail>;
   asNeededIds: ReadonlySet<string>;
   summary: CalendarMonthSummary;
+  runoutByDate: Record<string, RunoutEntry[]>;
   onNavigate: (month: string) => void;
   onSelectDay: (date: string) => void;
 }
@@ -51,6 +56,7 @@ export function MonthGrid({
   dayDetails,
   asNeededIds,
   summary,
+  runoutByDate,
   onNavigate,
   onSelectDay,
 }: MonthGridProps) {
@@ -107,6 +113,8 @@ export function MonthGrid({
             (marker.taken > 0 || marker.skipped > 0 || marker.missed > 0);
           const lateCount = detail && !isFuture ? summarizeDay(detail, asNeededIds, true).late : 0;
           const endingMedications = detail?.endingMedications ?? [];
+          const runouts = dateStr >= todayDate ? (runoutByDate[dateStr] ?? []) : [];
+          const runoutUrgent = runouts.some((r) => r.daysLeft <= RUNOUT_URGENT_DAYS);
 
           return (
             <button
@@ -149,6 +157,14 @@ export function MonthGrid({
                   aria-label="Medication ends"
                 />
               )}
+              {runouts.length > 0 && (
+                <PillBottle
+                  size={14}
+                  className={runoutUrgent ? "text-status-danger" : "text-status-warning"}
+                  role="img"
+                  aria-label="Medication runs out"
+                />
+              )}
             </button>
           );
         })}
@@ -161,6 +177,10 @@ export function MonthGrid({
         <span className="flex items-center gap-1.5">
           <span className={cn("font-semibold", COUNT_CLASSES.late)}>L</span>
           Late = taken after grace period
+        </span>
+        <span className="flex items-center gap-1.5">
+          <PillBottle size={14} className="text-status-danger" aria-hidden="true" />
+          Refill needed (projected run-out, estimate)
         </span>
       </div>
     </div>

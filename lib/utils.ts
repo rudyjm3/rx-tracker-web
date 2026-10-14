@@ -10,6 +10,13 @@ export function localDateString(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+// "MM-DD-YYYY" display form of a stored local YYYY-MM-DD date. Pure string
+// reshaping (no Date parsing) so it can't shift across timezones.
+export function formatDate(dateStr: string): string {
+  const [year, month, day] = dateStr.slice(0, 10).split("-");
+  return `${month}-${day}-${year}`;
+}
+
 export function to12h(time: string): string {
   const [hourStr, minuteStr] = time.split(":");
   const hour = parseInt(hourStr, 10);

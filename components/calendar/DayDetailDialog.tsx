@@ -1,10 +1,12 @@
 "use client";
 
-import { Flag, Layers } from "lucide-react";
+import { Flag, Layers, PillBottle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
+import { formatDate } from "@/lib/utils";
+import type { RunoutEntry } from "@/lib/schedule";
 import type {
   CalendarDayDetail,
   CalendarDayEndingMedication,
@@ -111,6 +113,7 @@ function PlannedMedicationRow({
 
 interface DayDetailDialogProps {
   day: CalendarDayDetail | null;
+  runouts: RunoutEntry[];
   onClose: () => void;
   onEditSlot: (slot: CalendarDaySlot) => void;
   onEditGroup: (group: CalendarDayGroupSummary) => void;
@@ -133,8 +136,46 @@ function EndingTodayCallout({ endingMedications }: { endingMedications: Calendar
   );
 }
 
+function formatQty(n: number): string {
+  return Number(n.toFixed(3)).toString();
+}
+
+function runoutLabel(status: RunoutEntry["status"]): string {
+  return status === "out" ? "Out of stock" : status === "low" ? "Low supply" : "Runs out";
+}
+
+function RunoutCallout({ runouts }: { runouts: RunoutEntry[] }) {
+  if (runouts.length === 0) return null;
+  const urgent = runouts.some((r) => r.daysLeft <= 7);
+  return (
+    <div className="flex flex-col gap-1 text-sm text-brand-text">
+      {runouts.map((r) => (
+        <p key={r.medicationId} className="flex flex-wrap items-center gap-x-1">
+          <PillBottle
+            size={14}
+            className={urgent ? "text-status-danger" : "text-status-warning"}
+            aria-hidden="true"
+          />
+          <span className={cn("font-semibold", urgent ? "text-status-danger" : "text-status-warning")}>
+            {runoutLabel(r.status)}:
+          </span>
+          <MedicationNameWithDose medication={r} />
+          <span className="text-brand-text-muted">
+            ({formatQty(r.quantity)} {r.unit} left today
+            {r.status === "low" ? ` · est. run-out ${formatDate(r.runoutDate)}` : ""})
+          </span>
+        </p>
+      ))}
+      <p className="text-xs text-brand-text-muted">
+        Run-out dates are estimates that assume your current schedule continues.
+      </p>
+    </div>
+  );
+}
+
 export function DayDetailDialog({
   day,
+  runouts,
   onClose,
   onEditSlot,
   onEditGroup,
@@ -172,6 +213,7 @@ export function DayDetailDialog({
 
             <div className="flex flex-col gap-4">
               <EndingTodayCallout endingMedications={day.endingMedications} />
+              <RunoutCallout runouts={runouts} />
 
               {day.isFuture ? (
                 totalPlanned === 0 && day.pendingUngroupedAsNeeded.length === 0 ? (
