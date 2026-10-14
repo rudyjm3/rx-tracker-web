@@ -157,7 +157,7 @@ export function DayDetailDialog({
 
   return (
     <Dialog open={day !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" sheet onSheetDismiss={onClose}>
         {day && (
           <>
             <DialogHeader>

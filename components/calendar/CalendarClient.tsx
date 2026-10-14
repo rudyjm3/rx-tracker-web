@@ -10,6 +10,7 @@ import {
   backfillMonth,
   buildDayDetails,
   monthBounds,
+  summarizeMonth,
   type CalendarDayDetail,
   type CalendarDayGroupSummary,
   type CalendarDayPendingMember,
@@ -194,6 +195,15 @@ export function CalendarClient() {
     statusEventsQuery.data,
   ]);
 
+  const asNeededIds = useMemo(
+    () => new Set(allMedications.filter((m) => m.as_needed).map((m) => m.id)),
+    [allMedications],
+  );
+  const summary = useMemo(
+    () => summarizeMonth(dayDetails, todayDate, asNeededIds),
+    [dayDetails, todayDate, asNeededIds],
+  );
+
   const pendingLogMedication = pendingLogMember
     ? (allMedications.find((m) => m.id === pendingLogMember.medicationId) ?? null)
     : null;
@@ -270,6 +280,8 @@ export function CalendarClient() {
         todayDate={todayDate}
         markers={markersQuery.data ?? {}}
         dayDetails={dayDetails}
+        asNeededIds={asNeededIds}
+        summary={summary}
         onNavigate={navigateToMonth}
         onSelectDay={setSelectedDate}
       />

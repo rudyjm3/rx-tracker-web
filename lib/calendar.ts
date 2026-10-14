@@ -136,9 +136,11 @@ export async function backfillMonth(
 export type CalendarDayColor = "future" | "missed" | "skipped" | "taken" | "empty";
 
 /**
- * Day-cell color priority, matching the reference app: future days are
- * neutral regardless of data; otherwise missed beats skipped-only beats
- * taken beats no data at all.
+ * Day-cell color priority: future days are neutral regardless of data;
+ * otherwise the day's worst outcome wins — any missed dose, then any
+ * skipped dose, then all-taken. A day with nothing logged stays neutral.
+ * Doses still upcoming have no dose_logs row yet, so they never count
+ * against today.
  */
 export function calendarDayColor(
   isFuture: boolean,
@@ -147,7 +149,7 @@ export function calendarDayColor(
   if (isFuture) return "future";
   if (!marker) return "empty";
   if (marker.missed > 0) return "missed";
-  if (marker.skipped > 0 && marker.taken === 0) return "skipped";
+  if (marker.skipped > 0) return "skipped";
   if (marker.taken > 0) return "taken";
   return "empty";
 }
@@ -701,4 +703,74 @@ export function buildDayDetails(
   }
 
   return result;
+}
+
+export interface CalendarDayStats {
+  taken: number; // includes late doses — a late dose is still taken
+  late: number;
+  skipped: number;
+  missed: number;
+}
+
+function allSlots(day: CalendarDayDetail): { medicationId: string; slot: CalendarDaySlot }[] {
+  return [...day.medications, ...day.groups.flatMap((g) => g.medications)].flatMap((med) =>
+    med.slots.map((slot) => ({ medicationId: med.medicationId, slot })),
+  );
+}
+
+/**
+ * Per-day outcome counts from the same day-detail data the popup uses, so
+ * the grid's L badge, the popup labels, and the month summary can't
+ * disagree. `asNeededIds` (PRN medications) are left out unless
+ * `includeAsNeeded` is set; the grid badges include them (matching the
+ * T/S/M markers), the adherence summary doesn't.
+ */
+export function summarizeDay(
+  day: CalendarDayDetail,
+  asNeededIds: ReadonlySet<string>,
+  includeAsNeeded: boolean,
+): CalendarDayStats {
+  const stats: CalendarDayStats = { taken: 0, late: 0, skipped: 0, missed: 0 };
+  for (const { medicationId, slot } of allSlots(day)) {
+    if (!includeAsNeeded && asNeededIds.has(medicationId)) continue;
+    if (slot.status === "taken") {
+      stats.taken++;
+      if (slot.isLate) stats.late++;
+    } else if (slot.status === "skipped") stats.skipped++;
+    else if (slot.status === "missed") stats.missed++;
+  }
+  return stats;
+}
+
+export interface CalendarMonthSummary extends CalendarDayStats {
+  required: number; // resolved required doses (taken + skipped + missed) up to today
+  adherencePct: number | null; // null when nothing is resolved yet
+}
+
+/**
+ * Month totals for days up to and including `todayDate` (local
+ * YYYY-MM-DD strings, compared lexicographically). Future days are
+ * ignored and doses still pending have no log row, so neither can lower
+ * adherence. Same formula as computeAdherence: taken / resolved required.
+ */
+export function summarizeMonth(
+  dayDetails: Record<string, CalendarDayDetail>,
+  todayDate: string,
+  asNeededIds: ReadonlySet<string>,
+): CalendarMonthSummary {
+  const total: CalendarDayStats = { taken: 0, late: 0, skipped: 0, missed: 0 };
+  for (const [date, day] of Object.entries(dayDetails)) {
+    if (date > todayDate) continue;
+    const s = summarizeDay(day, asNeededIds, false);
+    total.taken += s.taken;
+    total.late += s.late;
+    total.skipped += s.skipped;
+    total.missed += s.missed;
+  }
+  const required = total.taken + total.skipped + total.missed;
+  return {
+    ...total,
+    required,
+    adherencePct: required === 0 ? null : Math.round((total.taken / required) * 100),
+  };
 }

@@ -5,6 +5,8 @@ import { cn } from "@/lib/cn";
 import {
   calendarDayColor,
   monthBounds,
+  summarizeDay,
+  type CalendarMonthSummary,
   type CalendarDayColor,
   type CalendarDayDetail,
 } from "@/lib/calendar";
@@ -18,9 +20,9 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // color for the whole cell.
 const COLOR_CLASSES: Record<CalendarDayColor, string> = {
   future: "bg-brand-bg text-brand-text-muted",
-  missed: "bg-status-danger/10 text-brand-text",
-  skipped: "bg-status-warning/10 text-brand-text",
-  taken: "bg-status-success/10 text-brand-text",
+  missed: "bg-status-danger/20 text-brand-text",
+  skipped: "bg-status-warning/20 text-brand-text",
+  taken: "bg-status-success/20 text-brand-text",
   empty: "bg-brand-card text-brand-text-muted",
 };
 
@@ -28,6 +30,7 @@ const COUNT_CLASSES = {
   taken: "text-status-success",
   skipped: "text-status-warning",
   missed: "text-status-danger",
+  late: "text-orange-600 dark:text-orange-400",
 };
 
 interface MonthGridProps {
@@ -35,6 +38,8 @@ interface MonthGridProps {
   todayDate: string; // "YYYY-MM-DD"
   markers: Record<string, CalendarDayMarker>;
   dayDetails: Record<string, CalendarDayDetail>;
+  asNeededIds: ReadonlySet<string>;
+  summary: CalendarMonthSummary;
   onNavigate: (month: string) => void;
   onSelectDay: (date: string) => void;
 }
@@ -44,6 +49,8 @@ export function MonthGrid({
   todayDate,
   markers,
   dayDetails,
+  asNeededIds,
+  summary,
   onNavigate,
   onSelectDay,
 }: MonthGridProps) {
@@ -75,6 +82,8 @@ export function MonthGrid({
         </button>
       </div>
 
+      <MonthSummaryRow summary={summary} />
+
       <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-brand-text-muted sm:gap-1.5">
         {WEEKDAY_LABELS.map((label) => (
           <div key={label}>{label}</div>
@@ -96,6 +105,7 @@ export function MonthGrid({
             !isFuture &&
             marker &&
             (marker.taken > 0 || marker.skipped > 0 || marker.missed > 0);
+          const lateCount = detail && !isFuture ? summarizeDay(detail, asNeededIds, true).late : 0;
           const endingMedications = detail?.endingMedications ?? [];
 
           return (
@@ -123,6 +133,11 @@ export function MonthGrid({
                   {marker!.missed > 0 && (
                     <span className={COUNT_CLASSES.missed}>{marker!.missed}M</span>
                   )}
+                  {lateCount > 0 && (
+                    <span className={COUNT_CLASSES.late} title="Late">
+                      {lateCount}L
+                    </span>
+                  )}
                 </span>
               )}
               {endingMedications.length > 0 && (
@@ -143,6 +158,10 @@ export function MonthGrid({
         <LegendDot colorClass="bg-status-success" label="Taken" />
         <LegendDot colorClass="bg-status-warning" label="Skipped" />
         <LegendDot colorClass="bg-status-danger" label="Missed" />
+        <span className="flex items-center gap-1.5">
+          <span className={cn("font-semibold", COUNT_CLASSES.late)}>L</span>
+          Late = taken after grace period
+        </span>
       </div>
     </div>
   );
@@ -154,5 +173,26 @@ function LegendDot({ colorClass, label }: { colorClass: string; label: string })
       <span className={cn("h-2.5 w-2.5 rounded-full", colorClass)} />
       {label}
     </span>
+  );
+}
+
+function MonthSummaryRow({ summary }: { summary: CalendarMonthSummary }) {
+  const items = [
+    { label: "Adherence", value: summary.adherencePct === null ? "—" : `${summary.adherencePct}%` },
+    { label: "Missed", value: summary.missed, className: COUNT_CLASSES.missed },
+    { label: "Late", value: summary.late, className: COUNT_CLASSES.late },
+    { label: "Skipped", value: summary.skipped, className: COUNT_CLASSES.skipped },
+  ];
+  return (
+    <dl className="-mt-1 grid grid-cols-4 gap-1 rounded-control bg-brand-bg px-2 py-1.5 text-center">
+      {items.map((item) => (
+        <div key={item.label} className="min-w-0">
+          <dd className={cn("text-sm font-bold leading-tight text-brand-navy", item.className)}>
+            {item.value}
+          </dd>
+          <dt className="truncate text-[10px] text-brand-text-muted">{item.label}</dt>
+        </div>
+      ))}
+    </dl>
   );
 }
