@@ -100,3 +100,19 @@ body {
     break-inside: avoid;
   }
 }
+
+/* Bottom-sheet entrance for <DialogContent sheet> on phones. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter {
+    animation: none !important;
+  }
+}
