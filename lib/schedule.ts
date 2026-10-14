@@ -352,13 +352,18 @@ export interface RunoutEntry {
   quantity: number; // current_quantity as of now
   unit: string; // inventory_unit, e.g. "tablets"
   runoutDate: string; // projected run-out, local YYYY-MM-DD
-  daysLeft: number; // whole days from today to runoutDate
+  daysLeft: number; // whole days from today to runoutDate (includes any wait for start_date)
 }
 
 function addLocalDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00`);
   d.setDate(d.getDate() + days);
   return localDateString(d);
+}
+
+function wholeDaysBetween(from: string, to: string): number {
+  const ms = new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime();
+  return Math.round(ms / 86_400_000);
 }
 
 /**
@@ -401,7 +406,10 @@ export function getRunoutByDate(
     const daysLeft = daysUntilRunout(med, overrides);
     if (daysLeft == null) continue;
 
-    const runoutDate = addLocalDays(todayDate, daysLeft);
+    // Consumption only starts on start_date, so a not-yet-started regimen's
+    // supply runs out that many days after it begins, not after today.
+    const baseDate = med.start_date && med.start_date > todayDate ? med.start_date : todayDate;
+    const runoutDate = addLocalDays(baseDate, daysLeft);
     if (med.end_date && med.end_date <= runoutDate) continue;
 
     const status: RunoutStatus =
@@ -421,7 +429,7 @@ export function getRunoutByDate(
       quantity: med.current_quantity,
       unit: med.inventory_unit || "pills",
       runoutDate,
-      daysLeft,
+      daysLeft: wholeDaysBetween(todayDate, runoutDate),
     });
   }
   return result;
