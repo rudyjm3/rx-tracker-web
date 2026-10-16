@@ -113,28 +113,40 @@ export async function postponeDose(
 }
 
 /**
- * Per medication, keeps only as many of `overdue` (earliest first, as
- * `slots` arrives sorted by time) as the medication still owes:
- * scheduled slots on the day minus dose_logs rows already on it.
+ * Drops overdue slots that an orphaned log already accounts for: a log
+ * on the day whose time matches none of the medication's slots *and* was
+ * written before the medication's current schedule rows existed — i.e.
+ * a dose logged under an earlier schedule time (a group/medication time
+ * edited afterwards). Each such log covers one of the medication's
+ * earliest still-pending slots. An off-schedule log written under the
+ * current schedule (Log Past Dose's "custom time instead") is not
+ * counted, so a genuinely missed slot still gets recorded.
  */
-function capToUnloggedCount(
+function dropSlotsCoveredByStaleLogs(
   overdue: DaySlot[],
   slots: DaySlot[],
-  existingLogs: Pick<DoseLog, "medication_id">[],
+  existingLogs: Pick<DoseLog, "medication_id" | "scheduled_time" | "created_at">[],
 ): DaySlot[] {
-  const scheduled = new Map<string, number>();
-  for (const s of slots) scheduled.set(s.medicationId, (scheduled.get(s.medicationId) ?? 0) + 1);
-  const logged = new Map<string, number>();
-  for (const l of existingLogs) logged.set(l.medication_id, (logged.get(l.medication_id) ?? 0) + 1);
-
-  const kept = new Map<string, number>();
-  return overdue.filter((s) => {
-    const owed = Math.max(0, (scheduled.get(s.medicationId) ?? 0) - (logged.get(s.medicationId) ?? 0));
-    const n = kept.get(s.medicationId) ?? 0;
-    if (n >= owed) return false;
-    kept.set(s.medicationId, n + 1);
-    return true;
-  });
+  const covered = new Set<DaySlot>();
+  for (const medicationId of new Set(overdue.map((s) => s.medicationId))) {
+    const medSlots = slots.filter((s) => s.medicationId === medicationId);
+    const rows = medSlots[0].medication.medication_schedule_times ?? [];
+    // Interval medications have no stored rows to date a schedule by.
+    if (rows.length === 0) continue;
+    const scheduleStart = Math.max(...rows.map((r) => Date.parse(r.created_at)));
+    const slotTimes = new Set(medSlots.map((s) => s.scheduledTime));
+    const stale = existingLogs.filter(
+      (l) =>
+        l.medication_id === medicationId &&
+        !slotTimes.has(l.scheduled_time.slice(0, 5)) &&
+        Date.parse(l.created_at) < scheduleStart,
+    ).length;
+    medSlots
+      .filter((s) => s.status === "pending")
+      .slice(0, stale)
+      .forEach((s) => covered.add(s));
+  }
+  return overdue.filter((s) => !covered.has(s));
 }
 
 /**
@@ -149,19 +161,19 @@ function capToUnloggedCount(
  * thus avoid re-triggering themselves) when there was nothing to do.
  *
  * `existingLogs` (every dose_logs row already on `date`, any status)
- * caps how many missed rows a medication can receive at its *unlogged*
- * count: scheduled slots minus logs already on the day. Slots match
- * logs by exact (medication, time), so a dose logged at a time the
- * schedule no longer uses — e.g. a group's time edited after its
- * members were taken — would otherwise leave the slot at the new time
- * "pending" and get a phantom missed row next to the real log (and get
- * it back after being deleted). Omit it to skip the cap.
+ * lets it skip a slot that a log written under an earlier schedule
+ * already accounts for (see dropSlotsCoveredByStaleLogs). Slots match
+ * logs by exact (medication, time), so a dose logged at a group's
+ * former time — its time edited after the members were taken — would
+ * otherwise leave the slot at the new time "pending" and get a phantom
+ * missed row next to the real log (and get it back after being
+ * deleted). Omit it to skip this check.
  */
 export async function finalizeMissedDoses(
   date: string,
   slots: DaySlot[],
   graceMinutes: number,
-  existingLogs?: Pick<DoseLog, "medication_id">[],
+  existingLogs?: Pick<DoseLog, "medication_id" | "scheduled_time" | "created_at">[],
 ): Promise<boolean> {
   const now = new Date();
   const overdue = slots.filter((slot) => {
@@ -174,7 +186,7 @@ export async function finalizeMissedDoses(
     const cutoff = new Date(due.getTime() + graceMinutes * 60000);
     return now > cutoff;
   });
-  const toFinalize = existingLogs ? capToUnloggedCount(overdue, slots, existingLogs) : overdue;
+  const toFinalize = existingLogs ? dropSlotsCoveredByStaleLogs(overdue, slots, existingLogs) : overdue;
   if (toFinalize.length === 0) return false;
 
   const supabase = createClient();
