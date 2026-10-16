@@ -89,6 +89,10 @@ export function GroupModal({
       toast.success(isEdit ? "Group updated" : "Group created");
       queryClient.invalidateQueries({ queryKey: ["groups"] });
       queryClient.invalidateQueries({ queryKey: ["group-members"] });
+      // Group edits rewrite each member's medication_schedule_times rows
+      // (DB triggers), which live nested in the cached medications — leaving
+      // them stale kept the old group time driving the calendar/dashboard.
+      queryClient.invalidateQueries({ queryKey: ["medications"] });
       onOpenChange(false);
     },
     onError: (err) => {

@@ -126,6 +126,17 @@ export function CalendarClient() {
     ) {
       return;
     }
+    // Cached schedule/group data is shown instantly on remount while it
+    // refetches; backfilling from that stale copy writes missed rows for
+    // times that no longer exist (e.g. a group time edited since).
+    if (
+      activeMedicationsQuery.isFetching ||
+      inactiveMedicationsQuery.isFetching ||
+      groupsQuery.isFetching ||
+      groupMembersQuery.isFetching
+    ) {
+      return;
+    }
     let cancelled = false;
     backfillMonth(
       bounds.monthStart,
@@ -164,6 +175,10 @@ export function CalendarClient() {
     inactiveMedicationsQuery.data,
     statusEventsQuery.data,
     graceQuery.data,
+    activeMedicationsQuery.isFetching,
+    inactiveMedicationsQuery.isFetching,
+    groupsQuery.isFetching,
+    groupMembersQuery.isFetching,
   ]);
 
   const allMedications = useMemo(

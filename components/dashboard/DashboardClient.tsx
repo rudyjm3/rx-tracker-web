@@ -431,7 +431,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   useEffect(() => {
     if (requiredSlots.length === 0 || graceQuery.data == null) return;
     let cancelled = false;
-    finalizeMissedDoses(date, requiredSlots, graceMinutes)
+    finalizeMissedDoses(date, requiredSlots, graceMinutes, logsQuery.data)
       .then((didFinalize) => {
         if (!cancelled && didFinalize) {
           queryClient.invalidateQueries({ queryKey: ["dose-logs", date] });

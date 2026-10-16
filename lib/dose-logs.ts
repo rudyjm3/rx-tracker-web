@@ -113,6 +113,31 @@ export async function postponeDose(
 }
 
 /**
+ * Per medication, keeps only as many of `overdue` (earliest first, as
+ * `slots` arrives sorted by time) as the medication still owes:
+ * scheduled slots on the day minus dose_logs rows already on it.
+ */
+function capToUnloggedCount(
+  overdue: DaySlot[],
+  slots: DaySlot[],
+  existingLogs: Pick<DoseLog, "medication_id">[],
+): DaySlot[] {
+  const scheduled = new Map<string, number>();
+  for (const s of slots) scheduled.set(s.medicationId, (scheduled.get(s.medicationId) ?? 0) + 1);
+  const logged = new Map<string, number>();
+  for (const l of existingLogs) logged.set(l.medication_id, (logged.get(l.medication_id) ?? 0) + 1);
+
+  const kept = new Map<string, number>();
+  return overdue.filter((s) => {
+    const owed = Math.max(0, (scheduled.get(s.medicationId) ?? 0) - (logged.get(s.medicationId) ?? 0));
+    const n = kept.get(s.medicationId) ?? 0;
+    if (n >= owed) return false;
+    kept.set(s.medicationId, n + 1);
+    return true;
+  });
+}
+
+/**
  * Finalizes any still-pending slot whose grace period has elapsed as
  * 'missed'. Due time is the postpone time if the dose was snoozed,
  * otherwise the slot's scheduled time; cutoff = due + graceMinutes.
@@ -122,14 +147,24 @@ export async function postponeDose(
  * clobbering a row that now exists. Returns whether any row was
  * actually finalized, so callers can skip invalidating queries (and
  * thus avoid re-triggering themselves) when there was nothing to do.
+ *
+ * `existingLogs` (every dose_logs row already on `date`, any status)
+ * caps how many missed rows a medication can receive at its *unlogged*
+ * count: scheduled slots minus logs already on the day. Slots match
+ * logs by exact (medication, time), so a dose logged at a time the
+ * schedule no longer uses — e.g. a group's time edited after its
+ * members were taken — would otherwise leave the slot at the new time
+ * "pending" and get a phantom missed row next to the real log (and get
+ * it back after being deleted). Omit it to skip the cap.
  */
 export async function finalizeMissedDoses(
   date: string,
   slots: DaySlot[],
   graceMinutes: number,
+  existingLogs?: Pick<DoseLog, "medication_id">[],
 ): Promise<boolean> {
   const now = new Date();
-  const toFinalize = slots.filter((slot) => {
+  const overdue = slots.filter((slot) => {
     if (slot.status !== "pending") return false;
     if (slot.medication.as_needed) return false;
     if (!slot.medication.adherence_enabled) return false;
@@ -139,6 +174,7 @@ export async function finalizeMissedDoses(
     const cutoff = new Date(due.getTime() + graceMinutes * 60000);
     return now > cutoff;
   });
+  const toFinalize = existingLogs ? capToUnloggedCount(overdue, slots, existingLogs) : overdue;
   if (toFinalize.length === 0) return false;
 
   const supabase = createClient();
