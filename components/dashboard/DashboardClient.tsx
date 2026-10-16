@@ -262,9 +262,11 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // overlay happens to be showing — this is what lets a past-due/missed
   // item get corrected in place instead of only from the overlay.
   function handleScheduleTake(slot: DaySlot) {
-    const due = slotDueTime(slot, date);
-    if (due <= Date.now()) {
-      startAlarmTake([slot], due);
+    // Lateness is judged against the scheduled time, not a snooze's
+    // pushed-out due time — a snoozed dose is still late.
+    const scheduled = new Date(`${date}T${slot.scheduledTime}`).getTime();
+    if (scheduled <= Date.now()) {
+      startAlarmTake([slot], scheduled);
     } else {
       handleTake(slot);
     }
