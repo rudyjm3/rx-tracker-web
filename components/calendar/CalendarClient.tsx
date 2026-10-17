@@ -16,7 +16,7 @@ import {
   type CalendarDayPendingMember,
   type CalendarDaySlot,
 } from "@/lib/calendar";
-import { getRunoutByDate } from "@/lib/schedule";
+import { getRunoutByDate, resolveQuantityPerDose } from "@/lib/schedule";
 import { getCalendarLogs, getCalendarMarkers } from "@/lib/dose-logs";
 import {
   getActiveMedications,
@@ -28,7 +28,11 @@ import {
 import { localDateString } from "@/lib/utils";
 import { MonthGrid } from "./MonthGrid";
 import { DayDetailDialog } from "./DayDetailDialog";
-import { BulkEditDoseLogDialog, type BulkEditableDoseLog } from "./BulkEditDoseLogDialog";
+import {
+  BulkEditDoseLogDialog,
+  type BulkEditableDoseLog,
+  type BulkPendingMember,
+} from "./BulkEditDoseLogDialog";
 import { EditDoseLogDialog, type EditableDoseLog } from "@/components/history/EditDoseLogDialog";
 import { LogPastDoseModal } from "@/components/medications/log-past-dose/LogPastDoseModal";
 
@@ -126,6 +130,17 @@ export function CalendarClient() {
     ) {
       return;
     }
+    // Cached schedule/group data is shown instantly on remount while it
+    // refetches; backfilling from that stale copy writes missed rows for
+    // times that no longer exist (e.g. a group time edited since).
+    if (
+      activeMedicationsQuery.isFetching ||
+      inactiveMedicationsQuery.isFetching ||
+      groupsQuery.isFetching ||
+      groupMembersQuery.isFetching
+    ) {
+      return;
+    }
     let cancelled = false;
     backfillMonth(
       bounds.monthStart,
@@ -164,6 +179,10 @@ export function CalendarClient() {
     inactiveMedicationsQuery.data,
     statusEventsQuery.data,
     graceQuery.data,
+    activeMedicationsQuery.isFetching,
+    inactiveMedicationsQuery.isFetching,
+    groupsQuery.isFetching,
+    groupMembersQuery.isFetching,
   ]);
 
   const allMedications = useMemo(
@@ -268,7 +287,41 @@ export function CalendarClient() {
         })
       : [];
 
+  // Group members with no row yet (e.g. an as-needed supplement bundled in
+  // the group) — "Edit all" covers them too, at the group's slot time that
+  // day: the time its logged members sit at, else the group's own time.
+  const editingGroupPending: BulkPendingMember[] =
+    editingGroup && selectedDate
+      ? editingGroup.pendingAsNeeded.flatMap((member) => {
+          const medication = allMedications.find((m) => m.id === member.medicationId);
+          if (!medication) return [];
+          const scheduledTime =
+            editingGroup.medications[0]?.slots[0]?.time ??
+            (groupsQuery.data ?? [])
+              .find((g) => g.id === editingGroup.groupId)
+              ?.scheduled_time.slice(0, 5);
+          if (!scheduledTime) return [];
+          const membership = (groupMembersQuery.data ?? []).find(
+            (gm) => gm.group_id === editingGroup.groupId && gm.medication_id === medication.id,
+          );
+          return [
+            {
+              medication,
+              scheduledForDate: selectedDate,
+              scheduledTime,
+              quantityPerDose: resolveQuantityPerDose({
+                medication,
+                scheduleTimeQuantityOverride: null,
+                groupMemberQuantityOverride: membership?.quantity_per_dose ?? null,
+              }),
+            },
+          ];
+        })
+      : [];
+
   function refreshCalendarData() {
+    // Logging/editing doses can change inventory (nested in medications).
+    queryClient.invalidateQueries({ queryKey: ["medications"] });
     queryClient.invalidateQueries({
       queryKey: ["calendar-markers", bounds.monthStart, bounds.monthEnd],
     });
@@ -340,6 +393,7 @@ export function CalendarClient() {
       <BulkEditDoseLogDialog
         groupName={editingGroup?.groupName ?? null}
         logs={editingGroupLogs}
+        pending={editingGroupPending}
         onClose={() => setEditingGroup(null)}
         onSaved={() => {
           toast.success("Group dose entries updated");

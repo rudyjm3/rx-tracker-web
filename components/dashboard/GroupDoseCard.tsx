@@ -26,6 +26,15 @@ function isPastDue(time: number): boolean {
   return time <= Date.now();
 }
 
+// The group's original scheduled time (earliest member), ignoring any
+// snooze: a snooze pushes `time` into the future, but the dose is still
+// late relative to its schedule, so the "when did you actually take it"
+// step must not be skipped just because the snooze hasn't expired yet.
+function scheduledEpoch(members: DaySlot[], date: string, fallback: number): number {
+  const times = members.map((m) => new Date(`${date}T${m.scheduledTime}`).getTime());
+  return times.length > 0 ? Math.min(...times) : fallback;
+}
+
 // Aggregate badge shown on the collapsed card once every member has a
 // final status — same missed-beats-skipped-beats-taken priority the
 // calendar's day-cell coloring already uses (lib/calendar.ts
@@ -92,10 +101,11 @@ export function GroupDoseCard({
   // mixed group (missed RX meds + a still-pending PRN supplement) only
   // logged the PRN member, leaving the rest "Missed".
   function handleTakeAll() {
-    if (isPastDue(time)) {
+    const scheduled = scheduledEpoch(members, date, time);
+    if (isPastDue(Math.min(time, scheduled))) {
       onTakeAll(
         members.filter((m) => m.status === "pending" || (!m.isPrn && m.status === "missed")),
-        time,
+        scheduled,
       );
     } else {
       pendingMembers.forEach(onTake);
@@ -105,7 +115,7 @@ export function GroupDoseCard({
   // correct are non-PRN ones sitting at "missed" — reuses the same
   // non-PRN filter the alarm overlay relies on.
   function handleMissedTakeAll() {
-    onTakeAll(affectedGroupMembers(members), time);
+    onTakeAll(affectedGroupMembers(members), scheduledEpoch(members, date, time));
   }
   function handleSkipAll() {
     pendingMembers.forEach(onSkip);

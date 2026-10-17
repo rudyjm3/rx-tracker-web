@@ -10,9 +10,9 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
-import { editDoseLog } from "@/lib/dose-logs";
+import { editDoseLog, recordDose, recordDoseAtTime } from "@/lib/dose-logs";
 import { localDateString } from "@/lib/utils";
-import type { DoseLogStatus } from "@/lib/types/medications";
+import type { DoseLogStatus, Medication } from "@/lib/types/medications";
 
 // One dose_logs row belonging to a group's shared dose for a given day —
 // enough to both display the member and re-apply a bulk edit to it via
@@ -31,9 +31,22 @@ export interface BulkEditableDoseLog {
   inventoryEnabled: boolean;
 }
 
+// A group member (in practice an as-needed one, which is never auto-
+// finalized) with no dose_logs row for this group dose yet. Saving the
+// bulk edit creates its row at the group's slot time so the whole group
+// ends up with one consistent status/time instead of leaving the
+// supplement behind to be logged separately.
+export interface BulkPendingMember {
+  medication: Medication;
+  scheduledForDate: string;
+  scheduledTime: string; // "HH:MM" — the group's slot time that day
+  quantityPerDose: number;
+}
+
 interface BulkEditDoseLogDialogProps {
   groupName: string | null; // null closes the dialog
   logs: BulkEditableDoseLog[];
+  pending?: BulkPendingMember[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -66,10 +79,11 @@ function nowTime(): string {
 export function BulkEditDoseLogDialog({
   groupName,
   logs,
+  pending = [],
   onClose,
   onSaved,
 }: BulkEditDoseLogDialogProps) {
-  const open = groupName !== null && logs.length > 0;
+  const open = groupName !== null && logs.length + pending.length > 0;
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent>
@@ -78,12 +92,13 @@ export function BulkEditDoseLogDialog({
             <DialogHeader>
               <DialogTitle>Edit all — {groupName}</DialogTitle>
               <p className="text-sm text-brand-text-muted">
-                Applies to all {logs.length} medications in this group for this dose.
+                Applies to all {logs.length + pending.length} medications in this group for this dose.
               </p>
             </DialogHeader>
             <BulkEditDoseLogForm
-              key={logs.map((l) => l.logId).join(",")}
+              key={[...logs.map((l) => l.logId), ...pending.map((p) => p.medication.id)].join(",")}
               logs={logs}
+              pending={pending}
               onSaved={onSaved}
               onCancel={onClose}
             />
@@ -96,10 +111,12 @@ export function BulkEditDoseLogDialog({
 
 function BulkEditDoseLogForm({
   logs,
+  pending,
   onSaved,
   onCancel,
 }: {
   logs: BulkEditableDoseLog[];
+  pending: BulkPendingMember[];
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -107,8 +124,8 @@ function BulkEditDoseLogForm({
   // overwritten with the same status/time/note, so there's no single
   // "correct" starting value to read back when members currently differ.
   const first = logs[0];
-  const [status, setStatus] = useState<DoseLogStatus>(first.status);
-  const [time, setTime] = useState(() => timeFromIso(first.takenAt) ?? nowTime());
+  const [status, setStatus] = useState<DoseLogStatus>(first?.status ?? "taken");
+  const [time, setTime] = useState(() => timeFromIso(first?.takenAt ?? null) ?? nowTime());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,8 +134,30 @@ function BulkEditDoseLogForm({
     setSaving(true);
     setError(null);
     try {
-      await Promise.all(
-        logs.map((log) => {
+      await Promise.all([
+        ...pending.map((member) => {
+          // "Missed" isn't a state an unlogged as-needed member can be
+          // in (it was never due), so it's left unlogged in that case.
+          if (status === "missed") return Promise.resolve();
+          if (status === "skipped") {
+            return recordDose(
+              member.medication,
+              member.scheduledForDate,
+              member.scheduledTime,
+              "skipped",
+              member.quantityPerDose,
+            );
+          }
+          return recordDoseAtTime(
+            member.medication,
+            member.scheduledForDate,
+            member.scheduledTime,
+            new Date(`${member.scheduledForDate}T${time}:00`).toISOString(),
+            member.quantityPerDose,
+            note.trim() ? { note: note.trim() } : undefined,
+          );
+        }),
+        ...logs.map((log) => {
           const baseDate = log.takenAt
             ? localDateString(new Date(log.takenAt))
             : log.scheduledForDate;
@@ -142,7 +181,7 @@ function BulkEditDoseLogForm({
             inventoryEnabled: log.inventoryEnabled,
           });
         }),
-      );
+      ]);
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save changes");
@@ -193,6 +232,12 @@ function BulkEditDoseLogForm({
         <ul className="flex flex-col gap-1 text-xs text-brand-text-muted">
           {logs.map((l) => (
             <li key={l.logId}>{l.medicationName}</li>
+          ))}
+          {pending.map((p) => (
+            <li key={p.medication.id}>
+              {p.medication.name} (not yet logged
+              {status === "missed" ? " — left unlogged" : ""})
+            </li>
           ))}
         </ul>
 

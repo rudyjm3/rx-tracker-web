@@ -113,6 +113,43 @@ export async function postponeDose(
 }
 
 /**
+ * Drops overdue slots that an orphaned log already accounts for: a log
+ * on the day whose time matches none of the medication's slots *and* was
+ * written before the medication's current schedule rows existed — i.e.
+ * a dose logged under an earlier schedule time (a group/medication time
+ * edited afterwards). Each such log covers one of the medication's
+ * earliest still-pending slots. An off-schedule log written under the
+ * current schedule (Log Past Dose's "custom time instead") is not
+ * counted, so a genuinely missed slot still gets recorded.
+ */
+function dropSlotsCoveredByStaleLogs(
+  overdue: DaySlot[],
+  slots: DaySlot[],
+  existingLogs: Pick<DoseLog, "medication_id" | "scheduled_time" | "created_at">[],
+): DaySlot[] {
+  const covered = new Set<DaySlot>();
+  for (const medicationId of new Set(overdue.map((s) => s.medicationId))) {
+    const medSlots = slots.filter((s) => s.medicationId === medicationId);
+    const rows = medSlots[0].medication.medication_schedule_times ?? [];
+    // Interval medications have no stored rows to date a schedule by.
+    if (rows.length === 0) continue;
+    const scheduleStart = Math.max(...rows.map((r) => Date.parse(r.created_at)));
+    const slotTimes = new Set(medSlots.map((s) => s.scheduledTime));
+    const stale = existingLogs.filter(
+      (l) =>
+        l.medication_id === medicationId &&
+        !slotTimes.has(l.scheduled_time.slice(0, 5)) &&
+        Date.parse(l.created_at) < scheduleStart,
+    ).length;
+    medSlots
+      .filter((s) => s.status === "pending")
+      .slice(0, stale)
+      .forEach((s) => covered.add(s));
+  }
+  return overdue.filter((s) => !covered.has(s));
+}
+
+/**
  * Finalizes any still-pending slot whose grace period has elapsed as
  * 'missed'. Due time is the postpone time if the dose was snoozed,
  * otherwise the slot's scheduled time; cutoff = due + graceMinutes.
@@ -122,14 +159,24 @@ export async function postponeDose(
  * clobbering a row that now exists. Returns whether any row was
  * actually finalized, so callers can skip invalidating queries (and
  * thus avoid re-triggering themselves) when there was nothing to do.
+ *
+ * `existingLogs` (every dose_logs row already on `date`, any status)
+ * lets it skip a slot that a log written under an earlier schedule
+ * already accounts for (see dropSlotsCoveredByStaleLogs). Slots match
+ * logs by exact (medication, time), so a dose logged at a group's
+ * former time — its time edited after the members were taken — would
+ * otherwise leave the slot at the new time "pending" and get a phantom
+ * missed row next to the real log (and get it back after being
+ * deleted). Omit it to skip this check.
  */
 export async function finalizeMissedDoses(
   date: string,
   slots: DaySlot[],
   graceMinutes: number,
+  existingLogs?: Pick<DoseLog, "medication_id" | "scheduled_time" | "created_at">[],
 ): Promise<boolean> {
   const now = new Date();
-  const toFinalize = slots.filter((slot) => {
+  const overdue = slots.filter((slot) => {
     if (slot.status !== "pending") return false;
     if (slot.medication.as_needed) return false;
     if (!slot.medication.adherence_enabled) return false;
@@ -139,6 +186,7 @@ export async function finalizeMissedDoses(
     const cutoff = new Date(due.getTime() + graceMinutes * 60000);
     return now > cutoff;
   });
+  const toFinalize = existingLogs ? dropSlotsCoveredByStaleLogs(overdue, slots, existingLogs) : overdue;
   if (toFinalize.length === 0) return false;
 
   const supabase = createClient();

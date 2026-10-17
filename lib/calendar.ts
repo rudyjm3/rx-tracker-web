@@ -1,4 +1,4 @@
-import { finalizeMissedDoses, type CalendarLogRow } from "@/lib/dose-logs";
+import { finalizeMissedDoses, getCalendarLogs, type CalendarLogRow } from "@/lib/dose-logs";
 import { generateDaySlots } from "@/lib/schedule";
 import { formatLate, localDateString, minutesLate, to12h } from "@/lib/utils";
 import type {
@@ -110,6 +110,18 @@ export async function backfillMonth(
   const lastBackfillDate = monthEnd < todayDate ? monthEnd : todayDate;
   if (lastBackfillDate < monthStart) return false;
 
+  // The month's real logs, so each date's slots resolve against what was
+  // actually logged and finalizeMissedDoses can cap synthesized misses at
+  // the doses still unlogged (a group time edited after its members were
+  // taken must not produce a phantom miss at the new time).
+  const logsByDate = new Map<string, CalendarLogRow[]>();
+  const allMedicationIds = [...activeMedications, ...inactiveMedications].map((m) => m.id);
+  for (const log of await getCalendarLogs(monthStart, lastBackfillDate, allMedicationIds)) {
+    const existing = logsByDate.get(log.scheduled_for_date) ?? [];
+    existing.push(log);
+    logsByDate.set(log.scheduled_for_date, existing);
+  }
+
   let didFinalize = false;
   for (
     let date = monthStart;
@@ -120,14 +132,15 @@ export async function backfillMonth(
       ...activeMedications.filter((med) => wasActiveOnDate(med.id, date, statusEvents)),
       ...historicallyActiveMedications(date, inactiveMedications, statusEvents),
     ].filter((med) => scheduleValidForDate(med, date));
+    const dayLogs = logsByDate.get(date) ?? [];
     // ignoreDashboardVisibility: this feeds finalizeMissedDoses only (never
     // rendered), so a dashboard-hidden but adherence-tracked medication must
     // still get its missed doses backfilled — finalizeMissedDoses itself
     // already excludes PRN and non-adherence medications.
-    const slots = generateDaySlots(date, medsForDate, groups, groupMembers, [], [], {
+    const slots = generateDaySlots(date, medsForDate, groups, groupMembers, dayLogs, [], {
       ignoreDashboardVisibility: true,
     });
-    const finalized = await finalizeMissedDoses(date, slots, graceMinutes);
+    const finalized = await finalizeMissedDoses(date, slots, graceMinutes, dayLogs);
     didFinalize ||= finalized;
   }
   return didFinalize;

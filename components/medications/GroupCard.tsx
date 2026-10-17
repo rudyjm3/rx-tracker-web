@@ -38,6 +38,9 @@ export function GroupCard({
       toast.success(`${group.name} deleted`);
       queryClient.invalidateQueries({ queryKey: ["groups"] });
       queryClient.invalidateQueries({ queryKey: ["group-members"] });
+      // Deactivating a group deletes its members' group-owned schedule rows
+      // (nested in the cached medications).
+      queryClient.invalidateQueries({ queryKey: ["medications"] });
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
