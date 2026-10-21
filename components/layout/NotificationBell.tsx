@@ -45,13 +45,16 @@ export function NotificationBell() {
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="min-w-[18rem]">
+      <DropdownMenuContent
+        collisionPadding={8}
+        className="w-[min(22rem,calc(100vw-1rem))] max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto"
+      >
         <DropdownMenuLabel>Notifications</DropdownMenuLabel>
         {needsSetup && (
           <div className="flex items-start gap-2 border-l-4 border-status-warning px-3 py-2">
             <ClipboardList size={16} className="mt-0.5 shrink-0 text-status-warning" />
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-brand-text">
+              <p className="break-words font-medium text-brand-text">
                 Finish setting up {setupLabel(name)} medications
               </p>
               <DropdownMenuItem
@@ -74,7 +77,7 @@ export function NotificationBell() {
               className="flex items-start gap-2 border-l-4 border-status-warning px-3 py-2"
             >
               <div className="min-w-0 flex-1">
-                <MedicationNameWithDose medication={medication} className="font-medium text-brand-text" />
+                <MedicationNameWithDose medication={medication} className="break-words font-medium text-brand-text" />
                 <p className="text-xs text-status-danger">
                   {SUPPLY_SEVERITY_LABEL[severity]} — {medication.current_quantity}{" "}
                   {medication.inventory_unit} remaining
