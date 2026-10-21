@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { localDateString } from "@/lib/utils";
 import type { MedicationRefill } from "@/lib/types/medications";
 
 // Amounts are always floats — never cast to int. Inventory can be
@@ -75,12 +76,14 @@ export async function adjustQuantity(
   medicationId: string,
   newQuantity: number,
   note = "",
+  adjustDate: string = localDateString(),
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.rpc("adjust_quantity", {
     p_medication_id: medicationId,
     p_new_quantity: newQuantity,
     p_note: note,
+    p_date: adjustDate,
   });
   if (error) throw error;
 }
