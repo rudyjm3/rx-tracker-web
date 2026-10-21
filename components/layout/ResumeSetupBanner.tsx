@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ClipboardList, X } from "lucide-react";
+import { useAuth } from "@/components/layout/AuthProvider";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { setupLabel, useResumeSetup } from "@/components/layout/useResumeSetup";
 import { useSessionDismissal } from "@/components/layout/useSessionDismissal";
@@ -15,10 +16,11 @@ import { useSessionDismissal } from "@/components/layout/useSessionDismissal";
 // The X hides it until the app is next opened; the matching notification
 // in the bell stays until setup is finished.
 export function ResumeSetupBanner() {
+  const { user } = useAuth();
   const { activeProfileId } = useActiveProfile();
   const { needsSetup, name } = useResumeSetup();
   const [dismissed, dismiss] = useSessionDismissal(
-    `rxtracker-resume-setup-dismissed:${activeProfileId ?? "self"}`,
+    `rxtracker-resume-setup-dismissed:${activeProfileId ?? user?.id ?? "self"}`,
   );
 
   if (!needsSetup || dismissed) return null;
