@@ -1184,7 +1184,8 @@ grant execute on function log_refill(uuid, numeric, numeric, text, date) to auth
 create or replace function adjust_quantity(
   p_medication_id uuid,
   p_new_quantity numeric,
-  p_note text default ''
+  p_note text default '',
+  p_date date default current_date
 )
 returns void
 language plpgsql
@@ -1201,7 +1202,7 @@ begin
     medication_id, refill_date, amount, pills_on_hand, note, entry_type
   )
   values (
-    p_medication_id, current_date, p_new_quantity - coalesce(v_current, 0), p_new_quantity,
+    p_medication_id, coalesce(p_date, current_date), p_new_quantity - coalesce(v_current, 0), p_new_quantity,
     coalesce(p_note, ''), 'adjustment'
   );
 
@@ -1212,7 +1213,7 @@ begin
 end;
 $$;
 
-grant execute on function adjust_quantity(uuid, numeric, text) to authenticated;
+grant execute on function adjust_quantity(uuid, numeric, text, date) to authenticated;
 
 -- ─────────────────────────────────────────
 -- DOSE LOG EDIT/DELETE RPCs (step 7 — History)
