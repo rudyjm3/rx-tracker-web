@@ -57,7 +57,6 @@ export function TopNav() {
 
   return (
     <header data-no-print className="border-b border-brand-border bg-brand-card">
-      {user && pathname !== "/settings" && <ResumeSetupBanner />}
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image
@@ -193,6 +192,7 @@ export function TopNav() {
           </div>
         )}
       </div>
+      {user && pathname !== "/settings" && <ResumeSetupBanner />}
       {user && <FamilyContextBanner />}
     </header>
   );
