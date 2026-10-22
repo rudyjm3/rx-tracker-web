@@ -17,6 +17,15 @@ function dayNumber(date: string): number {
   return Math.round(Date.UTC(y, m - 1, d) / DAY_MS);
 }
 
+// Status events are timestamptz values, so convert to the viewer's local
+// calendar date (matching the local start/as-of dates) before counting.
+function eventDayNumber(eventAt: string): number {
+  if (!eventAt.includes("T")) return dayNumber(eventAt);
+  const d = new Date(eventAt);
+  if (Number.isNaN(d.getTime())) return dayNumber(eventAt);
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
+}
+
 export function activeDaysOnMedication(
   startDate: string | null,
   events: MedicationStatusEventLike[],
@@ -31,7 +40,7 @@ export function activeDaysOnMedication(
   const stretches: Array<[number, number]> = [];
   let activeFrom: number | null = dayNumber(startDate);
   for (const e of sorted) {
-    const day = dayNumber(e.event_at);
+    const day = eventDayNumber(e.event_at);
     if (day > end) break;
     if (e.event === "discontinued" && activeFrom !== null) {
       stretches.push([activeFrom, day]);

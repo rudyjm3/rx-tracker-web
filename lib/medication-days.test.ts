@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
+process.env.TZ = "America/Los_Angeles";
 import { activeDaysOnMedication } from "./medication-days.ts";
 
 const ev = (event: string, day: string) => ({ event, event_at: `${day}T12:00:00Z` });
@@ -49,4 +51,10 @@ test("unsorted events and stray resume are tolerated", () => {
 test("events after asOf are ignored", () => {
   const events = [ev("discontinued", "2026-10-25")];
   assert.equal(activeDaysOnMedication("2026-10-01", events, "2026-10-10"), 10);
+});
+
+test("event timestamps use the local calendar date, not UTC", () => {
+  // 8 PM Pacific on Oct 5 is 03:00 UTC on Oct 6.
+  const events = [{ event: "discontinued", event_at: "2026-10-06T03:00:00Z" }];
+  assert.equal(activeDaysOnMedication("2026-10-01", events, "2026-10-22"), 5);
 });
