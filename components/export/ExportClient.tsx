@@ -219,6 +219,16 @@ export function ExportClient() {
       return { medication, event };
     });
 
+  // Days on medication stop counting at the discontinue date for
+  // inactive medications (never past the report's end date).
+  const daysOnMedicationEnd = (med: { id: string; active: boolean }) => {
+    if (med.active) return endDate;
+    const discontinuedOn = discontinuedMedications
+      .find((d) => d.medication.id === med.id)
+      ?.event?.event_at.slice(0, 10);
+    return discontinuedOn && discontinuedOn < endDate ? discontinuedOn : endDate;
+  };
+
   const allergiesQuery = useQuery({
     queryKey: ["export-allergies", activeProfileId],
     queryFn: () => getProfileAllergies(activeProfileId),
@@ -427,7 +437,7 @@ export function ExportClient() {
                   >
                     <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
-                      {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
+                      {daysOnMedication(med.start_date, daysOnMedicationEnd(med)) ?? "—"} days on medication
                     </span>
                   </li>
                 ))}
@@ -450,7 +460,7 @@ export function ExportClient() {
                   >
                     <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
-                      {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
+                      {daysOnMedication(med.start_date, daysOnMedicationEnd(med)) ?? "—"} days on medication
                     </span>
                   </li>
                 ))}
