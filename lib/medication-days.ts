@@ -77,9 +77,11 @@ export function wasActiveDuring(
   events: MedicationStatusEventLike[],
   rangeStart: string,
   rangeEnd: string,
+  courseEnd: string | null = null,
 ): boolean {
   if (!startDate) return true;
   const from = dayNumber(rangeStart);
+  if (courseEnd && dayNumber(courseEnd) < from) return false;
   return activeStretches(startDate, events, rangeEnd).some(
     ([stretchFrom, stretchTo]) => stretchTo >= stretchFrom && stretchTo >= from,
   );

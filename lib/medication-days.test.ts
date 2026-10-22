@@ -75,6 +75,12 @@ test("wasActiveDuring excludes meds started after the range and includes resumed
   assert.equal(wasActiveDuring("2026-01-01", events, "2026-09-22", "2026-10-22"), true);
 });
 
+test("wasActiveDuring excludes meds whose end date is before the range", () => {
+  assert.equal(wasActiveDuring("2026-01-01", [], "2026-09-22", "2026-10-22", "2026-09-21"), false);
+  assert.equal(wasActiveDuring("2026-01-01", [], "2026-09-22", "2026-10-22", "2026-09-22"), true);
+  assert.equal(wasActiveDuring("2026-01-01", [], "2026-09-22", "2026-10-22", null), true);
+});
+
 test("wasActiveDuring treats a missing start date as active", () => {
   assert.equal(wasActiveDuring(null, [], "2026-09-22", "2026-10-22"), true);
 });

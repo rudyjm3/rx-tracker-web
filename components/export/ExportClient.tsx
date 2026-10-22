@@ -194,7 +194,13 @@ export function ExportClient() {
         .filter((e): e is Extract<DoseHistoryEntry, { type: "status_event" }> => e.type === "status_event")
         .map((e) => e.data);
     }
-    return wasActiveDuring(med.start_date, events, startDate, endDate);
+    return wasActiveDuring(
+      med.start_date ?? med.created_at.slice(0, 10),
+      events,
+      startDate,
+      endDate,
+      med.end_date,
+    );
   };
   const periodMedications = allMedications.filter(isMedicationInPeriod);
   const selectedMedications = periodMedications.filter((m) => !excludedMedicationIds.has(m.id));
