@@ -1393,10 +1393,19 @@ begin
     raise exception 'Dose log not found';
   end if;
 
-  -- Applied in log_id order so two overlapping batches take their row
-  -- locks in the same order instead of deadlocking.
+  -- Take every row lock up front in one fixed order: all the dose logs by
+  -- id, then their medications by id. That is the same dose_log ->
+  -- medication order edit_dose_log uses on its own, so overlapping
+  -- batches (even for different dates of the same group, whose log ids
+  -- sort differently than their medication ids) and single edits can't
+  -- wait on each other in a cycle.
+  perform 1 from dose_logs where id = any(v_ids) order by id for update;
+  perform 1 from medications
+   where id in (select medication_id from dose_logs where id = any(v_ids))
+   order by id for update;
+
   for v_edit in
-    select e from jsonb_array_elements(p_edits) as e order by (e->>'log_id')::uuid
+    select e from jsonb_array_elements(p_edits) as e
   loop
     perform edit_dose_log(
       (v_edit->>'log_id')::uuid,
