@@ -348,7 +348,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
         <ReportTable
           rowKey={(r) => r.data.id}
           columns={[
-            { header: "Date", render: (r) => formatShortDate(r.at.slice(0, 10)) },
+            { header: "Date", render: (r) => formatShortDate(localDateFromTimestamp(r.at)) },
             {
               header: "Medication",
               render: (r) => (

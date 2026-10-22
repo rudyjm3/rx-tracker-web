@@ -619,7 +619,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                 {
                   header: "Date",
                   flex: 1,
-                  render: (r: DoctorVisitReportData["doseChanges"][number]) => formatShortDate(r.at.slice(0, 10)),
+                  render: (r: DoctorVisitReportData["doseChanges"][number]) => formatShortDate(localDateFromTimestamp(r.at)),
                 },
                 {
                   header: "Medication",
