@@ -19,7 +19,7 @@ import type { DoseHistoryEntry } from "@/lib/medications";
 import { levelColor, type DailyAverage, type WellbeingMetric } from "@/lib/pain-mood";
 import type { SideEffectRow } from "@/lib/side-effects";
 import type { ProfileAllergyWithName } from "@/lib/types/profile";
-import { formatLongDate, formatShortDate, to12h } from "@/lib/utils";
+import { formatLongDate, formatShortDate, localDateFromTimestamp, to12h } from "@/lib/utils";
 import type { FeedbackType, Medication, MedicationStatusEvent } from "@/lib/types/medications";
 
 type DoseChangeEntry = Extract<DoseHistoryEntry, { type: "dose_change" }>;
@@ -604,7 +604,7 @@ export function DoctorVisitReportPdf({ data }: { data: DoctorVisitReportData }) 
                 {
                   header: "Date Discontinued",
                   flex: 1,
-                  render: (r) => (r.event ? formatShortDate(r.event.event_at.slice(0, 10)) : "—"),
+                  render: (r) => (r.event ? formatShortDate(localDateFromTimestamp(r.event.event_at)) : "—"),
                 },
               ]}
               rows={data.discontinuedMedications}

@@ -31,8 +31,9 @@ import {
 } from "@/lib/pain-mood";
 import { getSideEffectsInRange } from "@/lib/side-effects";
 import { getUserProfile } from "@/lib/user-profile";
-import { daysOnMedication, formatLongDate, localDateString } from "@/lib/utils";
-import type { MedicationStatusEvent, StatusEventType } from "@/lib/types/medications";
+import { activeDaysOnMedication } from "@/lib/medication-days";
+import { formatLongDate, localDateFromTimestamp, localDateString } from "@/lib/utils";
+import type { Medication, MedicationStatusEvent, StatusEventType } from "@/lib/types/medications";
 import type { DoctorVisitReportData, TrendNoteEntry } from "./DoctorVisitReportPdf";
 import { ReportSummary } from "./ReportSummary";
 
@@ -204,7 +205,7 @@ export function ExportClient() {
       latestStatusEntry(doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [], "resumed");
     return {
       medication,
-      resumedOn: resumed ? formatLongDate(resumed.event_at.slice(0, 10)) : null,
+      resumedOn: resumed ? formatLongDate(localDateFromTimestamp(resumed.event_at)) : null,
     };
   });
   const discontinuedMedications = allMedications
@@ -218,6 +219,20 @@ export function ExportClient() {
         );
       return { medication, event };
     });
+
+  // Days on medication sum each active stretch (start → discontinue,
+  // resume → discontinue, …), so time spent discontinued isn't counted.
+  const daysOnMedicationFor = (med: Medication) => {
+    let events: Array<{ event: string; event_at: string }> = statusEvents.filter(
+      (e) => e.medication_id === med.id,
+    );
+    if (events.length === 0) {
+      events = (doseHistoryQueries[allMedications.indexOf(med)]?.data ?? [])
+        .filter((e): e is Extract<DoseHistoryEntry, { type: "status_event" }> => e.type === "status_event")
+        .map((e) => e.data);
+    }
+    return activeDaysOnMedication(med.start_date, events, endDate);
+  };
 
   const allergiesQuery = useQuery({
     queryKey: ["export-allergies", activeProfileId],
@@ -427,7 +442,7 @@ export function ExportClient() {
                   >
                     <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
-                      {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
+                      {daysOnMedicationFor(med) ?? "—"} days on medication
                     </span>
                   </li>
                 ))}
@@ -450,7 +465,7 @@ export function ExportClient() {
                   >
                     <MedicationNameWithDose medication={med} className="font-semibold text-brand-text" />
                     <span className="text-brand-text-muted">
-                      {daysOnMedication(med.start_date, endDate) ?? "—"} days on medication
+                      {daysOnMedicationFor(med) ?? "—"} days on medication
                     </span>
                   </li>
                 ))}

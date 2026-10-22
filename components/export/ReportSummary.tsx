@@ -4,7 +4,7 @@ import { FeedbackChip, feedbackChipTypes } from "@/components/ui/FeedbackChip";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { formatPrescribedDose } from "@/lib/medication-label";
-import { formatLongDate, formatShortDate, to12h } from "@/lib/utils";
+import { formatLongDate, formatShortDate, localDateFromTimestamp, to12h } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 import type { DoctorVisitReportData, TrendNoteEntry } from "./DoctorVisitReportPdf";
 import { ReportAdherenceRing } from "./ReportAdherenceRing";
@@ -336,7 +336,7 @@ export function ReportSummary({ data }: { data: DoctorVisitReportData }) {
             { header: "Notes", render: (r) => r.event?.comment || "—" },
             {
               header: "Date Discontinued",
-              render: (r) => (r.event ? formatShortDate(r.event.event_at.slice(0, 10)) : "—"),
+              render: (r) => (r.event ? formatShortDate(localDateFromTimestamp(r.event.event_at)) : "—"),
             },
           ]}
           rows={data.discontinuedMedications}
