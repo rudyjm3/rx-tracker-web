@@ -31,7 +31,7 @@ import {
 } from "@/lib/pain-mood";
 import { getSideEffectsInRange } from "@/lib/side-effects";
 import { getUserProfile } from "@/lib/user-profile";
-import { activeDaysOnMedication } from "@/lib/medication-days";
+import { activeDaysOnMedication, wasActiveDuring } from "@/lib/medication-days";
 import { formatLongDate, localDateFromTimestamp, localDateString } from "@/lib/utils";
 import type { Medication, MedicationStatusEvent, StatusEventType } from "@/lib/types/medications";
 import type { DoctorVisitReportData, TrendNoteEntry } from "./DoctorVisitReportPdf";
@@ -144,10 +144,6 @@ export function ExportClient() {
     });
   }
   const isMedicationSelected = (id: string) => !excludedMedicationIds.has(id);
-  const selectedMedications = useMemo(
-    () => allMedications.filter((m) => !excludedMedicationIds.has(m.id)),
-    [allMedications, excludedMedicationIds],
-  );
 
   const sideEffectsQuery = useQuery({
     queryKey: ["export-side-effects", startDate, endDate, allMedicationIds],
@@ -179,6 +175,30 @@ export function ExportClient() {
       queryFn: () => getDoseHistory(id),
     })),
   });
+  const statusEventsQuery = useQuery({
+    queryKey: ["export-status-events", allMedicationIds],
+    queryFn: () => getStatusEvents(allMedicationIds),
+    enabled: inactiveMedicationsQuery.data !== undefined,
+  });
+  const statusEvents = statusEventsQuery.data ?? [];
+
+  // A medication belongs in the report only if it was in use on at least
+  // one day of the reporting period — one discontinued before the period
+  // started (or started after it ended) is left out of every section.
+  const isMedicationInPeriod = (med: Medication) => {
+    let events: Array<{ event: string; event_at: string }> = statusEvents.filter(
+      (e) => e.medication_id === med.id,
+    );
+    if (events.length === 0) {
+      events = (doseHistoryQueries[allMedications.indexOf(med)]?.data ?? [])
+        .filter((e): e is Extract<DoseHistoryEntry, { type: "status_event" }> => e.type === "status_event")
+        .map((e) => e.data);
+    }
+    return wasActiveDuring(med.start_date, events, startDate, endDate);
+  };
+  const periodMedications = allMedications.filter(isMedicationInPeriod);
+  const selectedMedications = periodMedications.filter((m) => !excludedMedicationIds.has(m.id));
+
   const doseChangeGroups = allMedications
     .map((medication, i) => ({
       medication,
@@ -187,17 +207,15 @@ export function ExportClient() {
           entry.type === "dose_change",
       ),
     }))
-    .filter((group) => group.changes.length > 0 && isMedicationSelected(group.medication.id));
+    .filter(
+      (group) =>
+        group.changes.length > 0 &&
+        isMedicationSelected(group.medication.id) &&
+        isMedicationInPeriod(group.medication),
+    );
   const doseChanges = doseChangeGroups
     .flatMap((group) => group.changes.map((change) => ({ ...change, medication: group.medication })))
     .sort((a, b) => b.at.localeCompare(a.at));
-
-  const statusEventsQuery = useQuery({
-    queryKey: ["export-status-events", allMedicationIds],
-    queryFn: () => getStatusEvents(allMedicationIds),
-    enabled: inactiveMedicationsQuery.data !== undefined,
-  });
-  const statusEvents = statusEventsQuery.data ?? [];
 
   const currentMedications = selectedMedications.filter((m) => m.active).map((medication) => {
     const resumed =
@@ -208,8 +226,8 @@ export function ExportClient() {
       resumedOn: resumed ? formatLongDate(localDateFromTimestamp(resumed.event_at)) : null,
     };
   });
-  const discontinuedMedications = allMedications
-    .filter((m) => !m.active && isMedicationSelected(m.id))
+  const discontinuedMedications = selectedMedications
+    .filter((m) => !m.active)
     .map((medication) => {
       const event =
         latestMedicationStatusEvent(statusEvents, medication.id, "discontinued") ??
@@ -474,7 +492,7 @@ export function ExportClient() {
           </div>
         )}
 
-        {allMedications.length > 0 && (
+        {periodMedications.length > 0 && (
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-sm font-medium text-brand-text">Medications to include</span>
@@ -484,14 +502,14 @@ export function ExportClient() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setExcludedMedicationIds(new Set(allMedicationIds))}
+                  onClick={() => setExcludedMedicationIds(new Set(periodMedications.map((m) => m.id)))}
                 >
                   Select none
                 </button>
               </div>
             </div>
             <div className="flex max-h-40 flex-wrap gap-x-4 gap-y-1.5 overflow-y-auto">
-              {allMedications.map((med) => (
+              {periodMedications.map((med) => (
                 <label key={med.id} className="flex items-center gap-2 text-sm text-brand-text">
                   <Checkbox
                     checked={isMedicationSelected(med.id)}

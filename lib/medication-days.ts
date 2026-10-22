@@ -26,12 +26,11 @@ function eventDayNumber(eventAt: string): number {
   return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
 }
 
-export function activeDaysOnMedication(
-  startDate: string | null,
+function activeStretches(
+  startDate: string,
   events: MedicationStatusEventLike[],
   asOf: string,
-): number | null {
-  if (!startDate) return null;
+): Array<[number, number]> {
   const end = dayNumber(asOf);
   const sorted = events
     .filter((e) => e.event === "discontinued" || e.event === "resumed")
@@ -50,13 +49,38 @@ export function activeDaysOnMedication(
     }
   }
   if (activeFrom !== null) stretches.push([activeFrom, end]);
+  return stretches;
+}
+
+export function activeDaysOnMedication(
+  startDate: string | null,
+  events: MedicationStatusEventLike[],
+  asOf: string,
+): number | null {
+  if (!startDate) return null;
 
   let total = 0;
   let coveredUntil = -Infinity;
-  for (const [from, to] of stretches) {
+  for (const [from, to] of activeStretches(startDate, events, asOf)) {
     if (to < from) continue;
     total += to - Math.max(from, coveredUntil + 1) + 1;
     coveredUntil = Math.max(coveredUntil, to);
   }
   return total;
+}
+
+// Whether the medication was in use on any day of [rangeStart, rangeEnd]
+// (inclusive). Medications with no start date can't be placed in time, so
+// they're treated as active.
+export function wasActiveDuring(
+  startDate: string | null,
+  events: MedicationStatusEventLike[],
+  rangeStart: string,
+  rangeEnd: string,
+): boolean {
+  if (!startDate) return true;
+  const from = dayNumber(rangeStart);
+  return activeStretches(startDate, events, rangeEnd).some(
+    ([stretchFrom, stretchTo]) => stretchTo >= stretchFrom && stretchTo >= from,
+  );
 }
