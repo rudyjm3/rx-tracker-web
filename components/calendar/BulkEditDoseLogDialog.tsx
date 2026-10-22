@@ -10,13 +10,14 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
-import { editDoseLog, recordDose, recordDoseAtTime } from "@/lib/dose-logs";
+import { editDoseLogsBatch, recordDose, recordDoseAtTime } from "@/lib/dose-logs";
 import { localDateString } from "@/lib/utils";
 import type { DoseLogStatus, Medication } from "@/lib/types/medications";
 
 // One dose_logs row belonging to a group's shared dose for a given day —
 // enough to both display the member and re-apply a bulk edit to it via
-// the same editDoseLog RPC the single-slot EditDoseLogDialog uses.
+// the same edit_dose_log logic the single-slot EditDoseLogDialog uses
+// (via the atomic edit_dose_logs_batch RPC).
 export interface BulkEditableDoseLog {
   logId: string;
   medicationId: string;
@@ -71,10 +72,11 @@ function nowTime(): string {
 /**
  * Group-level counterpart to EditDoseLogDialog: applies the same status/
  * time-taken/note to every member's dose_logs row for a shared group
- * dose, in one dialog — matching this codebase's existing "bulk = N
- * individual calls" precedent (e.g. DashboardClient's handleTakeAll)
- * rather than a new Postgres RPC. Each member's own per-slot Edit action
- * (EditDoseLogDialog) stays fully available and untouched by this.
+ * dose, in one dialog. Existing rows are edited through a single atomic
+ * edit_dose_logs_batch RPC (all or none). Members with no row yet
+ * (`pending`) are still created by separate record_dose calls, so those
+ * are not covered by that atomicity. Each member's own per-slot Edit
+ * action (EditDoseLogDialog) stays fully available and untouched.
  */
 export function BulkEditDoseLogDialog({
   groupName,
@@ -134,8 +136,37 @@ function BulkEditDoseLogForm({
     setSaving(true);
     setError(null);
     try {
-      await Promise.all([
-        ...pending.map((member) => {
+      // Existing rows first, as one transaction: if it fails nothing has
+      // been written yet and the pending members below are never touched.
+      await editDoseLogsBatch(
+        logs.map((log) => {
+          const baseDate = log.takenAt
+            ? localDateString(new Date(log.takenAt))
+            : log.scheduledForDate;
+          const quantityPerDose =
+            status === "taken" && log.status === "taken" && log.deductedQuantity !== null
+              ? log.deductedQuantity
+              : log.quantityPerDose;
+          return {
+            logId: log.logId,
+            status,
+            takenAt: status === "taken" ? new Date(`${baseDate}T${time}:00`).toISOString() : null,
+            // Each member's own pain/mood feedback is preserved as-is
+            // (not user-editable here) rather than blanked out — the
+            // edit_dose_log RPC always writes whatever's passed for a
+            // 'taken' row, so omitting these would silently wipe
+            // feedback that has nothing to do with this bulk status/time
+            // change.
+            painLevel: status === "taken" ? (log.painLevel ?? undefined) : undefined,
+            moodLevel: status === "taken" ? (log.moodLevel ?? undefined) : undefined,
+            note: status === "taken" ? note.trim() : "",
+            quantityPerDose,
+            inventoryEnabled: log.inventoryEnabled,
+          };
+        }),
+      );
+      await Promise.all(
+        pending.map((member) => {
           // "Missed" isn't a state an unlogged as-needed member can be
           // in (it was never due), so it's left unlogged in that case.
           if (status === "missed") return Promise.resolve();
@@ -157,31 +188,7 @@ function BulkEditDoseLogForm({
             note.trim() ? { note: note.trim() } : undefined,
           );
         }),
-        ...logs.map((log) => {
-          const baseDate = log.takenAt
-            ? localDateString(new Date(log.takenAt))
-            : log.scheduledForDate;
-          const quantityPerDose =
-            status === "taken" && log.status === "taken" && log.deductedQuantity !== null
-              ? log.deductedQuantity
-              : log.quantityPerDose;
-          return editDoseLog(log.logId, {
-            status,
-            takenAt: status === "taken" ? new Date(`${baseDate}T${time}:00`).toISOString() : null,
-            // Each member's own pain/mood feedback is preserved as-is
-            // (not user-editable here) rather than blanked out — the
-            // edit_dose_log RPC always writes whatever's passed for a
-            // 'taken' row, so omitting these would silently wipe
-            // feedback that has nothing to do with this bulk status/time
-            // change.
-            painLevel: status === "taken" ? (log.painLevel ?? undefined) : undefined,
-            moodLevel: status === "taken" ? (log.moodLevel ?? undefined) : undefined,
-            note: status === "taken" ? note.trim() : "",
-            quantityPerDose,
-            inventoryEnabled: log.inventoryEnabled,
-          });
-        }),
-      ]);
+      );
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save changes");
