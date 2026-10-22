@@ -32,7 +32,7 @@ import {
 import { getSideEffectsInRange } from "@/lib/side-effects";
 import { getUserProfile } from "@/lib/user-profile";
 import { activeDaysOnMedication } from "@/lib/medication-days";
-import { formatLongDate, localDateString } from "@/lib/utils";
+import { formatLongDate, localDateFromTimestamp, localDateString } from "@/lib/utils";
 import type { Medication, MedicationStatusEvent, StatusEventType } from "@/lib/types/medications";
 import type { DoctorVisitReportData, TrendNoteEntry } from "./DoctorVisitReportPdf";
 import { ReportSummary } from "./ReportSummary";
@@ -205,7 +205,7 @@ export function ExportClient() {
       latestStatusEntry(doseHistoryQueries[allMedications.indexOf(medication)]?.data ?? [], "resumed");
     return {
       medication,
-      resumedOn: resumed ? formatLongDate(resumed.event_at.slice(0, 10)) : null,
+      resumedOn: resumed ? formatLongDate(localDateFromTimestamp(resumed.event_at)) : null,
     };
   });
   const discontinuedMedications = allMedications

@@ -10,6 +10,15 @@ export function localDateString(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+// Local YYYY-MM-DD calendar date of a stored timestamptz (e.g. a status
+// event's event_at), so late-evening events don't land on the next UTC day.
+// Date-only strings pass through unchanged.
+export function localDateFromTimestamp(timestamp: string): string {
+  if (!timestamp.includes("T")) return timestamp.slice(0, 10);
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? timestamp.slice(0, 10) : localDateString(date);
+}
+
 // "MM-DD-YYYY" display form of a stored local YYYY-MM-DD date. Pure string
 // reshaping (no Date parsing) so it can't shift across timezones.
 export function formatDate(dateStr: string): string {
