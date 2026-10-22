@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 process.env.TZ = "America/Los_Angeles";
-import { activeDaysOnMedication } from "./medication-days.ts";
+import { activeDaysOnMedication, wasActiveDuring } from "./medication-days.ts";
 
 const ev = (event: string, day: string) => ({ event, event_at: `${day}T12:00:00Z` });
 
@@ -57,4 +57,30 @@ test("event timestamps use the local calendar date, not UTC", () => {
   // 8 PM Pacific on Oct 5 is 03:00 UTC on Oct 6.
   const events = [{ event: "discontinued", event_at: "2026-10-06T03:00:00Z" }];
   assert.equal(activeDaysOnMedication("2026-10-01", events, "2026-10-22"), 5);
+});
+
+test("wasActiveDuring excludes meds discontinued before the range", () => {
+  const events = [ev("discontinued", "2026-09-21")];
+  assert.equal(wasActiveDuring("2026-09-04", events, "2026-09-22", "2026-10-22"), false);
+});
+
+test("wasActiveDuring includes meds discontinued mid-range or on its first day", () => {
+  assert.equal(wasActiveDuring("2026-01-01", [ev("discontinued", "2026-10-20")], "2026-09-22", "2026-10-22"), true);
+  assert.equal(wasActiveDuring("2026-01-01", [ev("discontinued", "2026-09-22")], "2026-09-22", "2026-10-22"), true);
+});
+
+test("wasActiveDuring excludes meds started after the range and includes resumed ones", () => {
+  assert.equal(wasActiveDuring("2026-11-01", [], "2026-09-22", "2026-10-22"), false);
+  const events = [ev("discontinued", "2026-08-01"), ev("resumed", "2026-10-01")];
+  assert.equal(wasActiveDuring("2026-01-01", events, "2026-09-22", "2026-10-22"), true);
+});
+
+test("wasActiveDuring excludes meds whose end date is before the range", () => {
+  assert.equal(wasActiveDuring("2026-01-01", [], "2026-09-22", "2026-10-22", "2026-09-21"), false);
+  assert.equal(wasActiveDuring("2026-01-01", [], "2026-09-22", "2026-10-22", "2026-09-22"), true);
+  assert.equal(wasActiveDuring("2026-01-01", [], "2026-09-22", "2026-10-22", null), true);
+});
+
+test("wasActiveDuring treats a missing start date as active", () => {
+  assert.equal(wasActiveDuring(null, [], "2026-09-22", "2026-10-22"), true);
 });
