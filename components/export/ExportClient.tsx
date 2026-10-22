@@ -150,9 +150,6 @@ export function ExportClient() {
     queryFn: () => getSideEffectsInRange(startDate, endDate, allMedicationIds),
     enabled: inactiveMedicationsQuery.data !== undefined,
   });
-  const sideEffects = (sideEffectsQuery.data ?? []).filter((se) =>
-    isMedicationSelected(se.medication_id),
-  );
 
   // Uncapped — adherence must reflect the full selected range, not just
   // whichever rows happen to fit under a display-table row cap.
@@ -161,9 +158,6 @@ export function ExportClient() {
     queryFn: () => getDoseLogStatusesInRange(startDate, endDate, allMedicationIds),
     enabled: inactiveMedicationsQuery.data !== undefined,
   });
-  const adherenceStatuses = (adherenceStatusesQuery.data ?? []).filter((l) =>
-    isMedicationSelected(l.medication_id),
-  );
 
   // Dose history (dose changes + discontinued/resumed status events) is
   // per-medication (not date-range scoped) — fetched via the same
@@ -204,6 +198,15 @@ export function ExportClient() {
   };
   const periodMedications = allMedications.filter(isMedicationInPeriod);
   const selectedMedications = periodMedications.filter((m) => !excludedMedicationIds.has(m.id));
+  // Date-range rows (side effects, dose logs) are fetched for every
+  // medication, so scope them to the same in-period, selected set.
+  const selectedMedicationIds = new Set(selectedMedications.map((m) => m.id));
+  const sideEffects = (sideEffectsQuery.data ?? []).filter((se) =>
+    selectedMedicationIds.has(se.medication_id),
+  );
+  const adherenceStatuses = (adherenceStatusesQuery.data ?? []).filter((l) =>
+    selectedMedicationIds.has(l.medication_id),
+  );
 
   const doseChangeGroups = allMedications
     .map((medication, i) => ({
@@ -297,7 +300,7 @@ export function ExportClient() {
     enabled: inactiveMedicationsQuery.data !== undefined,
   });
   const missedDoseDetailAll = (missedDoseLogsQuery.data ?? []).filter((l) =>
-    isMedicationSelected(l.medication_id),
+    selectedMedicationIds.has(l.medication_id),
   );
   const missedDoseDetail = missedDoseDetailAll.slice(0, MISSED_DOSE_DISPLAY_CAP);
 
