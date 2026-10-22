@@ -167,17 +167,6 @@ export function formatShortDate(dateStr: string): string {
   });
 }
 
-// Whole days a medication has been in use as of `asOf` (inclusive of
-// the start date itself, so a medication started today reads "1 day").
-// Used by the export report's pain/mood-tracked medication summaries.
-export function daysOnMedication(startDate: string | null, asOf: string): number | null {
-  if (!startDate) return null;
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${asOf}T00:00:00`);
-  const diffDays = Math.round((end.getTime() - start.getTime()) / 86_400_000);
-  return Math.max(diffDays + 1, 0);
-}
-
 // Whole years between a birth date and today — falls back to a birth
 // year alone (family_profiles carries both, for members whose exact date
 // isn't known) when there's no birth date. Port of the reference PHP
