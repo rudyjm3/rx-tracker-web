@@ -194,7 +194,22 @@ export function DayDetailDialog({
     ...(day?.plannedMedications.map((m) => m.medicationId) ?? []),
     ...(day?.plannedGroups.flatMap((g) => g.medications.map((m) => m.medicationId)) ?? []),
   ]).size;
+  const loggedMedIds = new Set([
+    ...(day?.medications.map((m) => m.medicationId) ?? []),
+    ...(day?.groups.flatMap((g) => g.medications.map((m) => m.medicationId)) ?? []),
+  ]);
+  const plannedOnlyMedications = [
+    ...new Set([
+      ...(day?.plannedMedications.map((m) => m.medicationId) ?? []),
+      ...(day?.plannedGroups.flatMap((g) => g.medications.map((m) => m.medicationId)) ?? []),
+    ]),
+  ].filter((id) => !loggedMedIds.has(id)).length;
   const endingIds = new Set((day?.endingMedications ?? []).map((m) => m.medicationId));
+  // Today only: schedule slots with no dose logged yet, shown alongside the
+  // logged doses so the full day is visible and fills in as doses are taken.
+  const loggedGroupIds = new Set((day?.groups ?? []).map((g) => g.groupId));
+  const remainingByGroup = new Map((day?.plannedGroups ?? []).map((g) => [g.groupId, g]));
+  const unloggedGroups = (day?.plannedGroups ?? []).filter((g) => !loggedGroupIds.has(g.groupId));
 
   return (
     <Dialog open={day !== null} onOpenChange={(open) => !open && onClose()}>
@@ -206,7 +221,7 @@ export function DayDetailDialog({
                 {day.dayName}, {day.displayDate}
               </DialogTitle>
               <p className="text-sm text-brand-text-muted">
-                Medications: {day.isFuture ? totalPlannedMedications : totalMedications} | Planned doses —{" "}
+                Medications: {day.isFuture ? totalPlannedMedications : totalMedications + plannedOnlyMedications} | Planned doses —{" "}
                 Required: {day.plannedRequired} / Non-required: {day.plannedNonRequired}
               </p>
             </DialogHeader>
@@ -254,7 +269,7 @@ export function DayDetailDialog({
                     ))}
                   </ul>
                 )
-              ) : totalMedications === 0 && day.pendingUngroupedAsNeeded.length === 0 ? (
+              ) : totalMedications === 0 && totalPlanned === 0 && day.pendingUngroupedAsNeeded.length === 0 ? (
                 <p className="text-sm text-brand-text-muted">No dose data for this day.</p>
               ) : (
                 <ul className="flex flex-col gap-4">
@@ -288,6 +303,11 @@ export function DayDetailDialog({
                             />
                           </li>
                         ))}
+                        {(remainingByGroup.get(group.groupId)?.medications ?? []).map((slot) => (
+                          <li key={`planned-${slot.medicationId}-${slot.scheduledTime}`}>
+                            <PlannedMedicationRow slot={slot} endingToday={endingIds.has(slot.medicationId)} />
+                          </li>
+                        ))}
                         {group.pendingAsNeeded.map((member) => (
                           <li
                             key={member.medicationId}
@@ -309,6 +329,21 @@ export function DayDetailDialog({
                       </ul>
                     </li>
                   ))}
+                  {unloggedGroups.map((group) => (
+                    <li key={group.groupId} className="rounded-card border border-brand-border p-3">
+                      <div className="flex items-center gap-1.5 font-semibold text-brand-text">
+                        <Layers size={14} className="text-brand-deep-blue" />
+                        {group.groupName}
+                      </div>
+                      <ul className="mt-3 flex flex-col gap-2 border-t border-brand-border pt-3">
+                        {group.medications.map((slot) => (
+                          <li key={`${slot.medicationId}-${slot.scheduledTime}`}>
+                            <PlannedMedicationRow slot={slot} endingToday={endingIds.has(slot.medicationId)} />
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
                   {day.medications.map((med) => (
                     <li
                       key={med.medicationId}
@@ -322,6 +357,14 @@ export function DayDetailDialog({
                         endingToday={endingIds.has(med.medicationId)}
                         onEditSlot={onEditSlot}
                       />
+                    </li>
+                  ))}
+                  {day.plannedMedications.map((slot) => (
+                    <li
+                      key={`${slot.medicationId}-${slot.scheduledTime}`}
+                      className="rounded-card border border-brand-border p-3"
+                    >
+                      <PlannedMedicationRow slot={slot} endingToday={endingIds.has(slot.medicationId)} />
                     </li>
                   ))}
                   {day.pendingUngroupedAsNeeded.map((member) => (
