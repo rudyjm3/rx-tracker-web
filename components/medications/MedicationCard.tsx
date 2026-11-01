@@ -7,6 +7,7 @@ import {
   Activity,
   CalendarCheck,
   CalendarPlus,
+  CalendarCog,
   ChevronsDown,
   FileText,
   History,
@@ -34,6 +35,7 @@ import type { Medication, MedicationRefill } from "@/lib/types/medications";
 import { MedicationTrendModal } from "./MedicationTrendModal";
 import { RefillModal } from "./RefillModal";
 import { RefillHistoryModal } from "./RefillHistoryModal";
+import { ManageRefillsModal } from "./ManageRefillsModal";
 import { SideEffectModal } from "./SideEffectModal";
 import { NotesModal } from "./NotesModal";
 import { DoseHistoryPanel } from "./DoseHistoryPanel";
@@ -95,6 +97,7 @@ function runoutSummary(med: Medication, groupDoseOverrides: GroupDoseOverride[])
 type ModalKind =
   | "refill"
   | "refillHistory"
+  | "manageRefills"
   | "adjust"
   | "doseChange"
   | "notes"
@@ -295,6 +298,10 @@ export function MedicationCard({
                 <CalendarPlus size={18} />
                 Log Refill
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setOpenModal("manageRefills")}>
+                <CalendarCog size={18} />
+                Edit/Delete Refill
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("doseChange")}>
                 <Syringe size={18} />
                 Update prescribed dose
@@ -382,6 +389,13 @@ export function MedicationCard({
           onOpenChange={(open) => setOpenModal(open ? "adjust" : null)}
           medication={medication}
           mode="adjust"
+        />
+      )}
+      {openModal === "manageRefills" && (
+        <ManageRefillsModal
+          open
+          onOpenChange={(open) => setOpenModal(open ? "manageRefills" : null)}
+          medication={medication}
         />
       )}
       <RefillHistoryModal
