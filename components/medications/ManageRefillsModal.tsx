@@ -21,6 +21,8 @@ interface ManageRefillsModalProps {
   medication: Medication;
   // Opens straight into the edit form for this refill.
   initialRefill?: MedicationRefill;
+  // With initialRefill: open the edit form (default) or the delete confirmation.
+  initialAction?: "edit" | "delete";
 }
 
 function formatAmount(n: number): string {
@@ -35,10 +37,14 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function ManageRefillsModal({ open, onOpenChange, medication, initialRefill }: ManageRefillsModalProps) {
+export function ManageRefillsModal({ open, onOpenChange, medication, initialRefill, initialAction = "edit" }: ManageRefillsModalProps) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState<MedicationRefill | null>(initialRefill ?? null);
-  const [deleting, setDeleting] = useState<MedicationRefill | null>(null);
+  const [editing, setEditing] = useState<MedicationRefill | null>(
+    initialAction === "edit" ? (initialRefill ?? null) : null,
+  );
+  const [deleting, setDeleting] = useState<MedicationRefill | null>(
+    initialAction === "delete" ? (initialRefill ?? null) : null,
+  );
   const [amount, setAmount] = useState(initialRefill ? String(initialRefill.amount) : "");
   const [date, setDate] = useState(initialRefill?.refill_date ?? "");
   const [note, setNote] = useState(initialRefill?.note ?? "");
@@ -78,7 +84,8 @@ export function ManageRefillsModal({ open, onOpenChange, medication, initialRefi
     onSuccess: () => {
       toast.success("Refill deleted");
       invalidate();
-      setDeleting(null);
+      if (initialRefill) onOpenChange(false);
+      else setDeleting(null);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Something went wrong"),
   });
@@ -169,7 +176,7 @@ export function ManageRefillsModal({ open, onOpenChange, medication, initialRefi
               {unit}? Your current count will go down by {formatAmount(deleting.amount)} {unit}.
             </p>
             <div className="mt-2 flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="compact" onClick={() => setDeleting(null)}>
+              <Button type="button" variant="ghost" size="compact" onClick={() => (initialRefill ? onOpenChange(false) : setDeleting(null))}>
                 Cancel
               </Button>
               <Button
