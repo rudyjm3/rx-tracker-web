@@ -54,6 +54,10 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   if (!isResolving && startProfileRef.current === null) {
     startProfileRef.current = { id: activeProfileId };
   }
+  // The autosave subscription holds the first render's closures, so
+  // doSaveDraft reads the live profile through this ref.
+  const activeProfileIdRef = useRef(activeProfileId);
+  activeProfileIdRef.current = activeProfileId;
   const [step, setStep] = useState(1);
   const [furthestStep, setFurthestStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -139,7 +143,8 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       currentDraftIdRef.current = id;
     }
 
-    if (startProfileRef.current && startProfileRef.current.id !== activeProfileId) return;
+    const currentProfileId = activeProfileIdRef.current;
+    if (!startProfileRef.current || startProfileRef.current.id !== currentProfileId) return;
 
     const draftIdToSave = currentDraftIdRef.current;
     const savePromise = saveDraft({
@@ -147,7 +152,7 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       formData: form.getValues(),
       currentStep: stepToSave,
       furthestStep: Math.max(furthestStepRef.current, stepToSave),
-      profileId: activeProfileId,
+      profileId: currentProfileId,
     });
 
     if (!draftIdToSave) {
