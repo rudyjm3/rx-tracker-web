@@ -9,6 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
+import { Button } from "@/components/ui/Button";
+import { EditRefillDialog } from "./EditRefillDialog";
 import { getRefillHistory } from "@/lib/inventory";
 import type { Medication, MedicationRefill } from "@/lib/types/medications";
 
@@ -45,6 +47,7 @@ export function RefillHistoryModal({
   medication,
 }: RefillHistoryModalProps) {
   const [viewDate, setViewDate] = useState(() => new Date());
+  const [editingRefill, setEditingRefill] = useState<{ refill: MedicationRefill; action: "edit" | "delete" } | null>(null);
 
   const historyQuery = useQuery({
     queryKey: ["refill-history", medication.id],
@@ -160,6 +163,8 @@ export function RefillHistoryModal({
                     entry={entry}
                     unit={medication.inventory_unit}
                     daysSincePrev={daysSincePrevById.get(entry.id) ?? null}
+                    onEdit={() => setEditingRefill({ refill: entry, action: "edit" })}
+                    onDelete={() => setEditingRefill({ refill: entry, action: "delete" })}
                   />
                 ))}
               </ul>
@@ -167,6 +172,16 @@ export function RefillHistoryModal({
           </div>
         )}
       </DialogContent>
+      {editingRefill && (
+        <EditRefillDialog
+          key={`${editingRefill.refill.id}-${editingRefill.action}`}
+          open
+          onOpenChange={(o) => !o && setEditingRefill(null)}
+          medication={medication}
+          refill={editingRefill.refill}
+          action={editingRefill.action}
+        />
+      )}
     </Dialog>
   );
 }
@@ -175,10 +190,14 @@ function RefillHistoryRow({
   entry,
   unit,
   daysSincePrev,
+  onEdit,
+  onDelete,
 }: {
   entry: MedicationRefill;
   unit: string;
   daysSincePrev: number | null;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const dateLabel = parseDate(entry.refill_date).toLocaleDateString(undefined, {
     month: "short",
@@ -190,7 +209,24 @@ function RefillHistoryRow({
 
   return (
     <li className="py-3">
-      <p className="text-sm font-semibold text-brand-navy">{dateLabel}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-brand-navy">{dateLabel}</p>
+        {!isAdjustment && (
+          <div className="flex gap-2">
+            <Button variant="secondary" size="compact" onClick={onEdit}>
+              Edit
+            </Button>
+            <Button
+              variant="secondary"
+              size="compact"
+              className="text-status-danger"
+              onClick={onDelete}
+            >
+              Delete
+            </Button>
+          </div>
+        )}
+      </div>
       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
         {isAdjustment && (
           <span className="rounded-full bg-brand-bg px-2 py-0.5 font-semibold text-brand-text-muted">

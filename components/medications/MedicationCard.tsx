@@ -295,13 +295,13 @@ export function MedicationCard({
                 <CalendarPlus size={18} />
                 Log Refill
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setOpenModal("doseChange")}>
-                <Syringe size={18} />
-                Update prescribed dose
-              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("refillHistory")}>
                 <History size={18} />
                 Refill History
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setOpenModal("doseChange")}>
+                <Syringe size={18} />
+                Update prescribed dose
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpenModal("adjust")}>
                 <SlidersHorizontal size={18} />
