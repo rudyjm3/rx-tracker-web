@@ -47,7 +47,13 @@ interface WizardShellProps {
 export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { activeProfileId } = useActiveProfile();
+  const { activeProfileId, isResolving } = useActiveProfile();
+  // Profile the wizard was opened under. If the user switches profiles
+  // mid-wizard we bail out rather than save under the wrong profile.
+  const startProfileRef = useRef<{ id: string | null } | null>(null);
+  if (!isResolving && startProfileRef.current === null) {
+    startProfileRef.current = { id: activeProfileId };
+  }
   const [step, setStep] = useState(1);
   const [furthestStep, setFurthestStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -117,6 +123,14 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
     }
   }, [mode, editQuery.data, draftQuery.data, groupMembersQuery.data, medicationId, form]);
 
+  useEffect(() => {
+    const start = startProfileRef.current;
+    if (!start || start.id === activeProfileId) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    toast.info("Profile changed — medication form closed");
+    router.replace("/medications");
+  }, [activeProfileId, router]);
+
   async function doSaveDraft(stepToSave: number): Promise<void> {
     const existingDraftId = currentDraftIdRef.current;
 
@@ -124,6 +138,8 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
       const id = await draftCreatePromiseRef.current;
       currentDraftIdRef.current = id;
     }
+
+    if (startProfileRef.current && startProfileRef.current.id !== activeProfileId) return;
 
     const draftIdToSave = currentDraftIdRef.current;
     const savePromise = saveDraft({
@@ -222,6 +238,7 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
   }
 
   async function onSubmit(values: MedicationFormValues) {
+    if (startProfileRef.current && startProfileRef.current.id !== activeProfileId) return;
     setSubmitting(true);
     try {
       const input = toMedicationInput(values);
