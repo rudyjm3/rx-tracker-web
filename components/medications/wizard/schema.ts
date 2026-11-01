@@ -24,7 +24,7 @@ const scheduleTimeSchema = z.object({
 
 export const medicationFormSchema = z
   .object({
-    // Step 1 — Identity
+    // Step 1 — Medication
     name: z.string().min(1, "Name is required"),
     doseAmount: z
       .string()
@@ -56,6 +56,7 @@ export const medicationFormSchema = z
 
     // Step 2 — Inventory
     inventoryEnabled: z.boolean(),
+    // Derived from doseForm (see dose-forms.ts) — never typed in directly.
     inventoryType: z.string(),
     inventoryUnit: z.string(),
     // Onboarding-only: which method (StepInventory.tsx) produced
@@ -196,8 +197,6 @@ export const STEP_FIELDS: Record<number, (keyof MedicationFormValues)[]> = {
   ],
   2: [
     "inventoryEnabled",
-    "inventoryType",
-    "inventoryUnit",
     "startingQuantity",
     "inventoryMethod",
     "quantityPerDose",
@@ -214,4 +213,4 @@ export const STEP_FIELDS: Record<number, (keyof MedicationFormValues)[]> = {
   4: ["feedbackType", "dashboardEnabled", "remindersEnabled", "adherenceEnabled"],
 };
 
-export const STEP_LABELS = ["Identity", "Inventory", "Schedule", "Feedback"];
+export const STEP_LABELS = ["Medication", "Inventory", "Schedule", "Feedback"];

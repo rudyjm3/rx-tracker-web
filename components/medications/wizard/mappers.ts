@@ -1,5 +1,6 @@
 import type { MedicationInput, ScheduleTimeInput } from "@/lib/medications";
 import type { Medication } from "@/lib/types/medications";
+import { hasInventoryWording, inventoryWordingForForm } from "./dose-forms";
 import type { MedicationFormValues } from "./schema";
 
 // Numbers live in the form as strings (see schema.ts); these two
@@ -66,7 +67,18 @@ export function toScheduleTimes(values: MedicationFormValues): ScheduleTimeInput
   }));
 }
 
+// Inventory type/unit follow the dose form picked in step 1. A form we
+// can't map (e.g. free text from onboarding) keeps whatever the form
+// already holds.
+function inventoryWording(values: MedicationFormValues) {
+  if (hasInventoryWording(values.doseForm)) {
+    return inventoryWordingForForm(values.doseForm);
+  }
+  return { type: values.inventoryType, unit: values.inventoryUnit };
+}
+
 export function toMedicationInput(values: MedicationFormValues): MedicationInput {
+  const wording = inventoryWording(values);
   const isInterval = !values.asNeeded && values.scheduleMode === "interval";
   return {
     name: values.name,
@@ -83,8 +95,8 @@ export function toMedicationInput(values: MedicationFormValues): MedicationInput
     start_date: values.startDate || null,
     end_date: values.endDate || null,
     inventory_enabled: values.inventoryEnabled,
-    inventory_type: values.inventoryType,
-    inventory_unit: values.inventoryUnit,
+    inventory_type: wording.type,
+    inventory_unit: wording.unit,
     starting_quantity: values.inventoryEnabled
       ? strToNum(values.startingQuantity)
       : null,

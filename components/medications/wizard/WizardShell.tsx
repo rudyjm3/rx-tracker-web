@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
-import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import {
   Dialog,
@@ -37,6 +36,7 @@ import { StepIdentity } from "./StepIdentity";
 import { StepSchedule } from "./StepSchedule";
 import { StepInventory } from "./StepInventory";
 import { StepFeedback } from "./StepFeedback";
+import { WizardStepper } from "./WizardStepper";
 
 interface WizardShellProps {
   mode: "create" | "edit";
@@ -115,6 +115,10 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
         ...medicationToFormValues(editQuery.data),
         groupId: membership?.group_id ?? "",
       });
+      // The saved medication already passed validation, so every step is
+      // reachable straight away.
+      furthestStepRef.current = STEP_LABELS.length;
+      setFurthestStep(STEP_LABELS.length);
       hasHydrated.current = true;
     }
     if (mode === "create" && draftQuery.data) {
@@ -234,6 +238,21 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
     await persistDraft(nextStep);
   }
 
+  // Secondary navigation via the stepper. Going back is always allowed;
+  // going forward only to a step already reached, and only if the step
+  // being left is valid.
+  async function handleStepSelect(target: number) {
+    if (target === step) return;
+    if (target > step) {
+      if (target > furthestStepRef.current) return;
+      const valid = await form.trigger(STEP_FIELDS[step]);
+      if (!valid) return;
+    }
+    stepRef.current = target;
+    setStep(target);
+    await persistDraft(target);
+  }
+
   function handleBack() {
     setStep((s) => {
       const previousStep = Math.max(1, s - 1);
@@ -329,37 +348,12 @@ export function WizardShell({ mode, medicationId, draftId }: WizardShellProps) {
 
   return (
     <FormProvider {...form}>
-      <div className="mb-6 flex items-center gap-2">
-        {STEP_LABELS.map((label, i) => {
-          const stepNumber = i + 1;
-          const isActive = stepNumber === step;
-          const isDone = stepNumber < step || stepNumber <= furthestStep;
-          return (
-            <div key={label} className="flex flex-1 flex-col items-center gap-1">
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
-                  isActive
-                    ? "bg-gradient-brand text-white"
-                    : isDone
-                      ? "bg-brand-bg text-brand-deep-blue"
-                      : "bg-brand-bg text-brand-text-muted",
-                )}
-              >
-                {stepNumber}
-              </div>
-              <span
-                className={cn(
-                  "text-xs",
-                  isActive ? "text-brand-text" : "text-brand-text-muted",
-                )}
-              >
-                {label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <WizardStepper
+        labels={STEP_LABELS}
+        step={step}
+        furthestStep={furthestStep}
+        onSelect={handleStepSelect}
+      />
 
       <div className="rounded-card border border-brand-border bg-brand-card p-6 shadow-card">
         {renderStep()}
