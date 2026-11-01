@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { Field, inputClass } from "@/components/ui/Field";
-import { inventoryWordingForForm } from "./dose-forms";
+import { hasInventoryWording, inventoryWordingForForm } from "./dose-forms";
 import type { MedicationFormValues } from "./schema";
 
 export function StepInventory() {
@@ -16,15 +16,23 @@ export function StepInventory() {
 
   const inventoryEnabled = watch("inventoryEnabled");
   const doseForm = watch("doseForm");
-  const wording = inventoryWordingForForm(doseForm);
+  const mapped = hasInventoryWording(doseForm);
+  const derived = inventoryWordingForForm(doseForm);
+  const storedUnit = watch("inventoryUnit");
+  // An empty/unmapped form keeps whatever wording the medication already has
+  // (e.g. a custom unit on a medication being edited) rather than resetting it.
+  const wording = mapped
+    ? derived
+    : { type: watch("inventoryType") || derived.type, unit: storedUnit || derived.unit };
 
   // Inventory type/unit aren't asked for again — they follow the form
   // chosen in the Medication step. Mirror them into the form values so
   // drafts and onboarding see the same wording.
   useEffect(() => {
-    setValue("inventoryType", wording.type);
-    setValue("inventoryUnit", wording.unit);
-  }, [wording.type, wording.unit, setValue]);
+    if (!mapped) return;
+    setValue("inventoryType", derived.type);
+    setValue("inventoryUnit", derived.unit);
+  }, [mapped, derived.type, derived.unit, setValue]);
 
   return (
     <div className="flex flex-col gap-4">
