@@ -19,6 +19,8 @@ interface ManageRefillsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   medication: Medication;
+  // Opens straight into the edit form for this refill.
+  initialRefill?: MedicationRefill;
 }
 
 function formatAmount(n: number): string {
@@ -33,13 +35,13 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function ManageRefillsModal({ open, onOpenChange, medication }: ManageRefillsModalProps) {
+export function ManageRefillsModal({ open, onOpenChange, medication, initialRefill }: ManageRefillsModalProps) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState<MedicationRefill | null>(null);
+  const [editing, setEditing] = useState<MedicationRefill | null>(initialRefill ?? null);
   const [deleting, setDeleting] = useState<MedicationRefill | null>(null);
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState("");
-  const [note, setNote] = useState("");
+  const [amount, setAmount] = useState(initialRefill ? String(initialRefill.amount) : "");
+  const [date, setDate] = useState(initialRefill?.refill_date ?? "");
+  const [note, setNote] = useState(initialRefill?.note ?? "");
 
   const historyQuery = useQuery({
     queryKey: ["refill-history", medication.id],
@@ -62,7 +64,8 @@ export function ManageRefillsModal({ open, onOpenChange, medication }: ManageRef
     onSuccess: () => {
       toast.success("Refill updated");
       invalidate();
-      setEditing(null);
+      if (initialRefill) onOpenChange(false);
+      else setEditing(null);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Something went wrong"),
   });
@@ -151,8 +154,8 @@ export function ManageRefillsModal({ open, onOpenChange, medication }: ManageRef
               Changing the amount also adjusts your current count by the difference.
             </p>
             <div className="mt-2 flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="compact" onClick={() => setEditing(null)}>
-                Back
+              <Button type="button" variant="ghost" size="compact" onClick={() => (initialRefill ? onOpenChange(false) : setEditing(null))}>
+                {initialRefill ? "Cancel" : "Back"}
               </Button>
               <Button type="submit" size="compact" disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? "Saving…" : "Save changes"}
