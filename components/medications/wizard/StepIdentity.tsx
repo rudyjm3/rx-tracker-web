@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { Field, inputClass } from "@/components/ui/Field";
 import { cn } from "@/lib/cn";
+import { DOSE_FORM_OPTIONS, DOSE_UNIT_OPTIONS } from "./dose-forms";
 import { DailyMedAutocomplete } from "./DailyMedAutocomplete";
 import type { MedicationFormValues } from "./schema";
 
@@ -43,31 +44,21 @@ export function StepIdentity() {
         </Field>
         <Field label="Unit">
           <select className={inputClass} {...register("doseUnit", clearDailyMedMatch)}>
-            <option value="mg">mg</option>
-            <option value="mcg">mcg</option>
-            <option value="g">g</option>
-            <option value="mL">mL</option>
-            <option value="tsp">tsp</option>
-            <option value="tbsp">tbsp</option>
-            <option value="oz">oz</option>
-            <option value="IU">IU</option>
-            <option value="units">units</option>
-            <option value="drops">drops</option>
-            <option value="puffs">puffs</option>
-            <option value="patches">patches</option>
+            {DOSE_UNIT_OPTIONS.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="Form">
           <select className={inputClass} {...register("doseForm")}>
             <option value="">-- select --</option>
-            <option value="tablet">Tablet</option>
-            <option value="capsule">Capsule</option>
-            <option value="liquid">Liquid</option>
-            <option value="inhaler">Inhaler</option>
-            <option value="injection">Injection</option>
-            <option value="patch">Patch</option>
-            <option value="drops">Drops</option>
-            <option value="other">Other</option>
+            {DOSE_FORM_OPTIONS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
           </select>
         </Field>
       </div>
