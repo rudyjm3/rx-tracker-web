@@ -15,7 +15,7 @@ import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { deleteRefill, updateRefill } from "@/lib/inventory";
 import type { Medication, MedicationRefill } from "@/lib/types/medications";
 
-interface ManageRefillsModalProps {
+interface EditRefillDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   medication: Medication;
@@ -36,13 +36,13 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function ManageRefillsModal({
+export function EditRefillDialog({
   open,
   onOpenChange,
   medication,
   refill,
   action,
-}: ManageRefillsModalProps) {
+}: EditRefillDialogProps) {
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState(String(refill.amount));
   const [date, setDate] = useState(refill.refill_date);

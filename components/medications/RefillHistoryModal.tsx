@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/Dialog";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { Button } from "@/components/ui/Button";
-import { ManageRefillsModal } from "./ManageRefillsModal";
+import { EditRefillDialog } from "./EditRefillDialog";
 import { getRefillHistory } from "@/lib/inventory";
 import type { Medication, MedicationRefill } from "@/lib/types/medications";
 
@@ -173,7 +173,7 @@ export function RefillHistoryModal({
         )}
       </DialogContent>
       {editingRefill && (
-        <ManageRefillsModal
+        <EditRefillDialog
           key={`${editingRefill.refill.id}-${editingRefill.action}`}
           open
           onOpenChange={(o) => !o && setEditingRefill(null)}
