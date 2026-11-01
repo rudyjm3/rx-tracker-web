@@ -65,6 +65,7 @@ export function TopNav() {
             width={32}
             height={32}
             className="rounded-xl"
+            style={{ width: 32, height: 32 }}
           />
           <span className="text-lg font-bold text-brand-navy">
             RxTracker
