@@ -178,8 +178,8 @@ export function RefillHistoryModal({
           open
           onOpenChange={(o) => !o && setEditingRefill(null)}
           medication={medication}
-          initialRefill={editingRefill.refill}
-          initialAction={editingRefill.action}
+          refill={editingRefill.refill}
+          action={editingRefill.action}
         />
       )}
     </Dialog>

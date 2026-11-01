@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -12,17 +12,16 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
-import { deleteRefill, getRefillHistory, updateRefill } from "@/lib/inventory";
+import { deleteRefill, updateRefill } from "@/lib/inventory";
 import type { Medication, MedicationRefill } from "@/lib/types/medications";
 
 interface ManageRefillsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   medication: Medication;
-  // Opens straight into the edit form for this refill.
-  initialRefill?: MedicationRefill;
-  // With initialRefill: open the edit form (default) or the delete confirmation.
-  initialAction?: "edit" | "delete";
+  refill: MedicationRefill;
+  // Edit form or delete confirmation for this single refill.
+  action: "edit" | "delete";
 }
 
 function formatAmount(n: number): string {
@@ -37,65 +36,43 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function ManageRefillsModal({ open, onOpenChange, medication, initialRefill, initialAction = "edit" }: ManageRefillsModalProps) {
+export function ManageRefillsModal({
+  open,
+  onOpenChange,
+  medication,
+  refill,
+  action,
+}: ManageRefillsModalProps) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState<MedicationRefill | null>(
-    initialAction === "edit" ? (initialRefill ?? null) : null,
-  );
-  const [deleting, setDeleting] = useState<MedicationRefill | null>(
-    initialAction === "delete" ? (initialRefill ?? null) : null,
-  );
-  const [amount, setAmount] = useState(initialRefill ? String(initialRefill.amount) : "");
-  const [date, setDate] = useState(initialRefill?.refill_date ?? "");
-  const [note, setNote] = useState(initialRefill?.note ?? "");
+  const [amount, setAmount] = useState(String(refill.amount));
+  const [date, setDate] = useState(refill.refill_date);
+  const [note, setNote] = useState(refill.note ?? "");
+  const unit = medication.inventory_unit;
 
-  const historyQuery = useQuery({
-    queryKey: ["refill-history", medication.id],
-    queryFn: () => getRefillHistory(medication.id),
-    enabled: open,
-  });
-  const refills = (historyQuery.data ?? []).filter((e) => e.entry_type === "refill");
-
-  function invalidate() {
+  function onDone() {
     queryClient.invalidateQueries({ queryKey: ["medications"] });
     queryClient.invalidateQueries({ queryKey: ["refill-history", medication.id] });
     queryClient.invalidateQueries({ queryKey: ["latest-refills"] });
+    onOpenChange(false);
   }
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!editing) return;
-      await updateRefill(editing.id, Number(amount), date, note);
-    },
+    mutationFn: () => updateRefill(refill.id, Number(amount), date, note),
     onSuccess: () => {
       toast.success("Refill updated");
-      invalidate();
-      if (initialRefill) onOpenChange(false);
-      else setEditing(null);
+      onDone();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Something went wrong"),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!deleting) return;
-      await deleteRefill(deleting.id);
-    },
+    mutationFn: () => deleteRefill(refill.id),
     onSuccess: () => {
       toast.success("Refill deleted");
-      invalidate();
-      if (initialRefill) onOpenChange(false);
-      else setDeleting(null);
+      onDone();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Something went wrong"),
   });
-
-  function startEdit(r: MedicationRefill) {
-    setEditing(r);
-    setAmount(String(r.amount));
-    setDate(r.refill_date);
-    setNote(r.note ?? "");
-  }
 
   function handleSave(e: FormEvent) {
     e.preventDefault();
@@ -107,27 +84,17 @@ export function ManageRefillsModal({ open, onOpenChange, medication, initialRefi
     saveMutation.mutate();
   }
 
-  const unit = medication.inventory_unit;
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          setEditing(null);
-          setDeleting(null);
-        }
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Edit/Delete Refill — <MedicationNameWithDose medication={medication} />
+            {action === "edit" ? "Edit refill" : "Delete refill"} —{" "}
+            <MedicationNameWithDose medication={medication} />
           </DialogTitle>
         </DialogHeader>
 
-        {editing ? (
+        {action === "edit" ? (
           <form onSubmit={handleSave} className="flex flex-col gap-3">
             <Field label="Refill date">
               <input
@@ -161,22 +128,22 @@ export function ManageRefillsModal({ open, onOpenChange, medication, initialRefi
               Changing the amount also adjusts your current count by the difference.
             </p>
             <div className="mt-2 flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="compact" onClick={() => (initialRefill ? onOpenChange(false) : setEditing(null))}>
-                {initialRefill ? "Cancel" : "Back"}
+              <Button type="button" variant="ghost" size="compact" onClick={() => onOpenChange(false)}>
+                Cancel
               </Button>
               <Button type="submit" size="compact" disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? "Saving…" : "Save changes"}
               </Button>
             </div>
           </form>
-        ) : deleting ? (
+        ) : (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-brand-text">
-              Delete the {formatDate(deleting.refill_date)} refill of {formatAmount(deleting.amount)}{" "}
-              {unit}? Your current count will go down by {formatAmount(deleting.amount)} {unit}.
+              Delete the {formatDate(refill.refill_date)} refill of {formatAmount(refill.amount)} {unit}?
+              Your current count will go down by {formatAmount(refill.amount)} {unit}.
             </p>
             <div className="mt-2 flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="compact" onClick={() => (initialRefill ? onOpenChange(false) : setDeleting(null))}>
+              <Button type="button" variant="ghost" size="compact" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button
@@ -190,37 +157,6 @@ export function ManageRefillsModal({ open, onOpenChange, medication, initialRefi
               </Button>
             </div>
           </div>
-        ) : historyQuery.isLoading ? (
-          <p className="text-sm text-brand-text-muted">Loading…</p>
-        ) : refills.length === 0 ? (
-          <p className="text-sm text-brand-text-muted">No refills logged yet.</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-brand-border">
-            {refills.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-brand-navy">{formatDate(r.refill_date)}</p>
-                  <p className="text-xs text-brand-text-muted">
-                    +{formatAmount(r.amount)} {unit}
-                    {r.note ? ` · ${r.note}` : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="secondary" size="compact" onClick={() => startEdit(r)}>
-                    Edit
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="compact"
-                    className="text-status-danger"
-                    onClick={() => setDeleting(r)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
         )}
       </DialogContent>
     </Dialog>
