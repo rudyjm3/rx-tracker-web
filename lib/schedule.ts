@@ -375,7 +375,8 @@ function wholeDaysBetween(from: string, to: string): number {
  *
  * Skipped: inactive, as-needed, inventory-untracked or quantity-less
  * medications, ones with no fixed schedule to project from, and ones whose
- * end_date is on/before the projected run-out (the regimen finishes first).
+ * end_date is strictly before the projected run-out (the regimen finishes first;
+ * end_date is inclusive, so a run-out on the final day still counts).
  * Medications already out of stock or at/below their low-supply threshold
  * are filed under `todayDate` ("out"/"low") instead of the future date.
  */
@@ -410,7 +411,7 @@ export function getRunoutByDate(
     // supply runs out that many days after it begins, not after today.
     const baseDate = med.start_date && med.start_date > todayDate ? med.start_date : todayDate;
     const runoutDate = addLocalDays(baseDate, daysLeft);
-    if (med.end_date && med.end_date <= runoutDate) continue;
+    if (med.end_date && med.end_date < runoutDate) continue;
 
     const status: RunoutStatus =
       med.current_quantity <= 0
