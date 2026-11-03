@@ -55,7 +55,7 @@ export function RefillHistoryModal({
     enabled: open,
   });
 
-  const entries = historyQuery.data ?? [];
+  const entries = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
 
   // Chronological pass (ascending) to attach "days since prev refill" —
   // computed across all-time refill entries, not just the viewed month,
