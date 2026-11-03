@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Pill, Settings, ShieldAlert, User } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useActiveProfile } from "@/components/layout/ActiveProfileProvider";
 import { useAuth } from "@/components/layout/AuthProvider";
 import { AllergyPanel } from "@/components/profile/AllergyPanel";
 import { AvatarPicker } from "@/components/profile/AvatarPicker";
@@ -42,6 +43,7 @@ import type { UserProfile } from "@/lib/types/profile";
 
 export function ProfileClient() {
   const { user } = useAuth();
+  const { setActiveProfileId } = useActiveProfile();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [avatarLightboxOpen, setAvatarLightboxOpen] = useState(false);
@@ -208,7 +210,13 @@ export function ProfileClient() {
             <Button type="button" variant="ghost" onClick={() => setMedsOpen(false)}>
               Close
             </Button>
-            <Link href="/medications" className={buttonVariants()}>
+            <Link
+              href="/medications"
+              className={buttonVariants()}
+              // This dialog lists the account owner's meds, so the page it
+              // opens must be scoped to the owner too, not a selected family member.
+              onClick={() => setActiveProfileId(null)}
+            >
               View all medications
             </Link>
           </DialogFooter>
@@ -232,6 +240,12 @@ export function ProfileClient() {
       />
     </div>
   );
+}
+
+async function getIdentities() {
+  const { data, error } = await createClient().auth.getUserIdentities();
+  if (error) throw error;
+  return data.identities;
 }
 
 function NavCard({
@@ -268,14 +282,7 @@ function NavCard({
 // "Allow manual linking" to be enabled in the Supabase Auth settings.
 function ConnectedAccountsPanel() {
   const queryClient = useQueryClient();
-  const identitiesQuery = useQuery({
-    queryKey: ["user-identities"],
-    queryFn: async () => {
-      const { data, error } = await createClient().auth.getUserIdentities();
-      if (error) throw error;
-      return data.identities;
-    },
-  });
+  const identitiesQuery = useQuery({ queryKey: ["user-identities"], queryFn: getIdentities });
   const identities = identitiesQuery.data ?? [];
   const google = identities.find((i) => i.provider === "google");
   // Supabase refuses to unlink an account's last identity.
@@ -331,7 +338,7 @@ function ConnectedAccountsPanel() {
           </Button>
           {!canDisconnect && (
             <p className="text-xs text-brand-text-muted">
-              Google is your only sign-in method. Set a password below before disconnecting it.
+              Google is your only sign-in method. Set a password in the Set Password panel below before disconnecting it.
             </p>
           )}
         </>
@@ -571,6 +578,11 @@ function ChangePasswordPanel() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  // Accounts created with Google have no email/password identity yet, so
+  // there is no current password to verify — they just set one.
+  const identitiesQuery = useQuery({ queryKey: ["user-identities"], queryFn: getIdentities });
+  const hasPassword = identitiesQuery.data?.some((i) => i.provider === "email") ?? true;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -584,17 +596,21 @@ function ChangePasswordPanel() {
       // supabase-js has no direct "verify current password" call — signing
       // in again with it is the standard way to confirm it's correct
       // before changing to the new one.
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email ?? "",
-        password: currentPassword,
-      });
-      if (signInError) throw new Error("Current password is incorrect.");
+      if (hasPassword) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: user?.email ?? "",
+          password: currentPassword,
+        });
+        if (signInError) throw new Error("Current password is incorrect.");
+      }
 
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
     },
     onSuccess: () => {
-      toast.success("Password changed successfully.");
+      toast.success(hasPassword ? "Password changed successfully." : "Password set successfully.");
+      // Setting a password adds an email identity, which lets Google be disconnected.
+      queryClient.invalidateQueries({ queryKey: ["user-identities"] });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -604,7 +620,7 @@ function ChangePasswordPanel() {
 
   return (
     <section className="flex flex-col gap-3 rounded-card border border-brand-border bg-brand-card p-4">
-      <h2 className="text-base font-bold text-brand-navy">Change Password</h2>
+      <h2 className="text-base font-bold text-brand-navy">{hasPassword ? "Change Password" : "Set Password"}</h2>
       <form
         className="flex flex-col gap-3"
         onSubmit={(e) => {
@@ -612,16 +628,18 @@ function ChangePasswordPanel() {
           mutation.mutate();
         }}
       >
-        <Field label="Current password">
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            className={inputClass}
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-          />
-        </Field>
+        {hasPassword && (
+          <Field label="Current password">
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              className={inputClass}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </Field>
+        )}
         <Field label="New password">
           <input
             type="password"
@@ -645,7 +663,7 @@ function ChangePasswordPanel() {
           />
         </Field>
         <Button type="submit" variant="secondary" disabled={mutation.isPending} className="self-start">
-          {mutation.isPending ? "Changing…" : "Change password"}
+          {mutation.isPending ? "Saving…" : hasPassword ? "Change password" : "Set password"}
         </Button>
       </form>
     </section>
