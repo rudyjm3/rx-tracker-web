@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronRight, Pill, Settings, ShieldAlert, User } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/components/layout/AuthProvider";
 import { AllergyPanel } from "@/components/profile/AllergyPanel";
@@ -19,6 +21,8 @@ import {
 import { Field, inputClass } from "@/components/ui/Field";
 import { buttonVariants } from "@/components/ui/Button";
 import { ImageLightbox } from "@/components/ui/ImageLightbox";
+import { getProfileAllergies } from "@/lib/allergies";
+import { getActiveMedications } from "@/lib/medications";
 import { createClient } from "@/lib/supabase/client";
 import {
   deleteAvatarIfManaged,
@@ -30,6 +34,7 @@ import {
   calculateAge,
   fallbackDisplayName,
   formatFeetInches,
+  formatMemberSince,
   formatUpdatedDate,
   heightToInches,
 } from "@/lib/utils";
@@ -40,12 +45,28 @@ export function ProfileClient() {
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [avatarLightboxOpen, setAvatarLightboxOpen] = useState(false);
+  const [medsOpen, setMedsOpen] = useState(false);
+  const [allergiesOpen, setAllergiesOpen] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ["user-profile"],
     queryFn: getUserProfile,
   });
   const profile = profileQuery.data ?? null;
+
+  const medsQuery = useQuery({
+    queryKey: ["medications", "active", null],
+    queryFn: () => getActiveMedications(null),
+  });
+  const meds = medsQuery.data ?? [];
+
+  // Same key AllergyPanel uses, so adding/removing inside the dialog updates
+  // the count on the card.
+  const allergiesQuery = useQuery({
+    queryKey: ["profile-allergies", null],
+    queryFn: () => getProfileAllergies(null),
+  });
+  const allergyCount = (allergiesQuery.data ?? []).filter((a) => a.is_active).length;
 
   const email = user?.email ?? "";
   const displayName =
@@ -64,37 +85,41 @@ export function ProfileClient() {
 
       <section className="flex flex-col gap-4 rounded-card border border-brand-border bg-brand-card p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-brand-navy">Profile Information</h2>
+          <h2 className="flex items-center gap-2 text-base font-bold text-brand-navy">
+            <User size={18} aria-hidden="true" /> Profile Information
+          </h2>
           <button
             type="button"
             onClick={() => setEditOpen(true)}
-            className="text-sm text-brand-deep-blue hover:underline"
+            aria-label="Edit profile"
+            className="rounded-full p-2 text-brand-deep-blue hover:bg-brand-bg"
           >
-            Edit
+            <Settings size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           {profile?.profile_picture ? (
             <button
               type="button"
               onClick={() => setAvatarLightboxOpen(true)}
               aria-label="View larger profile picture"
-              className="block h-14 w-14 shrink-0 overflow-hidden rounded-full"
+              className="block h-24 w-24 shrink-0 overflow-hidden rounded-full"
             >
               <Avatar pictureUrl={profile.profile_picture} label={displayName} />
             </button>
           ) : (
-            <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-full">
+            <span className="block h-24 w-24 shrink-0 overflow-hidden rounded-full">
               <Avatar pictureUrl={null} label={displayName} />
             </span>
           )}
-          <p className="text-lg font-semibold text-brand-text">{displayName}</p>
+          <p className="text-xl font-bold text-brand-blue">{displayName}</p>
         </div>
 
         <dl className="flex flex-col gap-2 text-sm">
-          <Row label="Display name" value={profile?.display_name || "—"} />
+          <Row label="Display name" value={profile?.display_name || displayName || "—"} />
           <Row label="Email" value={email} />
+          {user?.created_at && <Row label="Member since" value={formatMemberSince(user.created_at)} />}
           {profile?.birth_date && (
             <Row
               label="Birthdate"
@@ -126,10 +151,20 @@ export function ProfileClient() {
         </dl>
       </section>
 
-      <section className="rounded-card border border-brand-border bg-brand-card p-4">
-        <AllergyPanel profileId={null} />
-      </section>
+      <NavCard
+        icon={<Pill size={20} aria-hidden="true" />}
+        title="Medications and Supplements"
+        detail={`${meds.length} active ${meds.length === 1 ? "med" : "meds"}`}
+        onClick={() => setMedsOpen(true)}
+      />
+      <NavCard
+        icon={<ShieldAlert size={20} aria-hidden="true" />}
+        title="Allergies & Intolerances"
+        detail={`${allergyCount} ${allergyCount === 1 ? "allergy" : "allergies"}`}
+        onClick={() => setAllergiesOpen(true)}
+      />
 
+      <ConnectedAccountsPanel />
       <ChangePasswordPanel />
       <SecurityPanel />
       <DataPrivacyPanel />
@@ -152,6 +187,43 @@ export function ProfileClient() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={medsOpen} onOpenChange={setMedsOpen}>
+        <DialogContent sheet onSheetDismiss={() => setMedsOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Medications and Supplements</DialogTitle>
+          </DialogHeader>
+          {meds.length === 0 ? (
+            <p className="text-sm text-brand-text-muted">No active medications.</p>
+          ) : (
+            <ul className="flex flex-col">
+              {meds.map((m) => (
+                <li key={m.id} className="border-b border-brand-border py-3 last:border-b-0">
+                  <span className="font-semibold text-brand-navy">{m.name}</span>
+                  {m.dose && <span className="ml-1.5 text-sm font-bold text-[#6B7280]">{m.dose}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setMedsOpen(false)}>
+              Close
+            </Button>
+            <Link href="/medications" className={buttonVariants()}>
+              View all medications
+            </Link>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={allergiesOpen} onOpenChange={setAllergiesOpen}>
+        <DialogContent sheet onSheetDismiss={() => setAllergiesOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Allergies &amp; Intolerances</DialogTitle>
+          </DialogHeader>
+          <AllergyPanel profileId={null} showTitle={false} />
+        </DialogContent>
+      </Dialog>
+
       <ImageLightbox
         imageUrl={profile?.profile_picture ?? ""}
         caption={displayName}
@@ -159,6 +231,133 @@ export function ProfileClient() {
         onClose={() => setAvatarLightboxOpen(false)}
       />
     </div>
+  );
+}
+
+function NavCard({
+  icon,
+  title,
+  detail,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${title}, ${detail}`}
+      className="flex items-center gap-3 rounded-card border border-brand-border bg-brand-card p-4 text-left hover:bg-brand-bg"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-bg text-brand-deep-blue">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="font-bold text-brand-navy">{title}</span>
+        <span className="ml-2 text-sm text-brand-text-muted">{detail}</span>
+      </span>
+      <ChevronRight size={18} className="shrink-0 text-brand-text-muted" aria-hidden="true" />
+    </button>
+  );
+}
+
+// Google sign-in linking via Supabase manual identity linking. Requires
+// "Allow manual linking" to be enabled in the Supabase Auth settings.
+function ConnectedAccountsPanel() {
+  const queryClient = useQueryClient();
+  const identitiesQuery = useQuery({
+    queryKey: ["user-identities"],
+    queryFn: async () => {
+      const { data, error } = await createClient().auth.getUserIdentities();
+      if (error) throw error;
+      return data.identities;
+    },
+  });
+  const identities = identitiesQuery.data ?? [];
+  const google = identities.find((i) => i.provider === "google");
+  // Supabase refuses to unlink an account's last identity.
+  const canDisconnect = identities.length > 1;
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const callbackUrl = new URL("/auth/callback", window.location.origin);
+      callbackUrl.searchParams.set("next", "/profile");
+      const { error } = await createClient().auth.linkIdentity({
+        provider: "google",
+        options: { redirectTo: callbackUrl.toString() },
+      });
+      if (error) throw error;
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Couldn't connect Google"),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      if (!google) return;
+      const { error } = await createClient().auth.unlinkIdentity(google);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Google disconnected");
+      queryClient.invalidateQueries({ queryKey: ["user-identities"] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Couldn't disconnect Google"),
+  });
+
+  return (
+    <section className="flex flex-col gap-3 rounded-card border border-brand-border bg-brand-card p-4">
+      <h2 className="flex items-center gap-2 text-base font-bold text-brand-navy">
+        <GoogleMark /> Connected Accounts
+      </h2>
+      <p className="text-lg font-bold text-brand-navy">Google</p>
+      {google ? (
+        <p className="font-bold text-status-success">Connected ✓</p>
+      ) : (
+        <p className="text-brand-text-muted">Not connected</p>
+      )}
+      {google ? (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            className="self-start"
+            onClick={() => disconnectMutation.mutate()}
+            disabled={!canDisconnect || disconnectMutation.isPending}
+          >
+            {disconnectMutation.isPending ? "Disconnecting…" : "Disconnect"}
+          </Button>
+          {!canDisconnect && (
+            <p className="text-xs text-brand-text-muted">
+              Google is your only sign-in method. Set a password below before disconnecting it.
+            </p>
+          )}
+        </>
+      ) : (
+        <Button
+          type="button"
+          variant="secondary"
+          className="self-start"
+          onClick={() => connectMutation.mutate()}
+          disabled={connectMutation.isPending || identitiesQuery.isLoading}
+        >
+          {connectMutation.isPending ? "Connecting…" : "Connect"}
+        </Button>
+      )}
+    </section>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.4a5.5 5.5 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.6-5.2 3.6-8.8z" />
+      <path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3c-1.1.7-2.5 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1A12 12 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.4 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.4a12 12 0 0 0 0 10.8l4-3.1z" />
+      <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.4 6.6l4 3.1C6.3 6.9 8.9 4.8 12 4.8z" />
+    </svg>
   );
 }
 
