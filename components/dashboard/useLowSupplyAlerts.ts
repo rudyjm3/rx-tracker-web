@@ -65,9 +65,14 @@ export function useLowSupplyAlerts() {
   // flash on screen before it's filtered out.
   if (dismissed) {
     for (const medication of medicationsQuery.data ?? []) {
-      if (!medication.inventory_enabled || medication.current_quantity == null) continue;
+      if (!medication.inventory_enabled) continue;
       if (dismissed.has(medication.id)) continue;
-      let severity = severityFor(medication.current_quantity, medication.low_supply_threshold);
+      // Stock-based severity needs a known count; the refill-date fallback
+      // doesn't (the count can be blank when no starting quantity was entered).
+      let severity =
+        medication.current_quantity == null
+          ? null
+          : severityFor(medication.current_quantity, medication.low_supply_threshold);
       // No threshold set: the next refill date stands in for the pill count,
       // alerting from that date until a new one is entered.
       if (

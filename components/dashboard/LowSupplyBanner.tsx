@@ -30,9 +30,11 @@ export function LowSupplyBanner() {
             <p className="mt-1 text-lg font-bold">
               Refill: <MedicationNameWithDose medication={medication} doseClassName="text-[0.875em] font-bold text-white/70" />
             </p>
-            <p className="text-sm text-white/80">
-              Pills Left: {medication.current_quantity} {medication.inventory_unit}
-            </p>
+            {medication.current_quantity != null && (
+              <p className="text-sm text-white/80">
+                Pills Left: {medication.current_quantity} {medication.inventory_unit}
+              </p>
+            )}
             <Link
               href={refillHref(medication.id)}
               className="mt-3 inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/15 px-4 py-1.5 text-sm font-semibold text-white hover:bg-white/25"
