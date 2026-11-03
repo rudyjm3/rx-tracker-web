@@ -268,14 +268,10 @@ export function ExportClient() {
   });
   const allergies = allergiesQuery.data ?? [];
 
-  const adherenceEligibleMeds = useMemo(
-    () => selectedMedications.filter((m) => !m.as_needed && m.adherence_enabled),
-    [selectedMedications],
-  );
-  const eligibleIds = useMemo(
-    () => new Set(adherenceEligibleMeds.map((m) => m.id)),
-    [adherenceEligibleMeds],
-  );
+  // selectedMedications is a fresh array every render, so these cheap filters
+  // are computed directly rather than memoized against it.
+  const adherenceEligibleMeds = selectedMedications.filter((m) => !m.as_needed && m.adherence_enabled);
+  const eligibleIds = new Set(adherenceEligibleMeds.map((m) => m.id));
   const eligibleStatuses = adherenceStatuses.filter((l) => eligibleIds.has(l.medication_id));
   const overallAdherence = computeAdherence(eligibleStatuses);
   const dosesScheduled = eligibleStatuses.length;
@@ -304,14 +300,8 @@ export function ExportClient() {
   );
   const missedDoseDetail = missedDoseDetailAll.slice(0, MISSED_DOSE_DISPLAY_CAP);
 
-  const painTrackedMeds = useMemo(
-    () => (includePain ? selectedMedications.filter(medicationTracksPain) : []),
-    [includePain, selectedMedications],
-  );
-  const moodTrackedMeds = useMemo(
-    () => (includeMood ? selectedMedications.filter(medicationTracksMood) : []),
-    [includeMood, selectedMedications],
-  );
+  const painTrackedMeds = includePain ? selectedMedications.filter(medicationTracksPain) : [];
+  const moodTrackedMeds = includeMood ? selectedMedications.filter(medicationTracksMood) : [];
 
   const painTrendQueries = useQueries({
     queries: painTrackedMeds.map((med) => ({
