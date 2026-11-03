@@ -41,3 +41,13 @@ test("falls back to 30 days when no projection is possible", () => {
   const prn = med({ as_needed: true });
   assert.equal(suggestNextRefillDate(prn, 10, "2026-11-03"), "2026-12-03");
 });
+
+test("a supply that lasts under a day suggests the refill date itself, not +30", () => {
+  const empty = med({
+    medication_schedule_times: [
+      { reminder_time: "08:00:00", quantity_per_dose: null, group_id: null },
+      { reminder_time: "20:00:00", quantity_per_dose: null, group_id: null },
+    ],
+  });
+  assert.equal(suggestNextRefillDate(empty, 1, "2026-11-03"), "2026-11-03");
+});

@@ -89,15 +89,26 @@ export function RefillModal({
     mutationFn: async () => {
       if (mode === "refill") {
         await logRefill(medication.id, Number(amount) || 0, null, note, refillDate);
+        // The refill is committed at this point. If only the date update
+        // fails, report that without failing the whole action — retrying
+        // "Log refill" would add the refill a second time.
         if ((nextRefill || null) !== (medication.next_refill_date ?? null)) {
-          await setNextRefillDate(medication.id, nextRefill || null);
+          try {
+            await setNextRefillDate(medication.id, nextRefill || null);
+          } catch {
+            return "date-failed" as const;
+          }
         }
       } else {
         await adjustQuantity(medication.id, Number(pillsOnHand) || 0, note);
       }
     },
-    onSuccess: () => {
-      toast.success(mode === "refill" ? "Refill logged" : "Quantity adjusted");
+    onSuccess: (result) => {
+      if (result === "date-failed") {
+        toast.warning("Refill logged, but the next refill date couldn't be saved. Set it from Edit.");
+      } else {
+        toast.success(mode === "refill" ? "Refill logged" : "Quantity adjusted");
+      }
       queryClient.invalidateQueries({ queryKey: ["medications"] });
       queryClient.invalidateQueries({ queryKey: ["refill-history", medication.id] });
       queryClient.invalidateQueries({ queryKey: ["latest-refills"] });
