@@ -12,8 +12,12 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
-import { logRefill, adjustQuantity } from "@/lib/inventory";
-import { localDateString } from "@/lib/utils";
+import { logRefill, adjustQuantity, setNextRefillDate } from "@/lib/inventory";
+import {
+  localDateString,
+  suggestNextRefillDate,
+  type GroupDoseOverride,
+} from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 
 interface RefillModalProps {
@@ -21,6 +25,7 @@ interface RefillModalProps {
   onOpenChange: (open: boolean) => void;
   medication: Medication;
   mode: "refill" | "adjust";
+  groupDoseOverrides?: GroupDoseOverride[];
 }
 
 function UnitInput({
@@ -58,6 +63,7 @@ export function RefillModal({
   onOpenChange,
   medication,
   mode,
+  groupDoseOverrides = [],
 }: RefillModalProps) {
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
@@ -66,11 +72,26 @@ export function RefillModal({
   );
   const [refillDate, setRefillDate] = useState(localDateString());
   const [note, setNote] = useState("");
+  const [nextRefill, setNextRefill] = useState(medication.next_refill_date ?? "");
+  // Once the user edits the next refill date themselves, stop overwriting it
+  // with a fresh suggestion as the amount / refill date change.
+  const [nextRefillTouched, setNextRefillTouched] = useState(false);
+
+  function suggest(amountText: string, dateText: string) {
+    const amountValue = Number(amountText);
+    if (nextRefillTouched || !amountText || !Number.isFinite(amountValue) || amountValue <= 0 || !dateText) {
+      return;
+    }
+    setNextRefill(suggestNextRefillDate(medication, amountValue, dateText, groupDoseOverrides));
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (mode === "refill") {
         await logRefill(medication.id, Number(amount) || 0, null, note, refillDate);
+        if ((nextRefill || null) !== (medication.next_refill_date ?? null)) {
+          await setNextRefillDate(medication.id, nextRefill || null);
+        }
       } else {
         await adjustQuantity(medication.id, Number(pillsOnHand) || 0, note);
       }
@@ -84,6 +105,7 @@ export function RefillModal({
       setPillsOnHand(medication.current_quantity == null ? "" : String(medication.current_quantity));
       setRefillDate(localDateString());
       setNote("");
+      setNextRefillTouched(false);
       onOpenChange(false);
     },
     onError: (err) => {
@@ -128,19 +150,40 @@ export function RefillModal({
                   type="date"
                   required
                   value={refillDate}
-                  onChange={(e) => setRefillDate(e.target.value)}
+                  onChange={(e) => {
+                    setRefillDate(e.target.value);
+                    suggest(amount, e.target.value);
+                  }}
                   className={inputClass}
                 />
               </Field>
               <Field label={`Amount added (${medication.inventory_unit})`}>
                 <UnitInput
                   value={amount}
-                  onChange={setAmount}
+                  onChange={(v) => {
+                    setAmount(v);
+                    suggest(v, refillDate);
+                  }}
                   placeholder="e.g. 30"
                   unit={medication.inventory_unit}
                   required
                 />
               </Field>
+              <Field label="Next refill date (optional)">
+                <input
+                  type="date"
+                  value={nextRefill}
+                  onChange={(e) => {
+                    setNextRefillTouched(true);
+                    setNextRefill(e.target.value);
+                  }}
+                  className={inputClass}
+                />
+              </Field>
+              <p className="-mt-2 text-xs text-brand-text-muted">
+                Suggested from how long your supply lasts on the current schedule.
+                Edit or clear it as needed.
+              </p>
               <Field label="Note (optional)">
                 <input
                   type="text"

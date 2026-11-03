@@ -29,7 +29,7 @@ import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { MedTypeBadge } from "@/components/ui/MedTypeBadge";
 import { cn } from "@/lib/cn";
 import { medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
-import { daysUntilRunout, to12h, type GroupDoseOverride } from "@/lib/utils";
+import { daysUntilRunout, formatDate, to12h, type GroupDoseOverride } from "@/lib/utils";
 import type { Medication, MedicationRefill } from "@/lib/types/medications";
 import { MedicationTrendModal } from "./MedicationTrendModal";
 import { RefillModal } from "./RefillModal";
@@ -246,6 +246,11 @@ export function MedicationCard({
                   style={{ width: `${fillPct}%` }}
                 />
               </div>
+              {medication.next_refill_date && (
+                <p className="mt-1 text-xs text-brand-text-muted">
+                  Next refill: {formatDate(medication.next_refill_date)}
+                </p>
+              )}
               {runoutText && (
                 <p className="mt-1 text-xs text-brand-text-muted">{runoutText}</p>
               )}
@@ -373,6 +378,7 @@ export function MedicationCard({
           open
           onOpenChange={(open) => setOpenModal(open ? "refill" : null)}
           medication={medication}
+          groupDoseOverrides={groupDoseOverrides}
           mode="refill"
         />
       )}

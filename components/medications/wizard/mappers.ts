@@ -52,6 +52,7 @@ export function medicationToFormValues(med: Medication): MedicationFormValues {
     startingQuantity: numToStr(med.starting_quantity),
     quantityPerDose: numToStr(med.quantity_per_dose),
     lowSupplyThreshold: numToStr(med.low_supply_threshold),
+    nextRefillDate: med.next_refill_date ?? "",
     feedbackType: med.feedback_type,
     dashboardEnabled: med.dashboard_enabled,
     remindersEnabled: med.reminders_enabled,
@@ -102,6 +103,8 @@ export function toMedicationInput(values: MedicationFormValues): MedicationInput
       : null,
     quantity_per_dose: strToNum(values.quantityPerDose) ?? 1,
     low_supply_threshold: strToNum(values.lowSupplyThreshold) ?? 0,
+    next_refill_date:
+      values.inventoryEnabled && values.nextRefillDate ? values.nextRefillDate : null,
     feedback_type: values.feedbackType,
     dashboard_enabled: values.dashboardEnabled,
     reminders_enabled: values.remindersEnabled,

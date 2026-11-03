@@ -141,7 +141,13 @@ function formatQty(n: number): string {
 }
 
 function runoutLabel(status: RunoutEntry["status"]): string {
-  return status === "out" ? "Out of stock" : status === "low" ? "Low supply" : "Runs out";
+  return status === "out"
+    ? "Out of stock"
+    : status === "low"
+      ? "Low supply"
+      : status === "refill"
+        ? "Refill due"
+        : "Runs out";
 }
 
 function RunoutCallout({ runouts }: { runouts: RunoutEntry[] }) {
@@ -166,9 +172,11 @@ function RunoutCallout({ runouts }: { runouts: RunoutEntry[] }) {
           </span>
         </p>
       ))}
-      <p className="text-xs text-brand-text-muted">
-        Run-out dates are estimates that assume your current schedule continues.
-      </p>
+      {runouts.some((r) => r.status !== "refill") && (
+        <p className="text-xs text-brand-text-muted">
+          Run-out dates are estimates that assume your current schedule continues.
+        </p>
+      )}
     </div>
   );
 }

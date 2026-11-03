@@ -386,6 +386,7 @@ export function MedicationsListClient() {
             if (!open) router.replace(pathname);
           }}
           medication={refillTarget}
+          groupDoseOverrides={groupDoseOverridesFor(refillTarget.id)}
           mode="refill"
         />
       )}

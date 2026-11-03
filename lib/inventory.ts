@@ -29,6 +29,20 @@ export async function logRefill(
   if (error) throw error;
 }
 
+// Sets (or clears, with null) a medication's next refill date. A plain
+// column update — the date isn't part of the row-locked quantity math.
+export async function setNextRefillDate(
+  medicationId: string,
+  date: string | null,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("medications")
+    .update({ next_refill_date: date })
+    .eq("id", medicationId);
+  if (error) throw error;
+}
+
 export async function getRefillHistory(
   medicationId: string,
 ): Promise<MedicationRefill[]> {

@@ -340,7 +340,7 @@ export function buildDoseEvents(slots: DaySlot[], date: string): NextDoseEvent[]
   return events;
 }
 
-export type RunoutStatus = "runout" | "low" | "out";
+export type RunoutStatus = "runout" | "low" | "out" | "refill";
 
 export interface RunoutEntry {
   medicationId: string;
@@ -430,6 +430,27 @@ export function getRunoutByDate(
       unit: med.inventory_unit || "pills",
       runoutDate,
       daysLeft: wholeDaysBetween(todayDate, runoutDate),
+    });
+  }
+
+  // The entered next refill date gets its own marker on that day (today or
+  // later), unless the same medication is already flagged there above.
+  for (const med of medications) {
+    if (!med.active || !med.inventory_enabled || !med.next_refill_date) continue;
+    if (med.next_refill_date < todayDate) continue;
+    const list = (result[med.next_refill_date] ??= []);
+    if (list.some((r) => r.medicationId === med.id)) continue;
+    list.push({
+      medicationId: med.id,
+      name: med.name,
+      dose: med.dose,
+      dose_amount: med.dose_amount,
+      dose_unit: med.dose_unit,
+      status: "refill",
+      quantity: med.current_quantity ?? 0,
+      unit: med.inventory_unit || "pills",
+      runoutDate: med.next_refill_date,
+      daysLeft: wholeDaysBetween(todayDate, med.next_refill_date),
     });
   }
   return result;
