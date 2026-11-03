@@ -340,7 +340,7 @@ export function buildDoseEvents(slots: DaySlot[], date: string): NextDoseEvent[]
   return events;
 }
 
-export type RunoutStatus = "runout" | "low" | "out";
+export type RunoutStatus = "runout" | "low" | "out" | "refill";
 
 export interface RunoutEntry {
   medicationId: string;
@@ -349,7 +349,7 @@ export interface RunoutEntry {
   dose_amount: number | null;
   dose_unit: string | null;
   status: RunoutStatus;
-  quantity: number; // current_quantity as of now
+  quantity: number | null; // current_quantity as of now; null = unknown (refill entries only)
   unit: string; // inventory_unit, e.g. "tablets"
   runoutDate: string; // projected run-out, local YYYY-MM-DD
   daysLeft: number; // whole days from today to runoutDate (includes any wait for start_date)
@@ -375,7 +375,8 @@ function wholeDaysBetween(from: string, to: string): number {
  *
  * Skipped: inactive, as-needed, inventory-untracked or quantity-less
  * medications, ones with no fixed schedule to project from, and ones whose
- * end_date is on/before the projected run-out (the regimen finishes first).
+ * end_date is strictly before the projected run-out (the regimen finishes first;
+ * end_date is inclusive, so a run-out on the final day still counts).
  * Medications already out of stock or at/below their low-supply threshold
  * are filed under `todayDate` ("out"/"low") instead of the future date.
  */
@@ -410,7 +411,7 @@ export function getRunoutByDate(
     // supply runs out that many days after it begins, not after today.
     const baseDate = med.start_date && med.start_date > todayDate ? med.start_date : todayDate;
     const runoutDate = addLocalDays(baseDate, daysLeft);
-    if (med.end_date && med.end_date <= runoutDate) continue;
+    if (med.end_date && med.end_date < runoutDate) continue;
 
     const status: RunoutStatus =
       med.current_quantity <= 0
@@ -430,6 +431,27 @@ export function getRunoutByDate(
       unit: med.inventory_unit || "pills",
       runoutDate,
       daysLeft: wholeDaysBetween(todayDate, runoutDate),
+    });
+  }
+
+  // The entered next refill date gets its own marker on that day (today or
+  // later), unless the same medication is already flagged there above.
+  for (const med of medications) {
+    if (!med.active || !med.inventory_enabled || !med.next_refill_date) continue;
+    if (med.next_refill_date < todayDate) continue;
+    const list = (result[med.next_refill_date] ??= []);
+    if (list.some((r) => r.medicationId === med.id)) continue;
+    list.push({
+      medicationId: med.id,
+      name: med.name,
+      dose: med.dose,
+      dose_amount: med.dose_amount,
+      dose_unit: med.dose_unit,
+      status: "refill",
+      quantity: med.current_quantity,
+      unit: med.inventory_unit || "pills",
+      runoutDate: med.next_refill_date,
+      daysLeft: wholeDaysBetween(todayDate, med.next_refill_date),
     });
   }
   return result;

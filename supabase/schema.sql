@@ -95,6 +95,7 @@ create table if not exists medications (
   -- Exact DailyMed SPL document (openFDA NDC spl_set_id) matching this
   -- medication's strength, chosen via the name autocomplete. Nullable.
   dailymed_setid          text,
+  next_refill_date        date,
   sort_order              smallint not null default 0,
   created_at              timestamptz default now(),
   updated_at              timestamptz default now()
@@ -802,6 +803,10 @@ begin
            and v_old_dose_unit = v_new_dose_unit then v_existing.dailymed_setid
       else null
     end,
+    next_refill_date = case
+      when p_medication ? 'next_refill_date' then nullif(p_medication->>'next_refill_date', '')::date
+      else v_existing.next_refill_date
+    end,
     updated_at = now()
   where id = p_medication_id;
 
@@ -913,7 +918,7 @@ begin
     current_quantity, quantity_per_dose, low_supply_threshold,
     track_dose_feedback, feedback_type, start_date, end_date, active,
     setup_status, dashboard_enabled, reminders_enabled, adherence_enabled,
-    inventory_enabled, dailymed_setid
+    inventory_enabled, dailymed_setid, next_refill_date
   ) values (
     (select auth.uid()),
     nullif(p_medication->>'profile_id', '')::uuid,
@@ -944,7 +949,8 @@ begin
     coalesce((p_medication->>'reminders_enabled')::boolean, true),
     coalesce((p_medication->>'adherence_enabled')::boolean, true),
     v_inventory_enabled,
-    nullif(trim(p_medication->>'dailymed_setid'), '')
+    nullif(trim(p_medication->>'dailymed_setid'), ''),
+    nullif(p_medication->>'next_refill_date', '')::date
   )
   returning * into v_medication;
 

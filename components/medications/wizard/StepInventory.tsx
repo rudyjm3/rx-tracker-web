@@ -72,6 +72,18 @@ export function StepInventory() {
               />
             </Field>
           </div>
+          <Field label="Next refill date (optional)">
+            <input
+              type="date"
+              className={inputClass}
+              {...register("nextRefillDate")}
+            />
+          </Field>
+          <p className="-mt-2 text-xs text-brand-text-muted">
+            Marked on the calendar. Leave the low supply threshold at 0 and this
+            date is used for the refill alert instead of the pill count — set a
+            threshold to be reminded before it.
+          </p>
         </>
       )}
 

@@ -26,6 +26,24 @@ export function formatDate(dateStr: string): string {
   return `${month}-${day}-${year}`;
 }
 
+// Suggested next refill date after a refill: the refill date plus however many
+// days the stock on hand (current + amount just added) lasts on the current
+// schedule, or 30 days when no projection is possible.
+export function suggestNextRefillDate(
+  medication: Medication,
+  amountAdded: number,
+  refillDate: string,
+  groupDoseOverrides: GroupDoseOverride[] = [],
+): string {
+  const total = (medication.current_quantity ?? 0) + amountAdded;
+  const days = daysUntilRunout({ ...medication, current_quantity: total }, groupDoseOverrides);
+  const d = new Date(`${refillDate}T00:00:00`);
+  // null = no projection possible; 0 is a real (sub-day) supply, so don't
+  // push the date out a month.
+  d.setDate(d.getDate() + (days ?? 30));
+  return localDateString(d);
+}
+
 export function to12h(time: string): string {
   const [hourStr, minuteStr] = time.split(":");
   const hour = parseInt(hourStr, 10);

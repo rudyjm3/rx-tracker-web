@@ -79,8 +79,9 @@ export function NotificationBell() {
               <div className="min-w-0 flex-1">
                 <MedicationNameWithDose medication={medication} className="break-words font-medium text-brand-text" />
                 <p className="text-xs text-status-danger">
-                  {SUPPLY_SEVERITY_LABEL[severity]} — {medication.current_quantity}{" "}
-                  {medication.inventory_unit} remaining
+                  {SUPPLY_SEVERITY_LABEL[severity]}
+                  {medication.current_quantity != null &&
+                    ` — ${medication.current_quantity} ${medication.inventory_unit} remaining`}
                 </p>
                 <DropdownMenuItem
                   asChild

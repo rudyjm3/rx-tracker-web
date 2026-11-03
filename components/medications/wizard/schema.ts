@@ -83,6 +83,8 @@ export const medicationFormSchema = z
         (v) => Number.isFinite(Number(v)) && Number(v) >= 0,
         "Must be zero or greater",
       ),
+    // Optional YYYY-MM-DD (native date input).
+    nextRefillDate: z.string().optional(),
 
     // Step 4 — Feedback
     feedbackType: z.enum(["none", "pain", "mood", "both"]),
@@ -177,6 +179,7 @@ export const defaultFormValues: MedicationFormValues = {
   startingQuantity: "",
   quantityPerDose: "1",
   lowSupplyThreshold: "5",
+  nextRefillDate: "",
 
   feedbackType: "none",
   dashboardEnabled: true,
@@ -201,6 +204,7 @@ export const STEP_FIELDS: Record<number, (keyof MedicationFormValues)[]> = {
     "inventoryMethod",
     "quantityPerDose",
     "lowSupplyThreshold",
+    "nextRefillDate",
   ],
   3: [
     "asNeeded",

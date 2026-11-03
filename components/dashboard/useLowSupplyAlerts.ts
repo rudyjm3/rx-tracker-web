@@ -9,12 +9,13 @@ import { getActiveMedications } from "@/lib/medications";
 import { localDateString } from "@/lib/utils";
 import type { Medication } from "@/lib/types/medications";
 
-export type SupplySeverity = "out_of_stock" | "critical" | "low_stock";
+export type SupplySeverity = "out_of_stock" | "critical" | "low_stock" | "refill_due";
 
 export const SUPPLY_SEVERITY_LABEL: Record<SupplySeverity, string> = {
   out_of_stock: "Out of stock",
   critical: "Critically low",
   low_stock: "Low supply",
+  refill_due: "Refill due",
 };
 
 function severityFor(current: number, threshold: number): SupplySeverity | null {
@@ -64,9 +65,24 @@ export function useLowSupplyAlerts() {
   // flash on screen before it's filtered out.
   if (dismissed) {
     for (const medication of medicationsQuery.data ?? []) {
-      if (!medication.inventory_enabled || medication.current_quantity == null) continue;
+      if (!medication.inventory_enabled) continue;
       if (dismissed.has(medication.id)) continue;
-      const severity = severityFor(medication.current_quantity, medication.low_supply_threshold);
+      // Stock-based severity needs a known count; the refill-date fallback
+      // doesn't (the count can be blank when no starting quantity was entered).
+      let severity =
+        medication.current_quantity == null
+          ? null
+          : severityFor(medication.current_quantity, medication.low_supply_threshold);
+      // No threshold set: the next refill date stands in for the pill count,
+      // alerting from that date until a new one is entered.
+      if (
+        !severity &&
+        medication.low_supply_threshold <= 0 &&
+        medication.next_refill_date &&
+        medication.next_refill_date <= today
+      ) {
+        severity = "refill_due";
+      }
       if (severity) alerts.push({ medication, severity });
     }
   }

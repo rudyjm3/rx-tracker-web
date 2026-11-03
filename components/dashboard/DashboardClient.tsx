@@ -34,7 +34,7 @@ import {
   type DaySlot,
   type NextDoseEvent,
 } from "@/lib/schedule";
-import { isLate, localDateString, to12h } from "@/lib/utils";
+import { isLate, localDateString, to12h, type GroupDoseOverride } from "@/lib/utils";
 import { HeroPanel } from "./HeroPanel";
 import { ScheduleList } from "./ScheduleList";
 import { LowSupplyBanner } from "./LowSupplyBanner";
@@ -403,6 +403,20 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     () => adherenceSlots.filter((s) => !s.isPrn),
     [adherenceSlots],
   );
+
+  // Group-level dose overrides for a medication (active groups only), for the
+  // refill modal's next-refill-date suggestion.
+  function groupDoseOverridesFor(medicationId: string): GroupDoseOverride[] {
+    const groups = groupsQuery.data ?? [];
+    return (groupMembersQuery.data ?? [])
+      .filter((member) => member.medication_id === medicationId)
+      .flatMap((member) => {
+        const group = groups.find((item) => item.id === member.group_id);
+        return group
+          ? [{ scheduled_time: group.scheduled_time, quantity_per_dose: member.quantity_per_dose }]
+          : [];
+      });
+  }
 
   // Ungrouped as-needed medications never get a slot from generateDaySlots
   // (their doses are logged ad hoc) — pull those dose_logs in separately so
@@ -784,6 +798,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
         onClose={() => setZeroPillSlot(null)}
         onTakeAnyway={handleZeroPillTakeAnyway}
         onCancelDose={() => setZeroPillSlot(null)}
+        groupDoseOverridesFor={groupDoseOverridesFor}
       />
       <ZeroPillModal
         // Keyed by slot: this instance can cycle through several
@@ -796,6 +811,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
         onClose={handleAlarmZeroPillCancel}
         onTakeAnyway={handleAlarmZeroPillTakeAnyway}
         onCancelDose={handleAlarmZeroPillCancel}
+        groupDoseOverridesFor={groupDoseOverridesFor}
       />
       <FeedbackDialog
         slot={alarmFeedbackSlot}

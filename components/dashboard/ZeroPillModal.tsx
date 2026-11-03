@@ -16,6 +16,7 @@ import { MedicationNameWithDose } from "@/components/ui/MedicationNameWithDose";
 import { RefillModal } from "@/components/medications/RefillModal";
 import { adjustQuantity } from "@/lib/inventory";
 import type { DaySlot } from "@/lib/schedule";
+import type { GroupDoseOverride } from "@/lib/utils";
 
 interface ZeroPillModalProps {
   slot: DaySlot | null;
@@ -24,6 +25,8 @@ interface ZeroPillModalProps {
   onTakeAnyway: () => void;
   /** "Cancel dose" — abort, nothing is recorded. */
   onCancelDose: () => void;
+  /** Group-level dose overrides for a medication, used to suggest the next refill date. */
+  groupDoseOverridesFor?: (medicationId: string) => GroupDoseOverride[];
 }
 
 /**
@@ -32,7 +35,13 @@ interface ZeroPillModalProps {
  * being unavailable, so this offers a quick correction before falling
  * through to actually recording the dose.
  */
-export function ZeroPillModal({ slot, onClose, onTakeAnyway, onCancelDose }: ZeroPillModalProps) {
+export function ZeroPillModal({
+  slot,
+  onClose,
+  onTakeAnyway,
+  onCancelDose,
+  groupDoseOverridesFor,
+}: ZeroPillModalProps) {
   const queryClient = useQueryClient();
   const [count, setCount] = useState(0);
   const [refillOpen, setRefillOpen] = useState(false);
@@ -129,6 +138,7 @@ export function ZeroPillModal({ slot, onClose, onTakeAnyway, onCancelDose }: Zer
         open={refillOpen}
         onOpenChange={setRefillOpen}
         medication={medication}
+        groupDoseOverrides={groupDoseOverridesFor?.(medication.id)}
         mode="refill"
       />
     </>
