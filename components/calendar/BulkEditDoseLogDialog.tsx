@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
+import { LimitedNoteField } from "@/components/ui/LimitedNoteField";
 import { editDoseLogsBatch, recordDose, recordDoseAtTime } from "@/lib/dose-logs";
 import { localDateString } from "@/lib/utils";
 import type { DoseLogStatus, Medication } from "@/lib/types/medications";
@@ -225,15 +226,7 @@ function BulkEditDoseLogForm({
         )}
 
         {status === "taken" && (
-          <Field label="Notes (optional, applies to all)">
-            <textarea
-              className={inputClass}
-              rows={2}
-              maxLength={255}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </Field>
+          <LimitedNoteField label="Notes (optional, applies to all)" value={note} onChange={setNote} />
         )}
 
         <ul className="flex flex-col gap-1 text-xs text-brand-text-muted">

@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
+import { LimitedNoteField } from "@/components/ui/LimitedNoteField";
 import { LevelGrid } from "@/components/ui/LevelGrid";
 import { deleteDoseLog, editDoseLog } from "@/lib/dose-logs";
 import { medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
@@ -214,15 +215,7 @@ function EditDoseLogForm({ log, medication, onSaved, onDeleted, onCancel }: Edit
         )}
 
         {status === "taken" && (
-          <Field label="Notes (optional)">
-            <textarea
-              className={inputClass}
-              rows={2}
-              maxLength={255}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </Field>
+          <LimitedNoteField label="Notes (optional)" value={note} onChange={setNote} />
         )}
 
         {error && <p className="text-sm text-status-danger">{error}</p>}
