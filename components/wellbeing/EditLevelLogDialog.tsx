@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
+import { LimitedNoteField } from "@/components/ui/LimitedNoteField";
 import { LevelGrid } from "@/components/ui/LevelGrid";
 import { formatMedicationNameDose } from "@/lib/medication-label";
 import { deleteStandaloneLog, updateStandaloneLog, type WellbeingMetric } from "@/lib/pain-mood";
@@ -203,16 +204,7 @@ function EditLevelLogForm({
           </div>
         )}
 
-        <Field label="Comments (optional)">
-          <textarea
-            className={inputClass}
-            rows={2}
-            maxLength={255}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Any notes about this level…"
-          />
-        </Field>
+        <LimitedNoteField label="Comments (optional)" value={note} onChange={setNote} placeholder="Any notes about this level…" />
 
         {error && <p className="text-sm text-status-danger">{error}</p>}
       </div>

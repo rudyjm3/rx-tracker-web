@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
+import { LimitedNoteField } from "@/components/ui/LimitedNoteField";
 import { LevelGrid } from "@/components/ui/LevelGrid";
 import { formatMedicationNameDose } from "@/lib/medication-label";
 import { localDateString } from "@/lib/utils";
@@ -175,16 +176,7 @@ export function LogLevelModal({
           )}
 
           {showComment ? (
-            <Field label="Comments (optional)">
-              <textarea
-                className={inputClass}
-                rows={2}
-                maxLength={255}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Any notes about this level…"
-              />
-            </Field>
+            <LimitedNoteField label="Comments (optional)" value={note} onChange={setNote} placeholder="Any notes about this level…" />
           ) : (
             <button
               type="button"

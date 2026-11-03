@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { DialogFooter } from "@/components/ui/Dialog";
 import { Field, inputClass } from "@/components/ui/Field";
+import { LimitedNoteField } from "@/components/ui/LimitedNoteField";
 import { LevelGrid } from "@/components/ui/LevelGrid";
 import { medicationTracksMood, medicationTracksPain } from "@/lib/pain-mood";
 import type { DoseFeedback } from "@/lib/dose-logs";
@@ -102,15 +103,7 @@ export function DoseEntryForm({
         />
       )}
 
-      <Field label="Notes (optional)">
-        <textarea
-          className={inputClass}
-          rows={2}
-          maxLength={255}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </Field>
+      <LimitedNoteField label="Notes (optional)" value={note} onChange={setNote} />
 
       <DialogFooter className={onBack ? "justify-between" : undefined}>
         {onBack ? (
