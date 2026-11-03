@@ -167,8 +167,11 @@ function RunoutCallout({ runouts }: { runouts: RunoutEntry[] }) {
           </span>
           <MedicationNameWithDose medication={r} />
           <span className="text-brand-text-muted">
-            ({formatQty(r.quantity)} {r.unit} left today
-            {r.status === "low" ? ` · est. run-out ${formatDate(r.runoutDate)}` : ""})
+            {r.quantity != null ? `(${formatQty(r.quantity)} ${r.unit} left today` : "("}
+            {r.quantity != null && r.status === "low"
+              ? ` · est. run-out ${formatDate(r.runoutDate)}`
+              : ""}
+            {r.quantity != null ? ")" : `refill date ${formatDate(r.runoutDate)})`}
           </span>
         </p>
       ))}

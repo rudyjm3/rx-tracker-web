@@ -349,7 +349,7 @@ export interface RunoutEntry {
   dose_amount: number | null;
   dose_unit: string | null;
   status: RunoutStatus;
-  quantity: number; // current_quantity as of now
+  quantity: number | null; // current_quantity as of now; null = unknown (refill entries only)
   unit: string; // inventory_unit, e.g. "tablets"
   runoutDate: string; // projected run-out, local YYYY-MM-DD
   daysLeft: number; // whole days from today to runoutDate (includes any wait for start_date)
@@ -448,7 +448,7 @@ export function getRunoutByDate(
       dose_amount: med.dose_amount,
       dose_unit: med.dose_unit,
       status: "refill",
-      quantity: med.current_quantity ?? 0,
+      quantity: med.current_quantity,
       unit: med.inventory_unit || "pills",
       runoutDate: med.next_refill_date,
       daysLeft: wholeDaysBetween(todayDate, med.next_refill_date),
