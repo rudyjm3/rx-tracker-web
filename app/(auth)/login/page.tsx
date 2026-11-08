@@ -5,7 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { safeRedirectPath } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/Button";
+
+// /auth/callback redirects here with ?error=auth-callback-failed (plus
+// Supabase's error_description when the provider step failed) instead of
+// failing silently.
+function callbackErrorMessage(searchParams: Pick<URLSearchParams, "get">): string | null {
+  if (searchParams.get("error") !== "auth-callback-failed") return null;
+  const detail = searchParams.get("error_description");
+  return detail
+    ? `Sign-in couldn't be completed: ${detail}`
+    : "Sign-in couldn't be completed. Please try again.";
+}
 
 export default function LoginPage() {
   return (
@@ -18,12 +30,12 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") || "/dashboard";
+  const redirectTo = safeRedirectPath(searchParams.get("redirectTo"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => callbackErrorMessage(searchParams));
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent) {

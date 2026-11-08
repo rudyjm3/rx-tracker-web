@@ -24,6 +24,12 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 ```
 
+In production, also set `NEXT_PUBLIC_SITE_URL` to the public site URL
+(e.g. `https://rx-tracker-web.dwdrm.com`). `/auth/callback` uses it to build
+the post-sign-in redirect; behind Hostinger's reverse proxy the request's own
+origin is the server's internal address (`https://0.0.0.0:3000`). If unset,
+the `X-Forwarded-Host` / `Host` headers are used instead.
+
 Run `supabase/schema.sql` against your Supabase project (Project → SQL
 Editor → New query, paste, Run) before using any data page — medications,
 dose logs, etc. all depend on those tables. Auth (sign up/sign in) itself
