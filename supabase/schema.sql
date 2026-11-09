@@ -1567,11 +1567,31 @@ begin
         or nullif(e->>'medication_id', '') is null
         or nullif(e->>'scheduled_for_date', '') is null
         or nullif(e->>'scheduled_time', '') is null
-        or e->>'status' not in ('taken', 'skipped')
+        or coalesce(e->>'status', '') not in ('taken', 'skipped')
         or (e->>'status' = 'taken' and nullif(e->>'taken_at', '') is null)
   ) then
     raise exception 'Each pending dose needs a medication_id, scheduled_for_date, scheduled_time and a taken/skipped status (taken also needs taken_at)';
   end if;
+
+  if p_edits is null or jsonb_typeof(p_edits) <> 'array' then
+    raise exception 'p_edits must be a JSON array';
+  end if;
+
+  -- One lock order covering both phases, taken before either runs: the
+  -- existing dose logs by id, then every medication touched by either
+  -- array by id (the same dose_log -> medication order edit_dose_log uses).
+  -- Locking only inside each phase would let two overlapping saves hold
+  -- different medication locks and then wait on each other.
+  perform 1 from dose_logs
+   where id in (select (e->>'log_id')::uuid from jsonb_array_elements(p_edits) as e)
+   order by id for update;
+  perform 1 from medications
+   where id in (
+           select medication_id from dose_logs
+            where id in (select (e->>'log_id')::uuid from jsonb_array_elements(p_edits) as e)
+         )
+      or id in (select (e->>'medication_id')::uuid from jsonb_array_elements(p_pending) as e)
+   order by id for update;
 
   perform edit_dose_logs_batch(p_edits);
 
