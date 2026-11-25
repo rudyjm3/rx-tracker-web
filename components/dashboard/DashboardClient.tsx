@@ -12,7 +12,7 @@ import {
   finalizeMissedDoses,
   getTodayLogs,
   getTodayPostpones,
-  postponeDose,
+  postponeDoses,
   recordDose,
   recordDoseAtTime,
   type DoseFeedback,
@@ -246,7 +246,12 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   function alarmAffectedSlots(event: NextDoseEvent): DaySlot[] {
     if (event.kind === "single") return [event.slot];
     const members = dueNowGroupMembers ?? event.members;
-    return affectedGroupMembers(members);
+    // Take All records the whole group: required members (pending or
+    // missed) plus any still-pending PRN groupmates, which the alarm's
+    // event leaves out so they never trigger it on their own.
+    const affected = affectedGroupMembers(members);
+    const prnPending = pendingGroupSlots(event).filter((s) => s.isPrn);
+    return [...affected, ...prnPending.filter((s) => !affected.includes(s))];
   }
   function handleAlarmTakeAll(event: NextDoseEvent) {
     startAlarmTake(alarmAffectedSlots(event), event.time);
@@ -490,8 +495,8 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   });
 
   const snoozeMutation = useMutation({
-    mutationFn: ({ slot, minutes }: { slot: DaySlot; minutes: number }) =>
-      postponeDose(slot.medicationId, date, slot.scheduledTime, minutes),
+    mutationFn: ({ slots, minutes }: { slots: DaySlot[]; minutes: number }) =>
+      postponeDoses(slots, date, minutes),
     onSuccess: (_, { minutes }) => {
       toast.success(`Snoozed for ${minutes} minutes`);
       queryClient.invalidateQueries({ queryKey: ["dose-postpones", date] });
@@ -535,17 +540,37 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   }
   function handleSnooze(slot: DaySlot, minutes: number) {
     setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
-    snoozeMutation.mutate({ slot, minutes });
+    snoozeMutation.mutate({ slots: [slot], minutes });
   }
 
   function eventSlots(event: NextDoseEvent): DaySlot[] {
     return event.kind === "group" ? event.members : [event.slot];
   }
+  // Every still-pending member of an event's group at its due time,
+  // including PRN ones the alarm's event omits (group actions are all-or-
+  // nothing; individual choices go through Manage Individually).
+  function pendingGroupSlots(event: NextDoseEvent): DaySlot[] {
+    if (event.kind !== "group") return eventSlots(event).filter((s) => s.status === "pending");
+    return slots.filter(
+      (s) =>
+        s.groupId === event.groupId &&
+        s.status === "pending" &&
+        slotGroupTime(s, date, slots) === event.time,
+    );
+  }
   function handleSkipAll(event: NextDoseEvent) {
-    eventSlots(event).forEach(handleSkip);
+    pendingGroupSlots(event).forEach(handleSkip);
+  }
+  // One write with one shared postponed_until so the group stays a single
+  // card. Includes pending PRN groupmates, which the alarm's event omits.
+  function handleSnoozeSlots(targets: DaySlot[], minutes: number) {
+    const pending = targets.filter((s) => s.status === "pending");
+    if (pending.length === 0) return;
+    setPendingKey(pending.map((s) => `${s.medicationId}|${s.scheduledTime}`).join(","));
+    snoozeMutation.mutate({ slots: pending, minutes });
   }
   function handleSnoozeAll(event: NextDoseEvent, minutes: number) {
-    eventSlots(event).forEach((slot) => handleSnooze(slot, minutes));
+    handleSnoozeSlots(pendingGroupSlots(event), minutes);
   }
 
   const effectiveTime = (slot: DaySlot) => slotDueTime(slot, date);
@@ -610,13 +635,14 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // overlay's "N medications in group" display, which would then
   // undercount — the same class of bug heroEvents fixed for the Next
   // Dose card above. Look up the full membership from `slots` for
-  // display purposes only.
+  // display purposes only. PRN members are included here (they're excluded
+  // only from the events that trigger the alarm) because Take/Skip/Snooze
+  // All record them too, so the count and manage-each rows must show them.
   const dueNowGroupMembers =
     dueNowEvent?.kind === "group"
       ? slots.filter(
           (s) =>
             s.groupId === dueNowEvent.groupId &&
-            !s.isPrn &&
             slotGroupTime(s, date, slots) === dueNowEvent.time,
         )
       : null;
@@ -728,6 +754,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
               onTakeAll={handleScheduleTakeAll}
               onSkip={handleSkip}
               onSnooze={handleSnooze}
+              onSnoozeAll={handleSnoozeSlots}
               defaultSnoozeMinutes={snoozeSettingQuery.data}
               pendingKey={pendingKey}
             />
