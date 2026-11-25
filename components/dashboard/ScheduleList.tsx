@@ -42,6 +42,7 @@ interface ScheduleListProps {
   onTakeAll: (members: DaySlot[], groupTime: number) => void;
   onSkip: (slot: DaySlot) => void;
   onSnooze: (slot: DaySlot, minutes: number) => void;
+  onSnoozeAll: (slots: DaySlot[], minutes: number) => void;
   defaultSnoozeMinutes?: number;
   pendingKey?: string | null;
 }
@@ -54,6 +55,7 @@ export function ScheduleList({
   onTakeAll,
   onSkip,
   onSnooze,
+  onSnoozeAll,
   defaultSnoozeMinutes,
   pendingKey,
 }: ScheduleListProps) {
@@ -106,6 +108,7 @@ export function ScheduleList({
             onTakeAll={onTakeAll}
             onSkip={onSkip}
             onSnooze={onSnooze}
+            onSnoozeAll={onSnoozeAll}
             defaultSnoozeMinutes={defaultSnoozeMinutes}
             pendingKey={pendingKey}
           />

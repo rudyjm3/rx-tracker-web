@@ -12,7 +12,7 @@ import {
   finalizeMissedDoses,
   getTodayLogs,
   getTodayPostpones,
-  postponeDose,
+  postponeDoses,
   recordDose,
   recordDoseAtTime,
   type DoseFeedback,
@@ -490,8 +490,8 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   });
 
   const snoozeMutation = useMutation({
-    mutationFn: ({ slot, minutes }: { slot: DaySlot; minutes: number }) =>
-      postponeDose(slot.medicationId, date, slot.scheduledTime, minutes),
+    mutationFn: ({ slots, minutes }: { slots: DaySlot[]; minutes: number }) =>
+      postponeDoses(slots, date, minutes),
     onSuccess: (_, { minutes }) => {
       toast.success(`Snoozed for ${minutes} minutes`);
       queryClient.invalidateQueries({ queryKey: ["dose-postpones", date] });
@@ -535,7 +535,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   }
   function handleSnooze(slot: DaySlot, minutes: number) {
     setPendingKey(`${slot.medicationId}|${slot.scheduledTime}`);
-    snoozeMutation.mutate({ slot, minutes });
+    snoozeMutation.mutate({ slots: [slot], minutes });
   }
 
   function eventSlots(event: NextDoseEvent): DaySlot[] {
@@ -544,8 +544,28 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   function handleSkipAll(event: NextDoseEvent) {
     eventSlots(event).forEach(handleSkip);
   }
+  // One write with one shared postponed_until so the group stays a single
+  // card. Includes pending PRN groupmates, which the alarm's event omits.
+  function handleSnoozeSlots(targets: DaySlot[], minutes: number) {
+    const pending = targets.filter((s) => s.status === "pending");
+    if (pending.length === 0) return;
+    setPendingKey(pending.map((s) => `${s.medicationId}|${s.scheduledTime}`).join(","));
+    snoozeMutation.mutate({ slots: pending, minutes });
+  }
   function handleSnoozeAll(event: NextDoseEvent, minutes: number) {
-    eventSlots(event).forEach((slot) => handleSnooze(slot, minutes));
+    if (event.kind === "group") {
+      handleSnoozeSlots(
+        slots.filter(
+          (s) =>
+            s.groupId === event.groupId &&
+            s.status === "pending" &&
+            slotGroupTime(s, date, slots) === event.time,
+        ),
+        minutes,
+      );
+    } else {
+      handleSnoozeSlots(eventSlots(event), minutes);
+    }
   }
 
   const effectiveTime = (slot: DaySlot) => slotDueTime(slot, date);
@@ -728,6 +748,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
               onTakeAll={handleScheduleTakeAll}
               onSkip={handleSkip}
               onSnooze={handleSnooze}
+              onSnoozeAll={handleSnoozeSlots}
               defaultSnoozeMinutes={snoozeSettingQuery.data}
               pendingKey={pendingKey}
             />

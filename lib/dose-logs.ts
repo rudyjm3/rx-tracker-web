@@ -96,17 +96,33 @@ export async function postponeDose(
   scheduledTime: string,
   minutes: number,
 ): Promise<void> {
+  await postponeDoses([{ medicationId, scheduledTime }], scheduledForDate, minutes);
+}
+
+/**
+ * Snoozes several slots at once to ONE shared postponed_until. A group snooze
+ * must stamp every member with the identical instant: computing it per member
+ * lets the members drift apart by milliseconds, and the dashboard — which
+ * groups members by exact due time — then splits the group into
+ * single-medication cards.
+ */
+export async function postponeDoses(
+  slots: { medicationId: string; scheduledTime: string }[],
+  scheduledForDate: string,
+  minutes: number,
+): Promise<void> {
+  if (slots.length === 0) return;
   const supabase = createClient();
   const postponedUntil = new Date(Date.now() + minutes * 60000).toISOString();
 
   const { error } = await supabase.from("dose_postpones").upsert(
-    {
-      medication_id: medicationId,
+    slots.map((s) => ({
+      medication_id: s.medicationId,
       scheduled_for_date: scheduledForDate,
-      scheduled_time: scheduledTime,
+      scheduled_time: s.scheduledTime,
       postponed_until: postponedUntil,
       resolved_at: null,
-    },
+    })),
     { onConflict: "medication_id,scheduled_for_date,scheduled_time" },
   );
   if (error) throw error;

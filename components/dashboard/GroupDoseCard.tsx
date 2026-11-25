@@ -63,6 +63,7 @@ interface GroupDoseCardProps {
   onTakeAll: (members: DaySlot[], groupTime: number) => void;
   onSkip: (slot: DaySlot) => void;
   onSnooze: (slot: DaySlot, minutes: number) => void;
+  onSnoozeAll: (slots: DaySlot[], minutes: number) => void;
   defaultSnoozeMinutes?: number;
   pendingKey?: string | null;
 }
@@ -77,6 +78,7 @@ export function GroupDoseCard({
   onTakeAll,
   onSkip,
   onSnooze,
+  onSnoozeAll,
   defaultSnoozeMinutes,
   pendingKey,
 }: GroupDoseCardProps) {
@@ -121,7 +123,7 @@ export function GroupDoseCard({
     pendingMembers.forEach(onSkip);
   }
   function handleSnoozeAll(minutes: number) {
-    pendingMembers.forEach((m) => onSnooze(m, minutes));
+    onSnoozeAll(pendingMembers, minutes);
   }
 
   return (
