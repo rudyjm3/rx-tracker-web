@@ -246,7 +246,12 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   function alarmAffectedSlots(event: NextDoseEvent): DaySlot[] {
     if (event.kind === "single") return [event.slot];
     const members = dueNowGroupMembers ?? event.members;
-    return affectedGroupMembers(members);
+    // Take All records the whole group: required members (pending or
+    // missed) plus any still-pending PRN groupmates, which the alarm's
+    // event leaves out so they never trigger it on their own.
+    const affected = affectedGroupMembers(members);
+    const prnPending = pendingGroupSlots(event).filter((s) => s.isPrn);
+    return [...affected, ...prnPending.filter((s) => !affected.includes(s))];
   }
   function handleAlarmTakeAll(event: NextDoseEvent) {
     startAlarmTake(alarmAffectedSlots(event), event.time);
@@ -541,8 +546,20 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   function eventSlots(event: NextDoseEvent): DaySlot[] {
     return event.kind === "group" ? event.members : [event.slot];
   }
+  // Every still-pending member of an event's group at its due time,
+  // including PRN ones the alarm's event omits (group actions are all-or-
+  // nothing; individual choices go through Manage Individually).
+  function pendingGroupSlots(event: NextDoseEvent): DaySlot[] {
+    if (event.kind !== "group") return eventSlots(event).filter((s) => s.status === "pending");
+    return slots.filter(
+      (s) =>
+        s.groupId === event.groupId &&
+        s.status === "pending" &&
+        slotGroupTime(s, date, slots) === event.time,
+    );
+  }
   function handleSkipAll(event: NextDoseEvent) {
-    eventSlots(event).forEach(handleSkip);
+    pendingGroupSlots(event).forEach(handleSkip);
   }
   // One write with one shared postponed_until so the group stays a single
   // card. Includes pending PRN groupmates, which the alarm's event omits.
@@ -553,19 +570,7 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
     snoozeMutation.mutate({ slots: pending, minutes });
   }
   function handleSnoozeAll(event: NextDoseEvent, minutes: number) {
-    if (event.kind === "group") {
-      handleSnoozeSlots(
-        slots.filter(
-          (s) =>
-            s.groupId === event.groupId &&
-            s.status === "pending" &&
-            slotGroupTime(s, date, slots) === event.time,
-        ),
-        minutes,
-      );
-    } else {
-      handleSnoozeSlots(eventSlots(event), minutes);
-    }
+    handleSnoozeSlots(pendingGroupSlots(event), minutes);
   }
 
   const effectiveTime = (slot: DaySlot) => slotDueTime(slot, date);
