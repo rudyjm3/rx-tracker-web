@@ -87,6 +87,12 @@ export function GroupDoseCard({
 
   const pendingMembers = members.filter((m) => m.status === "pending");
   const allResolved = pendingMembers.length === 0;
+  // Once every required (non-PRN) member is resolved, the header actions are
+  // done even if an optional PRN member is still pending — it stays
+  // actionable from the expanded list. A PRN-only group keeps its actions.
+  const requiredResolved =
+    members.some((m) => !m.isPrn) && !pendingMembers.some((m) => !m.isPrn);
+  const headerResolved = allResolved || requiredResolved;
   const hasMissedMember = members.some((m) => !m.isPrn && m.status === "missed");
   const disabled = pendingKey !== null;
 
@@ -146,7 +152,7 @@ export function GroupDoseCard({
           </div>
         </div>
 
-        {allResolved ? (
+        {headerResolved ? (
           <div className="flex shrink-0 items-center gap-1.5">
             <Badge variant={summaryVariant(members, date, graceMinutes)} />
             {hasMissedMember && (
