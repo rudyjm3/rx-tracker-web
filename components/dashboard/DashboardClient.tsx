@@ -635,13 +635,14 @@ export function DashboardClient({ setupComplete = false }: { setupComplete?: boo
   // overlay's "N medications in group" display, which would then
   // undercount — the same class of bug heroEvents fixed for the Next
   // Dose card above. Look up the full membership from `slots` for
-  // display purposes only.
+  // display purposes only. PRN members are included here (they're excluded
+  // only from the events that trigger the alarm) because Take/Skip/Snooze
+  // All record them too, so the count and manage-each rows must show them.
   const dueNowGroupMembers =
     dueNowEvent?.kind === "group"
       ? slots.filter(
           (s) =>
             s.groupId === dueNowEvent.groupId &&
-            !s.isPrn &&
             slotGroupTime(s, date, slots) === dueNowEvent.time,
         )
       : null;
